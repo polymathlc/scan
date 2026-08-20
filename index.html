@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- No maximum-scale: iOS has ignored it since iOS 10, so it never stopped the
+     focus zoom it was added for — it only blocked pinch-zoom for low-vision
+     users on other browsers. Fields are 16px on touch instead, which is what
+     actually stops iOS zooming into them. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan &amp; Answer — Polymath Learning Centre</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Scan">
+<meta name="theme-color" content="#FFE0B2">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-soft: #F7F6F4;
+    --ink: #1A1A1A;
+    --ink-soft: #55554F;
+    --ink-faint: #8A8A84;
+    --accent: #FFE0B2;
+    --accent-strong: #FFCC80;
+    --accent-deep: #E8A54B;
+    --line: #ECECEA;
+    --danger: #E53935;
+    --ok: #43A047;
+    --radius: 16px;
+    --radius-sm: 11px;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+    --shadow-btn: 0 1px 2px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.08);
+    --shadow-modal: 0 4px 6px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.1);
+    --font: 'Century Gothic', CenturyGothic, AppleGothic, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: var(--bg-soft);
+    -webkit-text-size-adjust: 100%;
+    line-height: 1.6;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    position: sticky; top: 0; z-index: 60;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 14px 22px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; }
+  .brandMark {
+    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    display: grid; place-items: center;
+    background: var(--accent); font-size: 20px;
+  }
+  .brandText { display: flex; flex-direction: column; line-height: 1.25; }
+  .brandTitle { font-size: 1.06rem; font-weight: 700; letter-spacing: -0.01em; }
+  .brandSub { font-size: 0.74rem; color: var(--ink-faint); }
+  #versionTag { font-size: 0.7rem; color: var(--ink-faint); }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    font-family: var(--font); font-size: 0.88rem; font-weight: 600;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    padding: 10px 16px; cursor: pointer;
+    box-shadow: var(--shadow-btn);
+    transition: transform .08s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .btn:hover:not(:disabled) { background: #FCFBFA; transform: translateY(-1px); }
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn:disabled { opacity: .5; cursor: default; box-shadow: none; }
+  .btnPrimary { background: var(--accent); border-color: var(--accent-strong); }
+  .btnPrimary:hover:not(:disabled) { background: var(--accent-strong); }
+  .btnBig { font-size: 1rem; padding: 14px 24px; }
+  .btnGhost { box-shadow: none; background: transparent; }
+  .btnDanger { color: var(--danger); }
+
+  /* ---------- Layout ---------- */
+  main { max-width: 900px; margin: 0 auto; padding: 28px 20px 80px; }
+  .card {
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow-card);
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  .card h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+  .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  .sub { font-size: 0.87rem; color: var(--ink-soft); line-height: 1.65; }
+  .hint { font-size: 0.78rem; color: var(--ink-faint); }
+  .rowBtns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+  .spacer { flex: 1; }
+
+  /* ---------- Fields ---------- */
+  .fields { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 150px; flex: 1; }
+  .field label { font-size: 0.76rem; font-weight: 700; color: var(--ink-faint); }
+  select, input[type=text], textarea {
+    font-family: var(--font); font-size: 16px; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 11px 13px; width: 100%;
+    -webkit-appearance: none; appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238A8A84' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 13px center; padding-right: 34px;
+  }
+  textarea { resize: vertical; line-height: 1.6; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-strong); outline-offset: 1px; }
+
+  /* ---------- The photo pad ---------- */
+  .pad {
+    margin-top: 20px; border: 2px dashed var(--line); border-radius: var(--radius);
+    background: var(--bg-soft); padding: 34px 22px; text-align: center;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .pad.over { border-color: var(--accent-deep); background: #FFFBF3; }
+  .padIcon { font-size: 34px; }
+  .padTitle { font-weight: 700; margin-top: 10px; }
+  .padSub { font-size: 0.84rem; color: var(--ink-faint); margin-top: 6px; }
+  .padBtns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+
+  /* ---------- Page thumbnails ---------- */
+  .shots { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 20px; }
+  .shot {
+    width: 132px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: var(--bg); overflow: hidden; box-shadow: var(--shadow-btn);
+  }
+  .shot img { display: block; width: 100%; height: 108px; object-fit: cover; background: var(--bg-soft); }
+  .shotBar { display: flex; align-items: center; gap: 2px; padding: 5px 6px; border-top: 1px solid var(--line); }
+  .shotNum { font-size: 0.74rem; font-weight: 700; color: var(--ink-faint); margin-right: auto; padding-left: 3px; }
+  .shotBtn {
+    border: none; background: transparent; cursor: pointer; font-size: 0.82rem;
+    padding: 3px 5px; border-radius: 6px; color: var(--ink-soft); font-family: var(--font);
+  }
+  .shotBtn:hover:not(:disabled) { background: var(--bg-soft); }
+  .shotBtn:disabled { opacity: .3; cursor: default; }
+  .shotState { font-size: 0.7rem; padding: 4px 8px; color: var(--ink-faint); border-top: 1px solid var(--line); }
+  .shotState.err { color: var(--danger); }
+
+  /* ---------- Progress ---------- */
+  .progress { margin-top: 20px; display: none; }
+  .progress.on { display: block; }
+  .progBar { height: 7px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .progFill { height: 100%; width: 0; background: var(--accent-deep); border-radius: 999px; transition: width .3s ease; }
+  .progText { font-size: 0.84rem; color: var(--ink-soft); margin-top: 10px; }
+
+  /* ---------- Answers ---------- */
+  .ansCard {
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 22px 24px; margin-bottom: 16px;
+  }
+  .ansHead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .ansNum {
+    font-size: 0.78rem; font-weight: 700; color: #7A5410;
+    background: #FDF4E3; border: 1px solid #E7BD72; border-radius: 999px; padding: 3px 12px;
+  }
+  .ansPage { font-size: 0.74rem; color: var(--ink-faint); }
+  .ansQ { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.65; white-space: pre-wrap; }
+  .ansOpts { list-style: none; margin: 12px 0 0; display: flex; flex-direction: column; gap: 5px; }
+  .ansOpts li { font-size: 0.86rem; color: var(--ink-soft); padding: 5px 10px; border-radius: 8px; }
+  .ansOpts li.right { background: #EFF8EF; color: #1F5F23; font-weight: 600; }
+  .ansBox { margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm); background: #F4FAF4; border: 1px solid #CFE7D0; }
+  .ansLabel { font-size: 0.72rem; font-weight: 700; color: #2C6B30; letter-spacing: .03em; text-transform: uppercase; }
+  .ansText { font-size: 0.95rem; font-weight: 600; margin-top: 4px; white-space: pre-wrap; }
+  .whyBox { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--line); }
+  .whyLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
+  .whyText { font-size: 0.88rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
+
+  .empty {
+    color: var(--ink-faint); text-align: center; padding: 40px 18px;
+    border: 1px dashed var(--line); border-radius: var(--radius); font-size: 0.9rem;
+  }
+  .hidden { display: none !important; }
+
+  /* ---------- Modals ---------- */
+  .modalBack {
+    position: fixed; inset: 0; z-index: 200; display: none;
+    align-items: center; justify-content: center; padding: 20px;
+    background: rgba(26,26,26,.36);
+  }
+  .modalBack.open { display: flex; }
+  .modalCard {
+    background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow-modal);
+    width: 100%; max-width: 480px; max-height: 88vh; display: flex; flex-direction: column;
+  }
+  .modalCard.wide { max-width: 780px; }
+  .modalHead {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px 24px; border-bottom: 1px solid var(--line);
+  }
+  .modalHead h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
+  .modalBody { padding: 24px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .modalFoot {
+    display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;
+    padding: 16px 24px; border-top: 1px solid var(--line);
+  }
+
+  /* ---------- Teaching notes window ---------- */
+  .tnPanel {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 24px; margin-bottom: 18px; background: var(--bg);
+  }
+  .tnPanel h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  .tnSub { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.65; margin-bottom: 14px; }
+  .tnBtnRow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .tnHint { font-size: 0.76rem; color: var(--ink-faint); }
+  .tnStatus { font-size: 0.85rem; color: var(--ink-soft); margin-top: 14px; line-height: 1.6; }
+  .tnStats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tnStat {
+    flex: 1; min-width: 108px; text-align: center; padding: 14px 10px;
+    border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg-soft);
+  }
+  .tnStat b { display: block; font-size: 1.3rem; }
+  .tnStat span { font-size: 0.74rem; color: var(--ink-faint); }
+  .tnCard {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; margin-bottom: 14px; background: var(--bg);
+  }
+  .tnCardHead { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 10px; }
+  .tnCardId { flex: 1; min-width: 180px; }
+  .tnCardTitle { font-size: 0.98rem; font-weight: 700; }
+  .tnCardMeta { font-size: 0.74rem; color: var(--ink-faint); margin-top: 3px; }
+  .tnCardBtns { display: flex; gap: 8px; }
+  .tnCardBtns .btn { padding: 6px 12px; font-size: 0.8rem; }
+  .tnRow { display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; }
+  .tnLabel { flex: none; width: 132px; font-size: 0.74rem; font-weight: 700; color: var(--ink-faint); padding-top: 3px; }
+  .tnChips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+  .tnChip { font-size: 0.75rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-soft); }
+  .tnChipTopic { background: #EEF5FF; border-color: #B9D3F2; color: #274B77; }
+  .tnChipKw { background: #FDF4E3; border-color: #E7BD72; color: #7A5410; }
+  .tnText { flex: 1; font-size: 0.85rem; line-height: 1.65; white-space: pre-wrap; }
+  .tnTextSoft { color: var(--ink-faint); font-style: italic; }
+  .tnNone { font-size: 0.8rem; color: var(--ink-faint); }
+  .tnFacts { margin-top: 10px; }
+  .tnFacts summary { font-size: 0.8rem; font-weight: 600; color: var(--ink-faint); cursor: pointer; }
+  .tnFacts .tnText { margin-top: 8px; }
+  .tnEmpty { color: var(--ink-faint); text-align: center; padding: 30px 16px; border: 1px dashed var(--line); border-radius: var(--radius); font-size: 0.87rem; margin-bottom: 18px; }
+  .tnListHead { margin: 22px 2px 12px; }
+  .tnListHead h3 { font-size: 1rem; font-weight: 700; }
+  .tnProfile { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .fieldRow { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .fieldRow label { font-size: 0.78rem; font-weight: 700; }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+    background: var(--ink); color: #fff; font-size: 0.87rem;
+    padding: 12px 20px; border-radius: 999px; box-shadow: var(--shadow-modal);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    z-index: 400; max-width: min(92vw, 520px); text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 620px) {
+    header { padding: 12px 16px; }
+    main { padding: 20px 14px 64px; }
+    .card { padding: 20px 18px; }
+    .tnPanel, .tnCard { padding: 18px 16px; }
+    .tnRow { flex-direction: column; gap: 3px; }
+    .tnLabel { width: auto; }
+    .ansCard { padding: 18px 16px; }
+  }
+  @media print {
+    header, .noPrint, #toast, .modalBack { display: none !important; }
+    body { background: #fff; }
+    main { max-width: none; padding: 0; }
+    .ansCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brandMark">📸</div>
+    <div class="brandText">
+      <div class="brandTitle">Scan &amp; Answer</div>
+      <div class="brandSub">Polymath Learning Centre · <span id="versionTag"></span></div>
+    </div>
+  </div>
+  <button class="btn" id="quickNoteBtn" style="display:none">✍️ Add a note</button>
+  <button class="btn" id="notesBtn" style="display:none">📚 Teaching notes</button>
+  <span id="whoAmI" class="hint"></span>
+  <button class="btn" id="signInBtn">Sign in</button>
+  <button class="btn" id="signOutBtn" style="display:none">Sign out</button>
+</header>
+
+<main>
+
+  <!-- ---------- Signed out ---------- -->
+  <section class="card" id="signedOutCard">
+    <h2>Photograph the questions. Get the answers.</h2>
+    <p class="sub">Take a photo of a worksheet or an exam paper — or pick pictures out of your gallery —
+      and every question on them is read and answered, in your teacher's own words.
+      A question that runs over onto the next page is fine: add both pictures and they are read as one paper.</p>
+    <div class="rowBtns"><button class="btn btnPrimary btnBig" id="signInBtn2">Sign in with Google</button></div>
+  </section>
+
+  <!-- ---------- The scan page ---------- -->
+  <section id="scanPage" class="hidden">
+
+    <div class="card">
+      <h2>1. Add your pictures</h2>
+      <p class="sub">Photograph one page at a time, or choose several out of your gallery at once.
+        Keep them in the order they are printed — a question that carries on over the page is stitched
+        back together from the picture before it.</p>
+
+      <div class="fields">
+        <div class="field">
+          <label for="scanLevel">Level</label>
+          <select id="scanLevel">
+            <option value="">Any level</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanSubject">Subject</label>
+          <select id="scanSubject">
+            <option value="">Any subject</option>
+            <option value="science">Science</option>
+            <option value="math">Mathematics</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanDetail">How much explanation</label>
+          <select id="scanDetail">
+            <option value="normal">Answer + short reason</option>
+            <option value="full">Answer + full working</option>
+            <option value="short">Answer only</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="pad" id="scanPad">
+        <div class="padIcon">📷</div>
+        <div class="padTitle">Take a photo or choose from your gallery</div>
+        <div class="padSub" id="padSub">On a computer you can also drag pictures in, or paste one with Ctrl&nbsp;+&nbsp;V.</div>
+        <div class="padBtns">
+          <button class="btn btnPrimary" id="cameraBtn">📷 Take a photo</button>
+          <button class="btn" id="galleryBtn">🖼 Choose pictures</button>
+        </div>
+      </div>
+
+      <!-- The picker's value is cleared BEFORE the files are queued: an input
+           still holding last time's file fires no `change` for the same photo
+           picked twice, so the second tap would do nothing at all. -->
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple style="display:none">
+      <input type="file" id="galleryInput" accept="image/*" multiple style="display:none">
+
+      <div class="shots" id="shots"></div>
+
+      <div class="rowBtns" id="scanActions" style="display:none">
+        <button class="btn btnPrimary btnBig" id="readBtn">✨ Read &amp; answer</button>
+        <button class="btn" id="clearShotsBtn">Remove all pictures</button>
+        <span class="hint" id="shotCount"></span>
+      </div>
+
+      <div class="progress" id="scanProgress">
+        <div class="progBar"><div class="progFill" id="progFill"></div></div>
+        <div class="progText" id="progText"></div>
+      </div>
+    </div>
+
+    <div id="answersWrap" class="hidden">
+      <div class="card noPrint">
+        <div class="rowBtns" style="margin-top:0">
+          <h2 id="answersTitle" style="margin:0">2. The answers</h2>
+          <div class="spacer"></div>
+          <button class="btn" id="copyAnswersBtn">📋 Copy</button>
+          <button class="btn" id="printAnswersBtn">🖨 Print</button>
+        </div>
+        <p class="sub" id="answersNote" style="margin-top:10px"></p>
+      </div>
+      <div id="answersList"></div>
+    </div>
+
+  </section>
+</main>
+
+<!-- ---------- 📚 Teaching notes ---------- -->
+<div class="modalBack" id="notesModal">
+  <div class="modalCard wide">
+    <div class="modalHead">
+      <h2>📚 Teaching notes</h2>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn btnGhost" id="notesCloseBtn">✕</button>
+    </div>
+    <div class="modalBody" id="notesBody"></div>
+  </div>
+</div>
+<input type="file" id="notesFileInput" accept="application/pdf,image/*" multiple style="display:none">
+
+<!-- ---------- ✍️ Add a note ---------- -->
+<div class="modalBack" id="quickNoteModal">
+  <div class="modalCard">
+    <div class="modalHead"><h2>✍️ Add a note</h2></div>
+    <div class="modalBody">
+      <p class="sub" style="margin-bottom:16px">House rules in your own words. They go into the prompt
+        exactly as you type them — nothing is extracted, nothing is summarised — so every answer this app
+        writes follows them from the next question onwards. They are shared with Ans Key and the Science
+        Learning Portal.</p>
+      <div class="fieldRow">
+        <label for="qnTitle">Title <span class="hint">(optional)</span></label>
+        <input type="text" id="qnTitle" placeholder="e.g. Always name the process">
+      </div>
+      <div class="fieldRow">
+        <label for="qnText">The note</label>
+        <textarea id="qnText" rows="6" placeholder="e.g. Always give the answer in a full sentence and name the process — “evaporation”, not “it dries up”."></textarea>
+      </div>
+      <div class="tnStatus" id="qnStatus" style="display:none"></div>
+    </div>
+    <div class="modalFoot">
+      <button class="btn" id="quickNoteCancelBtn">Cancel</button>
+      <button class="btn btnPrimary" id="quickNoteSaveBtn">Save note</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Edit an uploaded note ---------- -->
+<div class="modalBack" id="noteEditModal">
+  <div class="modalCard wide">
+    <div class="modalHead"><h2>✎ Edit these notes</h2></div>
+    <div class="modalBody">
+      <div class="fieldRow"><label for="nteTitle">Title</label><input type="text" id="nteTitle"></div>
+      <div class="fieldRow"><label for="nteSubjects">Subjects <span class="hint">(math, science — blank means every subject)</span></label><input type="text" id="nteSubjects"></div>
+      <div class="fieldRow"><label for="nteLevels">Levels <span class="hint">(P3, P4, P5, P6, S1 — blank means every level)</span></label><input type="text" id="nteLevels"></div>
+      <div class="fieldRow"><label for="nteGuide">General guidance <span class="hint">(obeyed word for word on every question)</span></label><textarea id="nteGuide" rows="4"></textarea></div>
+      <div class="fieldRow"><label for="nteKeywords">Keywords <span class="hint">(comma separated)</span></label><textarea id="nteKeywords" rows="3"></textarea></div>
+      <div class="fieldRow"><label for="nteStandards">Marking standards</label><textarea id="nteStandards" rows="4"></textarea></div>
+      <div class="fieldRow"><label for="nteFacts">Key facts</label><textarea id="nteFacts" rows="6"></textarea></div>
+      <div class="fieldRow"><label for="nteComment">Your comment</label><textarea id="nteComment" rows="2"></textarea></div>
+    </div>
+    <div class="modalFoot">
+      <button class="btn" id="noteEditCancelBtn">Cancel</button>
+      <button class="btn btnPrimary" id="noteEditSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   SCAN & ANSWER — Polymath Learning Centre
+   ---------------------------------------------------------------------
+   Photograph a worksheet or an exam paper; every question printed on the
+   pictures is read and answered.
+
+   THE AI IS THE ANS KEY APP'S, PORTED WHOLE. The teaching notes, the style
+   profile learned from the teacher's own worksheets, the one grounding
+   function every AI call goes through, the tolerant JSON parser and the
+   Gemini bridge are all lifts from `polymathlc/anskey` — the same notebook
+   at users/{adminUid}/teachingNotes, the same style corpus at
+   users/{adminUid}/aiTraining/answerStyle. Keep the field names and the
+   digest shapes in step with that app (and with `polymathlc/cer`, which
+   shares the notebook too): a rename here silently ungrounds the others —
+   nothing throws, the digests just come back empty.
+   ===================================================================== */
+
+var APP_VERSION = 'v1.0.0';
+var ADMIN_EMAIL = 'chungzhikai@gmail.com';
+var ADMIN_DISPLAY_NAME = 'Mr Chung';
+
+document.getElementById('versionTag').textContent = APP_VERSION;
+
+firebase.initializeApp({
+  apiKey: "AIzaSyAUSI3Uh28IeqASEp0JhH4QPaVt-O3meBo",   // public Firebase web API key (NOT a secret)
+  authDomain: "mathgen--app.firebaseapp.com",
+  projectId: "mathgen--app",
+  storageBucket: "mathgen--app.firebasestorage.app",
+  messagingSenderId: "165654161198",
+  appId: "1:165654161198:web:16c8bd60eb3a2aa7edbcbf",
+  measurementId: "G-0MWZFG211D"
+});
+var db = firebase.firestore();
+var auth = firebase.auth();
+
+/* ================= Small helpers ================= */
+function $(id) { return document.getElementById(id); }
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+var toastTimer = null;
+function toast(msg, ms) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('show'); }, ms || 2800);
+}
+
+var currentUser = null;
+function isAdmin(user) { return !!user && user.email === ADMIN_EMAIL; }
+
+/* Every level the centre teaches, in teaching order — the same list the
+   other Polymath apps use, so a note tagged P5 there means P5 here. */
+var LEVELS = ['P3', 'P4', 'P5', 'P6', 'S1'];
+function levelLabel(l) { return l === 'S1' ? 'Sec 1' : (l || ''); }
+function subjectLabel(s) {
+  return s === 'math' ? 'Mathematics' : s === 'science' ? 'Science' : s === 'both' ? 'Maths & Science' : '';
+}
+
+/* What the notes are being applied to right now. The scan has no worksheet
+   to read a subject and a level off, so the two pickers ARE that context —
+   `noteAppliesHere` reads this object exactly as the Ans Key app reads its
+   own `wsMeta`. */
+var wsMeta = { level: '', subject: '' };
+
+/* ================= Tolerant JSON parse for model output =================
+   Strips code fences, finds the array/object, and repairs a reply that was
+   cut off mid-value. Keep in sync with the other Polymath apps. */
+function _parseAIJson(raw) {
+  let s = (raw || '').trim();
+  if (!s) throw new Error('empty AI response — please try again');
+  s = s.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const start = s.search(/[\[{]/);
+  if (start > 0) s = s.slice(start);
+  try { return JSON.parse(s); }
+  catch (firstErr) {
+    // Trailing junk after the JSON (a closing ``` fence, a "Note: …") makes
+    // JSON.parse throw 'unexpected non-whitespace character after JSON' —
+    // cut the string at the end of the first complete value and retry.
+    const cut = _jsonEndIndex(s);
+    if (cut > 0) {
+      try { return JSON.parse(s.slice(0, cut)); } catch (_) {}
+      try { return JSON.parse(_repairAIJson(s.slice(0, cut))); } catch (_) {}
+    }
+    try { return JSON.parse(_repairAIJson(s)); }
+    catch (_) { throw firstErr; }
+  }
+}
+
+/* Index just past the end of the first complete JSON object/array in s,
+   or -1 if it never closes (truncated output — the repair pass handles it). */
+function _jsonEndIndex(s) {
+  let inString = false, escaped = false, depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inString) {
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+/* Best-effort repair for slightly-malformed or TRUNCATED model JSON. */
+function _repairAIJson(s) {
+  s = String(s || '');
+  let out = '', inString = false, escaped = false;
+  const closers = [];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inString) {
+      if (escaped) { out += ch; escaped = false; continue; }
+      if (ch === '\\') { out += ch; escaped = true; continue; }
+      if (ch === '"') {
+        // Only a real close-quote if what follows continues the JSON
+        // structure; otherwise it is an unescaped quote INSIDE the string
+        // (e.g. an answer quoting the word "friction") — escape it.
+        let j = i + 1;
+        while (j < s.length && ' \t\r\n'.includes(s[j])) j++;
+        const nxt = j < s.length ? s[j] : '';
+        let close = false;
+        if (!nxt || ':}]'.includes(nxt)) close = true;
+        else if (nxt === ',') {
+          let k = j + 1;
+          while (k < s.length && ' \t\r\n'.includes(s[k])) k++;
+          close = k >= s.length || '"{[}]-0123456789'.includes(s[k]) ||
+                  /^(true|false|null)\b/.test(s.slice(k, k + 6));
+        }
+        if (close) { out += ch; inString = false; } else out += '\\"';
+        continue;
+      }
+      if (ch === '\n') { out += '\\n'; continue; }
+      if (ch === '\r') { continue; }
+      if (ch === '\t') { out += '\\t'; continue; }
+      out += ch; continue;
+    }
+    if (ch === '"') { out += ch; inString = true; continue; }
+    if (ch === '{') closers.push('}');
+    else if (ch === '[') closers.push(']');
+    else if ((ch === '}' || ch === ']') && closers[closers.length - 1] === ch) closers.pop();
+    out += ch;
+  }
+  if (inString) out += '"';
+  // A response cut off in the middle of a KEY leaves a dangling key that no
+  // amount of bracket-closing fixes — drop it.
+  out = out.replace(/([{,]\s*)"(?:[^"\\]|\\.)*"\s*:?\s*$/, '$1').replace(/,\s*$/, '');
+  while (closers.length) out += closers.pop();
+  return out;
+}
+
+/* ================= Teaching notes & AI style training =================
+   Ported whole from the Ans Key app (`polymathlc/anskey`) — same collection,
+   same field names, same digests. One notebook grounds three apps.
+
+   TWO SOURCES, ONE VOICE
+   ----------------------
+   1. TEACHING NOTES — the teacher's own notes, uploaded on the 📚 Teaching
+      notes window here, in Ans Key, or in the Science Learning Portal. They
+      live at
+        users/{adminUid}/teachingNotes/{id}
+      and Gemini pulls the topics, the KEYWORDS students must use, the
+      marking standards and the key facts out of each upload once. Fields are
+      kept compatible on purpose: `topics` stays reserved for the Portal's
+      syllabus list (this app writes it EMPTY, so a note written here reads
+      as a general note there instead of one tagged with topics it has never
+      heard of), and this app's own free wording goes in `noteTopics` /
+      `subjects` / `levels`. `guidance` is Ans Key's own field — standing
+      instructions typed by hand — and is read here for the same reason.
+   2. THE TEACHER'S OWN ANSWERS — the style profile Ans Key distils from the
+      answers the teacher has written on their own worksheets, at
+        users/{adminUid}/aiTraining/answerStyle
+      This app READS that profile and never writes to it: nothing scanned
+      here is an answer the teacher wrote, so there is nothing honest to
+      learn from. Press "Learn from this worksheet" in Ans Key and every
+      answer this app writes sharpens with it.
+
+   The digests are appended to the SYSTEM prompt of the scan, through the ONE
+   function `aiGrounding(kind)`. Adding an AI feature means calling it too:
+   grounding one call site and not another is how the AI ends up answering in
+   the teacher's voice on one button and not the next. */
+
+var TEACHING_NOTES_COLL = 'teachingNotes';
+var AI_TRAINING_COLL = 'aiTraining';
+var AI_STYLE_DOC = 'answerStyle';
+/* A student's device has no idea who the teacher is. The Science Learning
+   Portal publishes the pointer at config/admin — the same document students
+   there resolve the question bank from — so that is what is read, and
+   remembered so the next visit costs nothing. */
+var NOTES_OWNER_KEY = 'scanNotesOwnerUid';
+
+var teachingNotes = [];       // [{ id, title, keywords[], markingStandards, keyFacts, guidance, … }]
+var aiStyle = null;           // { samples: [], profile: {}, profileSamples, … } — read only here
+var notesOwnerUid = '';
+var notesLoaded = false;
+var notesLoading = null;      // in-flight load, so ten callers make one read
+var notesBusy = false;        // an upload is going on
+
+/* How much of the notebook reaches a prompt. Every AI call pays for these
+   tokens, so they are deliberately tight — the digest is a reminder of house
+   style, not the notes themselves. */
+var NOTES_KW_MAX = 40;
+var NOTES_STD_CHARS = 900;
+var NOTES_FACT_CHARS = 1400;
+/* Standing instructions are typed by hand and meant to be obeyed, so they get
+   their own budget and reach EVERY kind of call — marking included. */
+var NOTES_GUIDE_CHARS = 1600;
+var STYLE_RULE_CHARS = 800;
+var STYLE_EX_MAX = 6;
+
+function notesOwner() {
+  if (isAdmin(currentUser)) return currentUser.uid;
+  if (notesOwnerUid) return notesOwnerUid;
+  try { return localStorage.getItem(NOTES_OWNER_KEY) || ''; } catch (e) { return ''; }
+}
+function notesCollRef(owner) {
+  return db.collection('users').doc(owner).collection(TEACHING_NOTES_COLL);
+}
+function styleDocRef(owner) {
+  return db.collection('users').doc(owner).collection(AI_TRAINING_COLL).doc(AI_STYLE_DOC);
+}
+
+/* Who the teacher is, for anyone who is not the teacher. The pointer is the
+   Science Learning Portal's config/admin — one read, then remembered. A read
+   that fails is not an error worth showing: the AI simply carries on
+   ungrounded, exactly as it did before any of this existed. */
+async function resolveNotesOwner() {
+  if (isAdmin(currentUser)) return currentUser.uid;
+  if (notesOwnerUid) return notesOwnerUid;
+  try {
+    var cached = localStorage.getItem(NOTES_OWNER_KEY) || '';
+    if (cached) { notesOwnerUid = cached; return cached; }
+  } catch (e) {}
+  try {
+    var snap = await db.collection('config').doc('admin').get();
+    var uid = snap.exists && snap.data() && snap.data().uid;
+    if (uid) {
+      notesOwnerUid = uid;
+      try { localStorage.setItem(NOTES_OWNER_KEY, uid); } catch (e) {}
+      return uid;
+    }
+  } catch (e) { console.warn('Could not work out whose notes to read', e); }
+  return '';
+}
+
+/* Notes + style profile in one go. A read that is denied (a student whose
+   rules do not allow the teacher's notes, an offline device) is not an error
+   worth showing — the AI carries on ungrounded. */
+function loadTeachingNotes(force) {
+  if (notesLoaded && !force) return Promise.resolve(teachingNotes);
+  if (notesLoading) return notesLoading;
+  notesLoading = resolveNotesOwner().then(function (owner) {
+    if (!owner) { notesLoading = null; return teachingNotes; }
+    return Promise.all([
+      notesCollRef(owner).get().then(function (snap) {
+        var list = [];
+        snap.forEach(function (d) {
+          var n = d.data();
+          if (n) { n.id = d.id; list.push(n); }
+        });
+        list.sort(function (a, b) {
+          return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+        });
+        teachingNotes = list;
+      }).catch(function (e) { console.warn('Teaching notes could not be read', e); }),
+      styleDocRef(owner).get().then(function (snap) {
+        aiStyle = snap.exists ? snap.data() : null;
+      }).catch(function (e) { console.warn('AI style profile could not be read', e); })
+    ]).then(function () {
+      notesLoaded = true;
+      notesLoading = null;
+      if ($('notesModal').classList.contains('open')) renderNotesBody();
+      return teachingNotes;
+    });
+  });
+  return notesLoading;
+}
+
+/* ---- Which notes apply here ----
+   A note may name the subjects and levels it belongs to; one that names
+   neither is general and applies to everything. If nothing matches what is
+   being scanned the whole notebook is used rather than none of it — a
+   teacher who uploaded notes expects them to be read. */
+function noteAppliesHere(n) {
+  var subj = wsMeta.subject || '';
+  var lvl = wsMeta.level || '';
+  var subs = Array.isArray(n.subjects) ? n.subjects.filter(Boolean) : [];
+  var lvls = Array.isArray(n.levels) ? n.levels.filter(Boolean) : [];
+  if (subs.length && subj && subs.indexOf(subj) === -1 && subs.indexOf('both') === -1 && subj !== 'both') return false;
+  if (lvls.length && lvl && lvls.indexOf(lvl) === -1) return false;
+  return true;
+}
+function notesRelevant() {
+  if (!teachingNotes.length) return [];
+  var rel = teachingNotes.filter(noteAppliesHere);
+  return rel.length ? rel : teachingNotes;
+}
+function notesJoinField(rel, field, cap) {
+  var s = rel.map(function (n) { return String(n[field] || '').trim(); })
+             .filter(Boolean).join('\n').trim();
+  return s.length > cap ? s.slice(0, cap) : s;
+}
+function notesKeywordList(rel) {
+  var seen = {}, out = [];
+  rel.forEach(function (n) {
+    (n.keywords || []).forEach(function (k) {
+      var s = String(k).trim();
+      var key = s.toLowerCase();
+      if (s && !seen[key] && out.length < NOTES_KW_MAX) { seen[key] = 1; out.push(s); }
+    });
+  });
+  return out;
+}
+
+/* ---- The style profile, in prompt form ---- */
+function styleProfile() {
+  return (aiStyle && aiStyle.profile) || null;
+}
+function styleSamples() {
+  return (aiStyle && Array.isArray(aiStyle.samples)) ? aiStyle.samples : [];
+}
+function styleExemplars() {
+  var p = styleProfile();
+  var ex = (p && Array.isArray(p.exemplars)) ? p.exemplars : [];
+  return ex.filter(function (e) { return e && e.a; }).slice(0, STYLE_EX_MAX);
+}
+function styleBlock(kind) {
+  var p = styleProfile();
+  if (!p) return '';
+  var bits = [];
+  var rules = String(p.styleRules || '').trim().slice(0, STYLE_RULE_CHARS);
+  var phrasing = String(p.phrasing || '').trim().slice(0, 400);
+  var marking = String(p.markingStandards || '').trim().slice(0, 500);
+  if (rules) bits.push('How this teacher writes answers: ' + rules);
+  if (phrasing) bits.push('Phrasing: ' + phrasing);
+  if (kind === 'mark' && marking) bits.push('How this teacher marks: ' + marking);
+  var kw = (Array.isArray(p.keywords) ? p.keywords : []).slice(0, 24)
+             .map(function (s) { return String(s).trim(); }).filter(Boolean);
+  if (kw.length) bits.push('Words the teacher uses again and again: ' + kw.join(', ') + '.');
+  if (kind !== 'mark') {
+    var ex = styleExemplars();
+    if (ex.length) {
+      bits.push('Real answers this teacher has written on past worksheets — match their length, tone and level of detail:\n' +
+        ex.map(function (e) {
+          var q = String(e.q || '').trim().slice(0, 220);
+          return '• ' + (q ? q + ' → ' : '') + String(e.a).trim().slice(0, 260);
+        }).join('\n'));
+    }
+  }
+  if (!bits.length) return '';
+  return "\n\nTHE TEACHER'S OWN STYLE (learned from " +
+    ((aiStyle && aiStyle.profileSamples) || styleSamples().length) +
+    ' answers they have written on their own worksheets):\n' + bits.join('\n');
+}
+
+/* ---- The notebook, in prompt form ----
+   kind: 'answer'  writing an answer or an answer key
+         'mark'    marking a student's answer
+         'teach'   explaining */
+function notesBlock(kind) {
+  var rel = notesRelevant();
+  if (!rel.length) return '';
+  var kw = notesKeywordList(rel);
+  var std = notesJoinField(rel, 'markingStandards', NOTES_STD_CHARS);
+  var facts = notesJoinField(rel, 'keyFacts', NOTES_FACT_CHARS);
+  var com = notesJoinField(rel, 'comment', 300);
+  var bits = [];
+  if (kw.length) {
+    bits.push(kind === 'mark'
+      ? 'Preferred keywords — expect and accept these exact terms in a full-mark answer: ' + kw.join(', ') + '.'
+      : 'Preferred vocabulary — use these exact terms wherever they fit: ' + kw.join(', ') + '.');
+  }
+  if (std) bits.push('Marking standards from those notes: ' + std);
+  if (facts && kind !== 'mark') bits.push('Key facts taught:\n' + facts);
+  if (com) bits.push("The teacher's own guidance on these notes: " + com);
+  if (!bits.length) return '';
+  return "\n\nTHE TEACHER'S REFERENCE NOTES (their own uploaded notes — the syllabus as THEY teach it):\n" +
+    bits.join('\n');
+}
+
+/* ---- The general guidance, in prompt form ----
+   The teacher's own standing instructions, typed straight in with "Add a
+   note". Unlike the extracted fields these are house rules, so they go to
+   every kind of call and they lead the digest. */
+function notesGuidance() {
+  return notesJoinField(notesRelevant(), 'guidance', NOTES_GUIDE_CHARS);
+}
+function guidanceBlock() {
+  var guide = notesGuidance();
+  if (!guide) return '';
+  return "\n\nTHE TEACHER'S GENERAL GUIDANCE (standing instructions they typed themselves — house rules for this app, obey them on every question):\n" +
+    guide;
+}
+
+/* Everything the AI should know about this teacher, appended to a system
+   prompt. ONE call site per AI feature, so nothing can be grounded on the
+   notes in one place and not another. */
+function aiGrounding(kind) {
+  var guide = guidanceBlock();
+  var notes = notesBlock(kind);
+  var style = styleBlock(kind);
+  if (!guide && !notes && !style) return '';
+  var authority = kind === 'mark'
+    ? "\n\nAUTHORITY ORDER: the teacher's model answer (when one is attached) always wins — never mark against it. Then the general guidance above. Use the notes and the style for the keywords, the phrasing and the standard expected; fall back to ordinary syllabus knowledge only where they say nothing."
+    : "\n\nAUTHORITY ORDER: what the paper itself prints or shows always wins — never contradict it. Then the general guidance above. Otherwise base the content AND the wording on the notes and the style, and fall back to ordinary syllabus knowledge only where they say nothing.";
+  return guide + notes + style + authority;
+}
+
+/* Whether the answers about to be written are grounded on anything at all —
+   said on the page, because an ungrounded answer looks identical to a
+   grounded one and the teacher would never know. */
+function groundingSummary() {
+  var rel = notesRelevant();
+  var guide = rel.filter(function (n) { return String(n.guidance || '').trim(); }).length;
+  var kw = notesKeywordList(rel).length;
+  var bits = [];
+  if (guide) bits.push(guide + ' standing note' + (guide === 1 ? '' : 's'));
+  if (rel.length - guide > 0) bits.push((rel.length - guide) + ' set' + (rel.length - guide === 1 ? '' : 's') + ' of notes');
+  if (kw) bits.push(kw + ' keyword' + (kw === 1 ? '' : 's'));
+  if (styleProfile()) bits.push('your learned style');
+  return bits;
+}
+
+/* ================= Uploading notes ================= */
+function styleTrim(s, cap) {
+  s = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+  return s.length > cap ? s.slice(0, cap) : s;
+}
+function notesFileToBase64(f) {
+  return new Promise(function (resolve, reject) {
+    var r = new FileReader();
+    r.onload = function () { resolve(String(r.result).split(',')[1]); };
+    r.onerror = function () { reject(new Error('could not read “' + f.name + '”')); };
+    r.readAsDataURL(f);
+  });
+}
+
+async function notesHandleFiles(files) {
+  files = Array.isArray(files) ? files : [files];
+  if (!files.length || !isAdmin(currentUser)) return;
+  if (notesBusy) { toast('Still working on the last upload — one moment…'); return; }
+  if (!window.askGemini || !window.aiReady || !window.aiReady()) {
+    toast('AI is not available — check your connection and reload the page.', 5000);
+    return;
+  }
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    var ok = f.type === 'application/pdf' || (f.type && f.type.indexOf('image/') === 0);
+    if (!ok) { toast('“' + f.name + '” is not a PDF or an image — choose PDFs and/or photos only.', 5000); return; }
+  }
+  var total = files.reduce(function (s, f) { return s + f.size; }, 0);
+  if (total > 18 * 1024 * 1024) {
+    toast('Those files are too big together (about 18 MB per upload) — split them into two uploads.', 6000);
+    return;
+  }
+  var comment = ($('notesComment') ? $('notesComment').value : '').trim();
+  notesBusy = true;
+  renderNotesBody();
+  notesSetStatus(files.length === 1
+    ? '⏳ Reading “' + files[0].name + '” — pulling out the keywords, the marking standards and the key facts…'
+    : '⏳ Reading ' + files.length + ' files together — pulling out the keywords, the marking standards and the key facts…');
+  try {
+    var media = [];
+    for (var j = 0; j < files.length; j++) {
+      media.push({ mimeType: files[j].type, data: await notesFileToBase64(files[j]) });
+    }
+    var docDesc = files.length === 1
+      ? 'the attached ' + (files[0].type === 'application/pdf' ? 'PDF' : 'image')
+      : 'the ' + files.length + ' attached files, which together form ONE set of notes — read them in the order attached and analyse them as a single document';
+    var prompt =
+      "You are analysing a tuition teacher's own reference notes (" + docDesc + ') for a ' +
+      'Singapore primary-to-lower-secondary (P3 to Sec 1) app that reads photographs of worksheets ' +
+      'and exam papers and answers every question on them in that teacher\'s style.\n' +
+      (comment ? 'The teacher says about this document: "' + comment + '".\n' : '') +
+      'Extract the teaching content and return ONLY JSON:\n' +
+      '{"title":"a short descriptive title for these notes",' +
+      '"subjects":["math and/or science — only the subjects this document is about, from EXACTLY: math; science"],' +
+      '"levels":["only the levels this document is for, from EXACTLY: ' + LEVELS.join('; ') + ' — leave empty if it suits every level"],' +
+      '"noteTopics":["the topics this document covers, in the document\'s own words"],' +
+      '"keywords":["the EXACT terms and key phrases students are expected to use in their answers, most important first — copy the document\'s own wording"],' +
+      '"markingStandards":"how answers should be phrased and marked according to this document: required sentence patterns, terms that MUST appear for full marks, acceptable alternatives, common mistakes to penalise (plain text, at most 1200 characters)",' +
+      '"keyFacts":"the key facts, rules, formulas and methods taught, one short line each, separated by \\n (plain text, at most 1500 characters)"}\n' +
+      'Rules:\n- 10 to 40 keywords, each 1-4 words, no duplicates, most important first.\n' +
+      '- "subjects" and "levels" only from the lists given, and only when the document really is limited to them; an empty list means it applies to everything.\n' +
+      '- Plain text only, no markdown.';
+    var raw = await window.askGemini(prompt, {
+      system: 'You read a teacher\'s notes and return strict JSON. No markdown, no commentary.',
+      maxOutputTokens: 3072, temperature: 0.2, json: true, images: media
+    });
+    var p = _parseAIJson(raw) || {};
+    var subjOk = { math: 1, science: 1 };
+    var note = {
+      title: styleTrim(p.title, 140) || files[0].name || 'Untitled notes',
+      fileName: files.map(function (f) { return f.name || ''; }).filter(Boolean).join(', '),
+      comment: comment,
+      // `topics` belongs to the Science Learning Portal's syllabus list — left
+      // empty here so a note written in this app reads as a general note
+      // there instead of one tagged with topics it has never heard of.
+      topics: [],
+      noteTopics: (Array.isArray(p.noteTopics) ? p.noteTopics : [])
+        .map(function (s) { return styleTrim(s, 60); }).filter(Boolean).slice(0, 20),
+      subjects: (Array.isArray(p.subjects) ? p.subjects : [])
+        .map(function (s) { return String(s).toLowerCase().trim(); })
+        .filter(function (s) { return subjOk[s]; }),
+      levels: (Array.isArray(p.levels) ? p.levels : [])
+        .map(function (s) { return String(s).toUpperCase().trim(); })
+        .filter(function (s) { return LEVELS.indexOf(s) !== -1; }),
+      keywords: (Array.isArray(p.keywords) ? p.keywords : [])
+        .map(function (s) { return styleTrim(s, 60); }).filter(Boolean).slice(0, 60),
+      markingStandards: styleTrim(p.markingStandards, 1600),
+      keyFacts: String(p.keyFacts || '').trim().slice(0, 2000),
+      source: 'scan',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    var id = 'note_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    await notesCollRef(currentUser.uid).doc(id).set(note);
+    note.id = id;
+    teachingNotes.unshift(note);
+    if ($('notesComment')) $('notesComment').value = '';
+    toast('✅ “' + note.title + '” analysed — ' + note.keywords.length + ' keywords. Every answer follows them from now on.', 6000);
+  } catch (e) {
+    console.error('Notes analysis failed', e);
+    toast('Could not read those notes: ' + ((e && e.message) || e), 6000);
+  } finally {
+    notesBusy = false;
+    notesSetStatus('');
+    renderNotesBody();
+  }
+}
+
+/* ================= Adding a note by hand =================
+   No file, no AI call, no waiting: what is typed is saved verbatim as a note
+   with no subject and no level — so it applies to everything — and carried
+   into every AI call as a standing instruction. `guidance` is Ans Key's
+   field; the Science Learning Portal shares the collection, which is why the
+   general fields are still written, empty. */
+function quickNoteTitleFrom(text) {
+  var first = String(text || '').split('\n')[0].replace(/\s+/g, ' ').trim();
+  if (!first) return 'Quick note';
+  return first.length > 60 ? first.slice(0, 60).trim() + '…' : first;
+}
+function quickNoteStatus(msg) {
+  var el = $('qnStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? '' : 'none';
+}
+function openQuickNoteModal() {
+  if (!isAdmin(currentUser)) return;
+  quickNoteStatus('');
+  $('quickNoteModal').classList.add('open');
+  setTimeout(function () { if ($('qnText')) $('qnText').focus(); }, 50);
+}
+function closeQuickNoteModal() { $('quickNoteModal').classList.remove('open'); }
+
+async function quickNoteSave() {
+  if (!isAdmin(currentUser)) return;
+  var text = ($('qnText') ? $('qnText').value : '').trim();
+  if (!text) {
+    quickNoteStatus('Type the note first — one line is enough.');
+    if ($('qnText')) $('qnText').focus();
+    return;
+  }
+  var typed = ($('qnTitle') ? $('qnTitle').value : '').trim();
+  var note = {
+    title: styleTrim(typed, 140) || quickNoteTitleFrom(text),
+    fileName: '',
+    comment: '',
+    guidance: text.slice(0, 4000),
+    noteKind: 'guidance',
+    topics: [],
+    noteTopics: [],
+    subjects: [],
+    levels: [],
+    keywords: [],
+    markingStandards: '',
+    keyFacts: '',
+    source: 'scan',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  var btn = $('quickNoteSaveBtn');
+  if (btn) btn.disabled = true;
+  quickNoteStatus('⏳ Saving…');
+  try {
+    var id = 'note_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    await notesCollRef(currentUser.uid).doc(id).set(note);
+    note.id = id;
+    teachingNotes.unshift(note);
+    if ($('qnText')) $('qnText').value = '';
+    if ($('qnTitle')) $('qnTitle').value = '';
+    quickNoteStatus('');
+    closeQuickNoteModal();
+    renderNotesBody();
+    toast('✅ Noted — the AI follows “' + note.title + '” from now on.', 5000);
+  } catch (e) {
+    console.error('Quick note failed', e);
+    quickNoteStatus('Could not save: ' + ((e && e.message) || e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function notesDelete(id) {
+  var n = teachingNotes.filter(function (x) { return x.id === id; })[0];
+  if (!n || !isAdmin(currentUser)) return;
+  if (!confirm('Delete “' + (n.title || n.fileName || 'this note') + '”?\n\nThe AI stops using its keywords and marking standards — in this app, in Ans Key and in the Learning Portal.')) return;
+  try {
+    await notesCollRef(currentUser.uid).doc(id).delete();
+    teachingNotes = teachingNotes.filter(function (x) { return x.id !== id; });
+    renderNotesBody();
+    toast('Note deleted.');
+  } catch (e) {
+    toast('Could not delete: ' + ((e && e.message) || e), 5000);
+  }
+}
+
+/* ---- Editing what the AI extracted ---- */
+var noteEditId = null;
+function notesEditOpen(id) {
+  var n = teachingNotes.filter(function (x) { return x.id === id; })[0];
+  if (!n) return;
+  noteEditId = id;
+  $('nteTitle').value = n.title || '';
+  $('nteSubjects').value = (n.subjects || []).join(', ');
+  $('nteLevels').value = (n.levels || []).join(', ');
+  $('nteKeywords').value = (n.keywords || []).join(', ');
+  $('nteStandards').value = n.markingStandards || '';
+  $('nteFacts').value = n.keyFacts || '';
+  $('nteGuide').value = n.guidance || '';
+  $('nteComment').value = n.comment || '';
+  $('noteEditModal').classList.add('open');
+  setTimeout(function () { $('nteTitle').focus(); }, 50);
+}
+function notesEditClose() {
+  $('noteEditModal').classList.remove('open');
+  noteEditId = null;
+}
+async function notesEditSave() {
+  var n = teachingNotes.filter(function (x) { return x.id === noteEditId; })[0];
+  if (!n || !isAdmin(currentUser)) { notesEditClose(); return; }
+  var subjOk = { math: 1, science: 1 };
+  n.title = styleTrim($('nteTitle').value, 140) || n.fileName || 'Untitled notes';
+  n.subjects = $('nteSubjects').value.split(',').map(function (s) { return s.toLowerCase().trim(); })
+    .filter(function (s) { return subjOk[s]; });
+  n.levels = $('nteLevels').value.split(',').map(function (s) { return s.toUpperCase().trim(); })
+    .filter(function (s) { return LEVELS.indexOf(s) !== -1; });
+  n.keywords = $('nteKeywords').value.split(/[,\n]/).map(function (s) { return styleTrim(s, 60); })
+    .filter(Boolean).slice(0, 60);
+  n.markingStandards = styleTrim($('nteStandards').value, 1600);
+  n.keyFacts = $('nteFacts').value.trim().slice(0, 2000);
+  n.guidance = $('nteGuide').value.trim().slice(0, 4000);
+  n.comment = $('nteComment').value.trim();
+  n.updatedAt = new Date().toISOString();
+  try {
+    // Every key EXCEPT the id goes back, so a field another app owns
+    // (`noteTopics`, the Portal's `topics`) survives an edit made here.
+    var id = n.id;
+    var data = {};
+    for (var k in n) { if (k !== 'id') data[k] = n[k]; }
+    await notesCollRef(currentUser.uid).doc(id).set(data);
+    notesEditClose();
+    renderNotesBody();
+    toast('Note updated.');
+  } catch (e) {
+    toast('Could not save: ' + ((e && e.message) || e), 5000);
+  }
+}
+
+/* ================= The 📚 Teaching notes window ================= */
+function applyNotesVisibility() {
+  var show = isAdmin(currentUser);
+  if ($('notesBtn')) $('notesBtn').style.display = show ? '' : 'none';
+  if ($('quickNoteBtn')) $('quickNoteBtn').style.display = show ? '' : 'none';
+  if (!show) {
+    $('notesModal').classList.remove('open');
+    $('noteEditModal').classList.remove('open');
+    $('quickNoteModal').classList.remove('open');
+  }
+}
+function openNotesModal() {
+  if (!isAdmin(currentUser)) return;
+  $('notesModal').classList.add('open');
+  renderNotesBody();
+  loadTeachingNotes(true).then(renderNotesBody);
+}
+function closeNotesModal() { $('notesModal').classList.remove('open'); }
+
+function notesSetStatus(msg) {
+  var el = $('notesStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? '' : 'none';
+}
+function notesWhenText(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function notesSourceLabel(n) {
+  if (n.source === 'anskey') return 'from Ans Key';
+  if (n.source === 'scan') return '';
+  return 'from the Learning Portal';
+}
+
+function notesCardHtml(n) {
+  var tags = []
+    .concat((n.subjects || []).map(function (s) { return subjectLabel(s) || s; }))
+    .concat((n.levels || []).map(function (l) { return levelLabel(l); }))
+    .concat(n.noteTopics || [])
+    .concat(n.topics || []);
+  var tagHtml = tags.length
+    ? tags.map(function (t) { return '<span class="tnChip tnChipTopic">' + escHtml(t) + '</span>'; }).join('')
+    : '<span class="tnNone">Applies to every scan</span>';
+  var kwHtml = (n.keywords || []).length
+    ? (n.keywords || []).map(function (k) { return '<span class="tnChip tnChipKw">' + escHtml(k) + '</span>'; }).join('')
+    : '<span class="tnNone">No keywords yet — add some with Edit</span>';
+  var std = String(n.markingStandards || '').trim();
+  var facts = String(n.keyFacts || '').trim();
+  var com = String(n.comment || '').trim();
+  var guide = String(n.guidance || '').trim();
+  var when = notesWhenText(n.createdAt);
+  var src = notesSourceLabel(n);
+  var meta = [];
+  if (n.fileName) meta.push(escHtml(n.fileName));
+  if (when) meta.push((guide && !n.fileName ? 'written ' : 'uploaded ') + escHtml(when));
+  if (src) meta.push(escHtml(src));
+  return '<div class="tnCard">' +
+    '<div class="tnCardHead">' +
+      '<div class="tnCardId">' +
+        '<div class="tnCardTitle">' + escHtml(n.title || n.fileName || 'Untitled notes') + '</div>' +
+        '<div class="tnCardMeta">' + meta.join(' · ') + '</div>' +
+      '</div>' +
+      '<div class="tnCardBtns">' +
+        '<button class="btn" onclick="notesEditOpen(\'' + n.id + '\')">✎ Edit</button>' +
+        '<button class="btn btnDanger" onclick="notesDelete(\'' + n.id + '\')">✕ Delete</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="tnRow"><div class="tnLabel">Used for</div><div class="tnChips">' + tagHtml + '</div></div>' +
+    (guide ? '<div class="tnRow"><div class="tnLabel">General guidance</div><div class="tnText">' + escHtml(guide) + '</div></div>' : '') +
+    (guide && !(n.keywords || []).length ? '' :
+      '<div class="tnRow"><div class="tnLabel">Keywords</div><div class="tnChips">' + kwHtml + '</div></div>') +
+    (std ? '<div class="tnRow"><div class="tnLabel">Marking standards</div><div class="tnText">' + escHtml(std) + '</div></div>' : '') +
+    (com ? '<div class="tnRow"><div class="tnLabel">Your comment</div><div class="tnText tnTextSoft">' + escHtml(com) + '</div></div>' : '') +
+    (facts ? '<details class="tnFacts"><summary>Key facts</summary><div class="tnText">' + escHtml(facts) + '</div></details>' : '') +
+  '</div>';
+}
+
+/* The style profile, read-only. It is LEARNED in Ans Key, off the answers
+   the teacher wrote on their own worksheets — nothing photographed here is
+   the teacher's own answer, so there is nothing honest for this app to add
+   to it. Shown so it is obvious what the answers are being written against. */
+function notesStyleHtml() {
+  var p = styleProfile();
+  var body = p
+    ? '<div class="tnProfile">' +
+        (p.styleRules ? '<div class="tnRow"><div class="tnLabel">How you write</div><div class="tnText">' + escHtml(p.styleRules) + '</div></div>' : '') +
+        (p.phrasing ? '<div class="tnRow"><div class="tnLabel">Your phrasing</div><div class="tnText">' + escHtml(p.phrasing) + '</div></div>' : '') +
+        (p.markingStandards ? '<div class="tnRow"><div class="tnLabel">Your standard</div><div class="tnText">' + escHtml(p.markingStandards) + '</div></div>' : '') +
+        ((p.keywords || []).length ? '<div class="tnRow"><div class="tnLabel">Your words</div><div class="tnChips">' +
+          p.keywords.map(function (k) { return '<span class="tnChip tnChipKw">' + escHtml(k) + '</span>'; }).join('') + '</div></div>' : '') +
+        '<div class="tnCardMeta" style="margin-top:10px">Worked out from ' + ((aiStyle && aiStyle.profileSamples) || 0) + ' of your own answers' +
+          ((aiStyle && aiStyle.profileAt) ? ' on ' + escHtml(notesWhenText(aiStyle.profileAt)) : '') + '</div>' +
+      '</div>'
+    : '<div class="tnEmpty" style="margin:0">Nothing learned yet. Open <b>Ans Key</b>, press <b>📖 Learn from this worksheet</b> on a worksheet you have already answered, and every answer written here starts sounding like you.</div>';
+  return '<div class="tnPanel">' +
+    '<h3>🧠 Your learned style</h3>' +
+    '<p class="tnSub">This is the picture of how <i>you</i> answer, distilled in <b>Ans Key</b> from the answers you have written on your own worksheets. It is read here and followed on every question this app answers — this app never adds to it, because nothing photographed here is an answer you wrote.</p>' +
+    body +
+  '</div>';
+}
+
+function renderNotesBody() {
+  var body = $('notesBody');
+  if (!body) return;
+  if (!isAdmin(currentUser)) {
+    body.innerHTML = '<div class="tnEmpty">Teaching notes are the teacher\'s own.</div>';
+    return;
+  }
+  var status = ($('notesStatus') && $('notesStatus').textContent) || '';
+  var guideNotes = teachingNotes.filter(function (n) { return String(n.guidance || '').trim(); });
+  var fileNotes = teachingNotes.filter(function (n) { return !String(n.guidance || '').trim(); });
+  var cards = fileNotes.length
+    ? fileNotes.map(notesCardHtml).join('')
+    : '<div class="tnEmpty">No uploaded notes yet — upload your first PDF above. Everything the AI pulls out of it stays editable.</div>';
+  body.innerHTML =
+    '<div class="tnPanel">' +
+      '<h3>📌 General guidance</h3>' +
+      '<p class="tnSub">House rules in your own words. They apply to <b>every</b> scan and go into the prompt exactly as you typed them — nothing is extracted, nothing is summarised. This is the quickest way in: type it and it is live, here and in Ans Key.</p>' +
+      '<div class="tnBtnRow">' +
+        '<button class="btn btnPrimary" onclick="openQuickNoteModal()">✍️ Add a note</button>' +
+        '<span class="tnHint">Also on the toolbar, so you never have to open this window</span>' +
+      '</div>' +
+    '</div>' +
+    (guideNotes.length
+      ? guideNotes.map(notesCardHtml).join('')
+      : '<div class="tnEmpty">Nothing here yet. Add a note and every answer follows it from the next question onwards.</div>') +
+    '<div class="tnPanel">' +
+      '<h3>📚 Upload your notes</h3>' +
+      '<p class="tnSub">PDFs and photos of your own notes, answer keys and summaries — pick several at once and they are read <b>together as one set</b>. The AI pulls out the keywords your students must use, the marking standards and the key facts, then follows them on every question it answers. One notebook: anything uploaded in Ans Key or in the Science Learning Portal already counts here.</p>' +
+      '<div class="fieldRow">' +
+        '<label for="notesComment">Anything to tell the AI about this upload <span class="hint">(optional)</span></label>' +
+        '<textarea id="notesComment" rows="2" placeholder="e.g. follow the keywords in the summary table at the back"></textarea>' +
+      '</div>' +
+      '<div class="tnBtnRow">' +
+        '<button class="btn btnPrimary" onclick="$(\'notesFileInput\').click()"' + (notesBusy ? ' disabled' : '') + '>📄 Choose file(s) &amp; read them</button>' +
+        '<span class="tnHint">PDFs and/or photos, about 18 MB per upload</span>' +
+      '</div>' +
+      '<div id="notesStatus" class="tnStatus"' + (status ? '' : ' style="display:none"') + '>' + escHtml(status) + '</div>' +
+    '</div>' +
+    notesStyleHtml() +
+    '<div class="tnListHead"><h3>Uploaded notes (' + fileNotes.length + ')</h3></div>' +
+    cards;
+}
+
+/* =====================================================================
+   THE SCAN — pictures in, answers out
+   ---------------------------------------------------------------------
+   The pictures are read as ONE RUN, never one question per picture. They go
+   up SCAN_BATCH at a time as several images in a single vision call, and the
+   model decides where each question starts and ends — so a question spread
+   over two pages comes back as one question, and a page holding twelve
+   comes back as twelve. A question straddling a batch boundary is stitched
+   by the `continuation` entry, the same mechanism the Learning Portal's
+   exam-paper builder and Mark Paper use across a page break.
+
+   Nothing is saved anywhere. A photographed paper is somebody's work: it
+   lives in this tab and leaves through Copy or Print.
+   ===================================================================== */
+
+var SCAN_BATCH = 3;              // pictures per vision call
+var SCAN_MAX_SHOTS = 24;         // a whole exam paper, and a sane ceiling
+var SCAN_SHRINK_OVER = 900 * 1024;   // a phone photo past this is re-encoded
+var SCAN_PHOTO_MAX_SIDE = 2200;  // small print survives this; the whole read rests on it
+var SCAN_JPEG_Q = 0.9;
+
+var _shots = [];                 // [{ id, name, url, mimeType, data, status, err, n }]
+var _shotSeq = 0;
+var _answers = [];               // [{ number, page, question, options[], option, answer, explanation }]
+var _scanning = false;
+var _scanRun = 0;                // bumped on every run, so a stale reply is dropped
+
+/* ---- What a photograph of a paper actually looks like ----
+   Shared with the Learning Portal's readers word for word. */
+var SCAN_READING_NOTE =
+  'ABOUT THE IMAGES: they are phone photos, scans or photocopies of a printed paper, not clean digital pages. ' +
+  'Expect faint or broken lines, a grey or unevenly lit background, speckle and dirt, show-through of print from ' +
+  'the back of the sheet, slight skew or page curve, shadows near the spine or the edges, and blurred text. ' +
+  'Read THROUGH that damage: a faint or patchy figure is still a figure — do NOT skip a diagram, graph, table or ' +
+  'picture just because it is faint — and a speck of dirt is not punctuation, a decimal point or a tick. Where the ' +
+  'photograph has genuinely destroyed a word or a number, do NOT invent a plausible replacement: say it is unclear.\n';
+
+var SCAN_SYS =
+  'You are an experienced Singapore tuition teacher (P3 to Secondary 1) answering EVERY question printed on the ' +
+  'photographs of a worksheet or exam paper that are attached. Reply with STRICT JSON only, no markdown, exactly ' +
+  'this shape: {"questions":[{"continuation":false,"number":"16","page":1,"type":"mcq","question":"the printed ' +
+  'wording","options":[{"label":"1","text":"…"}],"option":"2","answer":"(2) the option\'s wording",' +
+  '"explanation":"why this is the answer"}]}. Rules: one entry for every question actually PRINTED on the ' +
+  'attached pictures, in the order they appear, keeping the paper\'s own numbering in "number" ("16", "3a"). ' +
+  'ONE ENTRY PER LETTERED PART: a question printed as 8(a) and 8(b) is TWO entries, numbered "8(a)" and "8(b)", ' +
+  'because they are answered separately. ' +
+  'EVERY question is answered, whatever form it takes — multiple choice, fill in the blank, true or false, ' +
+  'matching, a table or diagram to complete, and open-ended parts alike. Multiple-choice questions are NOT ' +
+  'optional and are the ones most often left out: a page holding nothing but multiple-choice questions must come ' +
+  'back with one entry for each of them. Never skip a question because it is multiple choice, because it looks ' +
+  'easy, or because someone has already written on it. Count the questions printed on the pictures before you ' +
+  'reply and check your list has that many entries. Never invent a question that is not there — a cover page, an ' +
+  'instructions page or a blank page returns {"questions":[]}. ' +
+  '"page" is which of the attached pictures the question is printed on, 1 for the first attached picture. ' +
+  '"question" is the printed wording as plain text, without the number itself; when the question depends on a ' +
+  'diagram, graph or table, add a short factual description of it in brackets at the end. ' +
+  'For a multiple-choice question, "type" is "mcq", "options" lists every printed option as ' +
+  '[{"label":"1","text":"…"}] using the labels the paper prints, "option" is the correct option\'s number or ' +
+  'letter exactly as printed ("2", "B") and "answer" is that option\'s own wording. For every other question ' +
+  '"type" is "open", "options" is empty, "option" is empty and "answer" is the final answer condensed to what a ' +
+  'marker needs — the value with its unit, or one or two short sentences. ' +
+  'Work every question out properly before you answer it: set the working out step by step, then check the ' +
+  'arithmetic back against the numbers printed on the page. A quick wrong answer is worse than no answer. ' +
+  'If someone has already written an answer on the paper, IGNORE it and work the answer out yourself — it may ' +
+  'well be wrong; that is often why the paper is being scanned. ' +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+var SCAN_DETAIL_RULE = {
+  short: '"explanation" is an empty string for every question — the answer alone is wanted this time.',
+  normal: '"explanation" is 2 to 4 sentences saying WHY, in plain language the student\'s level can follow, with ' +
+          'the working when there is working to show; one or two sentences is enough for a multiple-choice question.',
+  full: '"explanation" is a full worked explanation — every question gets one, none is ever left empty. Name the ' +
+        'concept being tested, give the working line by line with the numbers substituted in, and end with the ' +
+        'answer stated. For a multiple-choice question say why the correct option is right AND why the tempting ' +
+        'wrong ones are wrong.'
+};
+
+function scanDetail() {
+  var v = ($('scanDetail') && $('scanDetail').value) || 'normal';
+  return SCAN_DETAIL_RULE[v] ? v : 'normal';
+}
+
+/* ---- Getting the pictures in ---- */
+function _loadImageEl(src) {
+  return new Promise(function (res, rej) {
+    var im = new Image();
+    im.onload = function () { res(im); };
+    im.onerror = function () { rej(new Error('that picture could not be opened')); };
+    im.src = src;
+  });
+}
+function _readAsDataUrl(file) {
+  return new Promise(function (res, rej) {
+    var fr = new FileReader();
+    fr.onload = function () { res(String(fr.result)); };
+    fr.onerror = function () { rej(fr.error || new Error('could not read the file')); };
+    fr.readAsDataURL(file);
+  });
+}
+
+/* A 12 MP camera photo is several megabytes and far more resolution than the
+   model reads at, so anything over SCAN_SHRINK_OVER is re-encoded — as JPEG,
+   never PNG: a photograph re-encoded as PNG comes out BIGGER than it went in,
+   which is the opposite of the point. SCAN_PHOTO_MAX_SIDE is deliberately
+   generous: the whole read rests on the small print being legible, and
+   "$140.20" and "$14.20" are the same handful of pixels. */
+async function _prepShot(file) {
+  var dataUrl = await _readAsDataUrl(file);
+  if (file.size <= SCAN_SHRINK_OVER) return { url: dataUrl, mimeType: file.type || 'image/jpeg' };
+  try {
+    var img = await _loadImageEl(dataUrl);
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    var max = Math.max(w, h);
+    if (!max) return { url: dataUrl, mimeType: file.type || 'image/jpeg' };
+    var s = Math.min(1, SCAN_PHOTO_MAX_SIDE / max);
+    var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+    var c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    var out = c.toDataURL('image/jpeg', SCAN_JPEG_Q);
+    if (out.length >= dataUrl.length) return { url: dataUrl, mimeType: file.type || 'image/jpeg' };
+    return { url: out, mimeType: 'image/jpeg' };
+  } catch (e) {
+    console.warn('photo prep failed; sending the original', e);
+    return { url: dataUrl, mimeType: file.type || 'image/jpeg' };
+  }
+}
+
+async function addShots(files) {
+  files = Array.prototype.slice.call(files || []).filter(function (f) {
+    return f && f.type && f.type.indexOf('image/') === 0;
+  });
+  if (!files.length) { toast('Choose pictures — photos of the pages, not a PDF.', 4000); return; }
+  var room = SCAN_MAX_SHOTS - _shots.length;
+  if (room <= 0) { toast('That is ' + SCAN_MAX_SHOTS + ' pictures already — read these first.', 5000); return; }
+  if (files.length > room) {
+    toast('Only ' + room + ' more picture' + (room === 1 ? '' : 's') + ' will fit — the rest were left out.', 5000);
+    files = files.slice(0, room);
+  }
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    var id = 'shot_' + (++_shotSeq);
+    var shot = { id: id, name: f.name || 'photo', url: '', mimeType: '', data: '', status: '', err: '', n: 0 };
+    _shots.push(shot);
+    renderShots();
+    try {
+      var prepped = await _prepShot(f);
+      shot.url = prepped.url;
+      shot.mimeType = prepped.mimeType;
+      shot.data = prepped.url.split(',')[1] || '';
+      if (!shot.data) throw new Error('empty picture');
+    } catch (e) {
+      // A picture that could not be read is shown as a failed card, never
+      // dropped in silence: a photo that vanishes reads as one that worked.
+      shot.status = 'error';
+      shot.err = (e && e.message) || 'could not be read';
+    }
+    renderShots();
+  }
+}
+
+function removeShot(id) {
+  _shots = _shots.filter(function (s) { return s.id !== id; });
+  renderShots();
+}
+function moveShot(id, dir) {
+  var i = _shots.findIndex(function (s) { return s.id === id; });
+  var j = i + dir;
+  if (i < 0 || j < 0 || j >= _shots.length) return;
+  var tmp = _shots[i]; _shots[i] = _shots[j]; _shots[j] = tmp;
+  renderShots();
+}
+function clearShots() {
+  if (_scanning) return;
+  if (_shots.length > 1 && !confirm('Remove all ' + _shots.length + ' pictures?')) return;
+  _shots = [];
+  renderShots();
+}
+
+function shotStateText(s) {
+  if (s.status === 'error') return '⚠ ' + (s.err || 'could not be read');
+  if (s.status === 'reading') return '⏳ reading…';
+  if (s.status === 'done') return '✓ ' + s.n + ' question' + (s.n === 1 ? '' : 's');
+  if (s.status === 'empty') return '· nothing on this page';
+  return '';
+}
+
+function renderShots() {
+  var wrap = $('shots');
+  // The page numbers here are the ones the answers cite, so they count only
+  // the pictures that are actually SENT: one that could not be opened is not
+  // in the run, and giving it a page number would put every answer after it
+  // one page out.
+  var pageNo = 0;
+  wrap.innerHTML = _shots.map(function (s, i) {
+    var state = shotStateText(s);
+    var num = s.data ? 'Page ' + (++pageNo) : '—';
+    return '<div class="shot">' +
+      (s.url ? '<img src="' + s.url + '" alt="' + escHtml(num) + '">' : '<img alt="">') +
+      (state ? '<div class="shotState' + (s.status === 'error' ? ' err' : '') + '">' + escHtml(state) + '</div>' : '') +
+      '<div class="shotBar">' +
+        '<span class="shotNum">' + escHtml(num) + '</span>' +
+        '<button class="shotBtn" title="Move earlier" onclick="moveShot(\'' + s.id + '\',-1)"' + (i === 0 || _scanning ? ' disabled' : '') + '>◀</button>' +
+        '<button class="shotBtn" title="Move later" onclick="moveShot(\'' + s.id + '\',1)"' + (i === _shots.length - 1 || _scanning ? ' disabled' : '') + '>▶</button>' +
+        '<button class="shotBtn" title="Remove" onclick="removeShot(\'' + s.id + '\')"' + (_scanning ? ' disabled' : '') + '>✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  var ready = _shots.filter(function (s) { return s.data; }).length;
+  $('scanActions').style.display = _shots.length ? 'flex' : 'none';
+  $('shotCount').textContent = _shots.length
+    ? ready + ' picture' + (ready === 1 ? '' : 's') + ' ready' + (ready !== _shots.length ? ' · ' + (_shots.length - ready) + ' still opening' : '')
+    : '';
+  $('readBtn').disabled = _scanning || !ready;
+  $('clearShotsBtn').disabled = _scanning;
+}
+
+function scanProgress(done, total, msg) {
+  var el = $('scanProgress');
+  el.classList.add('on');
+  $('progFill').style.width = total ? Math.round((done / total) * 100) + '%' : '0%';
+  $('progText').textContent = msg || '';
+}
+function scanProgressOff() { $('scanProgress').classList.remove('on'); }
+
+/* ---- Reading the run ---- */
+function _scanStr(v, cap) {
+  var s = String(v == null ? '' : v).replace(/\s*\n\s*/g, ' ').trim();
+  return s.length > cap ? s.slice(0, cap) : s;
+}
+
+function _scanPrompt(n, from, total, carry) {
+  var detail = scanDetail();
+  var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
+  var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
+  var who = (lvl || subj) ? 'It is a ' + [lvl, subj].filter(Boolean).join(' ') + ' paper.' : '';
+  return 'The attached ' + (n === 1 ? 'picture is page ' + from : n + ' pictures are pages ' + from + '–' + (from + n - 1)) +
+      ' of ' + total + ' of a Singapore worksheet or exam paper, in order. ' + who + '\n' +
+    SCAN_READING_NOTE +
+    'Find EVERY question printed on these pages and answer each one.\n' +
+    (carry ? 'The page before these ended part-way through this question: "' + carry + '". If these pages carry it on, ' +
+             'the FIRST entry you return must have "continuation": true and hold only the rest of it — its wording, ' +
+             'and the answer to the WHOLE question now that you can see all of it.\n' : '') +
+    'Every other entry has "continuation": false.\n' +
+    SCAN_DETAIL_RULE[detail] + '\n' +
+    'Count the questions on these pages, then check your reply has that many entries before you send it.';
+}
+
+function _scanNewItem(r, batchStart, batchLen) {
+  if (!r || typeof r !== 'object') return null;
+  var question = _scanStr(r.question, 1400);
+  var answer = _scanStr(r.answer, 900);
+  var option = _scanStr(r.option, 8);
+  if (!question && !answer && !option) return null;
+  var type = String(r.type || '').toLowerCase() === 'mcq' ? 'mcq' : 'open';
+  var options = Array.isArray(r.options)
+    ? r.options.map(function (o) {
+        return { label: _scanStr(o && o.label, 4), text: _scanStr(o && o.text, 240) };
+      }).filter(function (o) { return o.label || o.text; })
+    : [];
+  // The model numbers pages 1..n WITHIN the batch it was given; an
+  // out-of-range or missing page falls back to the first page of that batch
+  // rather than pointing at a page that is not there.
+  var page = parseInt(r.page, 10);
+  if (!(page >= 1 && page <= batchLen)) page = 1;
+  return {
+    number: _scanStr(r.number, 16),
+    page: batchStart + page,          // 1-based across the whole run
+    endPage: batchStart + page,
+    type: type,
+    question: question,
+    options: options,
+    option: option,
+    answer: answer,
+    explanation: _scanStr(r.explanation, 2400)
+  };
+}
+
+/* Fold a batch's rows into the run. The ONE place `continuation` is honoured:
+   a batch whose FIRST entry says it is a continuation is finishing the
+   question the batch before ended part-way through, so it is folded into that
+   question rather than filed as half a question of its own — with the answer
+   and the explanation taken from THIS entry, because only now can the whole
+   question be seen. Returns how many questions each page produced, so the
+   thumbnails can say. */
+function _scanFoldRows(rows, batchStart, batchLen, into) {
+  var madeOn = {};
+  (rows || []).forEach(function (r, i) {
+    var it = _scanNewItem(r, batchStart, batchLen);
+    if (!it) return;
+    var prev = into[into.length - 1];
+    if (i === 0 && r && r.continuation === true && prev) {
+      prev.question = (prev.question + ' ' + it.question).trim();
+      prev.endPage = it.page;
+      if (it.options.length && !prev.options.length) prev.options = it.options;
+      if (it.option && !prev.option) prev.option = it.option;
+      if (it.answer) prev.answer = it.answer;
+      if (it.explanation) prev.explanation = it.explanation;
+      if (it.type === 'mcq') prev.type = 'mcq';
+      return;
+    }
+    into.push(it);
+    madeOn[it.page] = (madeOn[it.page] || 0) + 1;
+  });
+  return madeOn;
+}
+
+async function runScan() {
+  if (_scanning) return;
+  var shots = _shots.filter(function (s) { return s.data; });
+  if (!shots.length) { toast('Add a picture first.'); return; }
+  if (!window.askGemini || !window.aiReady || !window.aiReady()) {
+    toast('AI is not available — check your connection and reload the page.', 5000);
+    return;
+  }
+  // The notes are what make the answers the teacher's rather than the
+  // model's, so they are in hand BEFORE a word is written.
+  await loadTeachingNotes(false);
+
+  var run = ++_scanRun;
+  _scanning = true;
+  _answers = [];
+  var detail = scanDetail();
+  var failedPages = [];
+  shots.forEach(function (s) { s.status = ''; s.err = ''; s.n = 0; });
+  renderShots();
+  renderAnswers();
+  $('answersWrap').classList.remove('hidden');
+
+  var total = shots.length;
+  var carry = '';
+  try {
+    for (var start = 0; start < total; start += SCAN_BATCH) {
+      if (run !== _scanRun) return;                 // a newer run took over
+      var batch = shots.slice(start, start + SCAN_BATCH);
+      batch.forEach(function (s) { s.status = 'reading'; });
+      renderShots();
+      scanProgress(start, total,
+        '✨ Reading page ' + (start + 1) + (batch.length > 1 ? '–' + (start + batch.length) : '') +
+        ' of ' + total + '…' + (_answers.length ? '  (' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' so far)' : ''));
+
+      var rows;
+      try {
+        var raw = await window.askGemini(
+          _scanPrompt(batch.length, start + 1, total, carry),
+          {
+            system: SCAN_SYS + aiGrounding('answer'),
+            // The budget has to cover the thinking as well as the answers: a
+            // page of multiple-choice questions is 15-20 entries, not the 4
+            // or 5 an open-ended page comes to.
+            maxOutputTokens: detail === 'full' ? 32000 : 20000,
+            effort: 'xhigh',        // ChatGPT, when an engine is wired in
+            thinkingLevel: 'high',  // Gemini — this is what decides whether the answers are right
+            temperature: 0.2,
+            json: true,
+            images: batch.map(function (s) { return { mimeType: s.mimeType, data: s.data }; })
+          });
+        var parsed = _parseAIJson(raw);
+        rows = Array.isArray(parsed) ? parsed : ((parsed && Array.isArray(parsed.questions)) ? parsed.questions : []);
+      } catch (err) {
+        // One unreadable batch must never sink the rest of the paper.
+        console.warn('scan: batch failed', err);
+        batch.forEach(function (s) {
+          s.status = 'error';
+          s.err = (err && err.message) || 'could not be read';
+          failedPages.push(shots.indexOf(s) + 1);
+        });
+        carry = '';
+        renderShots();
+        renderAnswers();
+        continue;
+      }
+      if (run !== _scanRun) return;
+
+      var madeOn = _scanFoldRows(rows, start, batch.length, _answers);
+      batch.forEach(function (s, k) {
+        var n = madeOn[start + k + 1] || 0;
+        s.n = n;
+        s.status = n ? 'done' : 'empty';
+      });
+      // Whatever the last entry was, the next batch may be continuing it.
+      var last = _answers[_answers.length - 1];
+      carry = last ? _scanStr(last.question, 220) : '';
+      renderShots();
+      renderAnswers();
+      scanProgress(Math.min(start + batch.length, total), total, '');
+    }
+  } finally {
+    if (run === _scanRun) {
+      _scanning = false;
+      scanProgressOff();
+      renderShots();
+      renderAnswers();
+    }
+  }
+
+  // A paper that numbers nothing still has to be readable, so anything that
+  // came back without a number is numbered by where it sits on the paper.
+  _answers.forEach(function (it, i) { if (!it.number) it.number = String(i + 1); });
+  renderAnswers();
+
+  if (!_answers.length) {
+    toast(failedPages.length
+      ? 'None of those pages could be read — try a sharper, straighter photo in better light.'
+      : 'No questions were found on those pictures.', 6000);
+  } else {
+    toast('✅ ' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' answered' +
+      (failedPages.length ? ' — page ' + failedPages.join(', ') + ' could not be read' : '') + '.', 6000);
+  }
+}
+
+/* ---- Showing the answers ---- */
+function ansPageLabel(it) {
+  if (it.endPage && it.endPage !== it.page) return 'pages ' + it.page + '–' + it.endPage;
+  return 'page ' + it.page;
+}
+
+function answerCardHtml(it, i) {
+  var opts = (it.options || []).length
+    ? '<ul class="ansOpts">' + it.options.map(function (o) {
+        var right = it.option && String(o.label).toLowerCase() === String(it.option).toLowerCase();
+        return '<li class="' + (right ? 'right' : '') + '">' +
+          (o.label ? '(' + escHtml(o.label) + ') ' : '') + escHtml(o.text) +
+          (right ? ' ✓' : '') + '</li>';
+      }).join('') + '</ul>'
+    : '';
+  var ans = it.answer || (it.option ? '(' + it.option + ')' : '');
+  return '<div class="ansCard">' +
+    '<div class="ansHead">' +
+      '<span class="ansNum">' + escHtml(it.number || String(i + 1)) + '</span>' +
+      '<span class="ansPage">' + escHtml(ansPageLabel(it)) + (it.type === 'mcq' ? ' · multiple choice' : '') + '</span>' +
+    '</div>' +
+    (it.question ? '<div class="ansQ">' + escHtml(it.question) + '</div>' : '') +
+    opts +
+    (ans ? '<div class="ansBox"><div class="ansLabel">Answer</div><div class="ansText">' + escHtml(ans) + '</div></div>' : '') +
+    (it.explanation ? '<div class="whyBox"><div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
+  '</div>';
+}
+
+function renderAnswers() {
+  var list = $('answersList');
+  if (!_answers.length) {
+    list.innerHTML = _scanning
+      ? '<div class="empty">Reading the pages — the answers appear here as they come back.</div>'
+      : '<div class="empty">No questions were found on those pictures.</div>';
+  } else {
+    list.innerHTML = _answers.map(answerCardHtml).join('');
+  }
+  $('answersTitle').textContent = _answers.length
+    ? '2. The answers (' + _answers.length + ')'
+    : '2. The answers';
+  var ground = groundingSummary();
+  $('answersNote').innerHTML = ground.length
+    ? 'Written against your own ' + escHtml(ground.join(', ')) + '.'
+    : 'No teaching notes are being applied — these are ordinary syllabus answers. ' +
+      (isAdmin(currentUser) ? 'Add a note or upload yours to change that.' : '');
+  $('copyAnswersBtn').disabled = !_answers.length;
+  $('printAnswersBtn').disabled = !_answers.length;
+}
+
+function answersAsText() {
+  var head = [];
+  var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
+  var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
+  if (lvl || subj) head.push([lvl, subj].filter(Boolean).join(' '));
+  head.push(_answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleString('en-SG'));
+  return head.join(' · ') + '\n\n' + _answers.map(function (it, i) {
+    var lines = [(it.number || (i + 1)) + '. ' + (it.question || '')];
+    (it.options || []).forEach(function (o) {
+      var right = it.option && String(o.label).toLowerCase() === String(it.option).toLowerCase();
+      lines.push('   (' + o.label + ') ' + o.text + (right ? '  ✓' : ''));
+    });
+    lines.push('   Answer: ' + (it.answer || ('(' + it.option + ')')));
+    if (it.explanation) lines.push('   Why: ' + it.explanation);
+    return lines.join('\n');
+  }).join('\n\n');
+}
+
+function copyAnswers() {
+  var text = answersAsText();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(function () { toast('Copied.'); })
+      .catch(function () { _copyFallback(text); });
+  } else _copyFallback(text);
+}
+function _copyFallback(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('Copied.'); }
+  catch (e) { toast('Could not copy — select the text and copy it by hand.', 5000); }
+  document.body.removeChild(ta);
+}
+
+/* ================= Sign in ================= */
+function renderAuth() {
+  var signedIn = !!currentUser;
+  $('signInBtn').style.display = signedIn ? 'none' : '';
+  $('signOutBtn').style.display = signedIn ? '' : 'none';
+  $('signedOutCard').classList.toggle('hidden', signedIn);
+  $('scanPage').classList.toggle('hidden', !signedIn);
+  $('whoAmI').textContent = signedIn
+    ? (isAdmin(currentUser) ? ADMIN_DISPLAY_NAME : (currentUser.displayName || currentUser.email || ''))
+    : '';
+  applyNotesVisibility();
+}
+
+function signIn() {
+  var provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(function (e) {
+    // A popup blocked on a phone is the commonest failure — fall back rather
+    // than leaving a button that does nothing.
+    if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
+      auth.signInWithRedirect(provider);
+      return;
+    }
+    if (e && e.code === 'auth/popup-closed-by-user') return;
+    toast('Could not sign in: ' + ((e && e.message) || e), 5000);
+  });
+}
+function signOut() { auth.signOut(); }
+
+auth.onAuthStateChanged(function (user) {
+  currentUser = user || null;
+  // Whatever the last account had is dropped first — the new one keeps only
+  // what its own read is allowed to bring back.
+  teachingNotes = [];
+  aiStyle = null;
+  notesLoaded = false;
+  notesLoading = null;
+  renderAuth();
+  if (user) loadTeachingNotes(true).then(function () { renderAnswers(); });
+});
+
+/* ================= Wiring ================= */
+(function fillLevels() {
+  var sel = $('scanLevel');
+  LEVELS.forEach(function (l) {
+    var o = document.createElement('option');
+    o.value = l;
+    o.textContent = levelLabel(l);
+    sel.appendChild(o);
+  });
+})();
+
+/* The level and the subject are the context the notes are matched against,
+   so remembering them is remembering which notes apply. */
+var SCAN_PREF_KEY = 'scanPrefs';
+(function loadPrefs() {
+  try {
+    var p = JSON.parse(localStorage.getItem(SCAN_PREF_KEY) || '{}');
+    if (p.level && LEVELS.indexOf(p.level) !== -1) $('scanLevel').value = p.level;
+    if (p.subject) $('scanSubject').value = p.subject;
+    if (p.detail) $('scanDetail').value = p.detail;
+  } catch (e) {}
+  syncMeta();
+})();
+function syncMeta() {
+  wsMeta.level = $('scanLevel').value || '';
+  wsMeta.subject = $('scanSubject').value || '';
+  try {
+    localStorage.setItem(SCAN_PREF_KEY, JSON.stringify({
+      level: wsMeta.level, subject: wsMeta.subject, detail: $('scanDetail').value
+    }));
+  } catch (e) {}
+  if (_answers.length) renderAnswers();   // the note under the answers names the notes being applied
+}
+$('scanLevel').addEventListener('change', syncMeta);
+$('scanSubject').addEventListener('change', syncMeta);
+$('scanDetail').addEventListener('change', syncMeta);
+
+$('signInBtn').addEventListener('click', signIn);
+$('signInBtn2').addEventListener('click', signIn);
+$('signOutBtn').addEventListener('click', signOut);
+
+/* Both routes end at addShots, the ONE way in, so a photo taken with the
+   camera is prepared and queued exactly as one chosen from the gallery is.
+   The picker's value is cleared BEFORE the files are handed on: an input
+   still holding last time's file fires no `change` for the same photo picked
+   twice, and the second tap would silently do nothing. */
+function pickFrom(input) {
+  input.addEventListener('change', function () {
+    var files = Array.prototype.slice.call(input.files || []);
+    input.value = '';
+    if (files.length) addShots(files);
+  });
+}
+pickFrom($('cameraInput'));
+pickFrom($('galleryInput'));
+$('cameraBtn').addEventListener('click', function () { $('cameraInput').click(); });
+$('galleryBtn').addEventListener('click', function () { $('galleryInput').click(); });
+
+$('readBtn').addEventListener('click', runScan);
+$('clearShotsBtn').addEventListener('click', clearShots);
+$('copyAnswersBtn').addEventListener('click', copyAnswers);
+$('printAnswersBtn').addEventListener('click', function () { window.print(); });
+
+/* Drag, drop and paste — the desktop way in. A touchscreen has neither, which
+   is why the camera and the gallery buttons are the headline. */
+var pad = $('scanPad');
+['dragenter', 'dragover'].forEach(function (ev) {
+  pad.addEventListener(ev, function (e) { e.preventDefault(); pad.classList.add('over'); });
+});
+['dragleave', 'drop'].forEach(function (ev) {
+  pad.addEventListener(ev, function (e) { e.preventDefault(); pad.classList.remove('over'); });
+});
+pad.addEventListener('drop', function (e) {
+  var files = (e.dataTransfer && e.dataTransfer.files) || [];
+  if (files.length) addShots(files);
+});
+document.addEventListener('paste', function (e) {
+  if (!currentUser) return;
+  if ($('notesModal').classList.contains('open') || $('quickNoteModal').classList.contains('open') ||
+      $('noteEditModal').classList.contains('open')) return;
+  var t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
+  var items = (e.clipboardData && e.clipboardData.items) || [];
+  var files = [];
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    if (it && it.kind === 'file' && String(it.type || '').indexOf('image/') === 0) {
+      var f = it.getAsFile();
+      if (f) files.push(f);
+    }
+  }
+  if (!files.length) return;
+  e.preventDefault();
+  addShots(files);
+});
+if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+  $('padSub').textContent = 'Take one photo per page, or pick several out of your gallery at once.';
+}
+
+/* Teaching notes window */
+$('notesBtn').addEventListener('click', openNotesModal);
+$('notesCloseBtn').addEventListener('click', closeNotesModal);
+$('notesModal').addEventListener('click', function (e) { if (e.target === $('notesModal')) closeNotesModal(); });
+$('notesFileInput').addEventListener('change', function () {
+  var files = Array.prototype.slice.call(this.files || []);
+  this.value = '';
+  if (files.length) notesHandleFiles(files);
+});
+$('quickNoteBtn').addEventListener('click', openQuickNoteModal);
+$('quickNoteCancelBtn').addEventListener('click', closeQuickNoteModal);
+$('quickNoteSaveBtn').addEventListener('click', quickNoteSave);
+$('quickNoteModal').addEventListener('click', function (e) { if (e.target === $('quickNoteModal')) closeQuickNoteModal(); });
+$('noteEditCancelBtn').addEventListener('click', notesEditClose);
+$('noteEditSaveBtn').addEventListener('click', notesEditSave);
+$('noteEditModal').addEventListener('click', function (e) { if (e.target === $('noteEditModal')) notesEditClose(); });
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  if ($('noteEditModal').classList.contains('open')) notesEditClose();
+  else if ($('quickNoteModal').classList.contains('open')) closeQuickNoteModal();
+  else if ($('notesModal').classList.contains('open')) closeNotesModal();
+});
+
+/* A scan mid-flight is a page the tab is still reading — losing it costs the
+   whole run and every AI call it has already paid for. */
+window.addEventListener('beforeunload', function (e) {
+  if (!_scanning) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+/* The onclick handlers in the rendered notes cards live in this scope
+   already (a classic script, not a module) — these are the ones the rendered
+   markup references by name. */
+window.$ = $;
+window.notesEditOpen = notesEditOpen;
+window.notesDelete = notesDelete;
+window.openQuickNoteModal = openQuickNoteModal;
+window.moveShot = moveShot;
+window.removeShot = removeShot;
+
+renderAuth();
+renderShots();
+</script>
+
+<script type="module">
+/* ================= Firebase AI Logic (Gemini) =================
+   Lifted from the Ans Key app so the two answer alike. Everything here is
+   public client config (NOT a secret); quota abuse is prevented by App Check
+   (reCAPTCHA v3), enforced in the Firebase console. Exposes
+   window.askGemini / window.aiReady for the classic script above. Keep the
+   call shape in sync with the other Polymath apps. */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js";
+import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-ai.js";
+
+// Shared Polymath Firebase project — same across all apps
+const firebaseConfig = {
+  apiKey: "AIzaSyAUSI3Uh28IeqASEp0JhH4QPaVt-O3meBo",   // public Firebase web API key (NOT a secret)
+  authDomain: "mathgen--app.firebaseapp.com",
+  projectId: "mathgen--app",
+  storageBucket: "mathgen--app.firebasestorage.app",
+  messagingSenderId: "165654161198",
+  appId: "1:165654161198:web:16c8bd60eb3a2aa7edbcbf",
+  measurementId: "G-0MWZFG211D"
+};
+
+// App Check (reCAPTCHA v3) site key — registered for polymathlc.github.io (+ localhost)
+const RECAPTCHA_SITE_KEY = "6Le98gwtAAAAAAzkjJTZXFM5D8tpjx_P4rtRuhuH";
+
+// Model used app-wide.
+const AI_MODEL = "gemini-3.7-flash";
+// The FLOOR of the thinking scale, and the level every ordinary call asks
+// for. THE TWO MOVE TOGETHER: every model has its own thinking scale, and a
+// level it does not know is a 400 INVALID_ARGUMENT on every AI call in the
+// app — not a worse answer, no answer at all. Gemini 3.7 Flash takes
+// low / medium / high and DROPPED the "minimal" 3.6 accepted, exactly as 3.x
+// had already dropped 2.x's numeric thinkingBudget. Change the model, check
+// its scale first.
+const AI_THINK_MIN = "low";
+window.AI_GEMINI_MODEL = AI_MODEL;
+
+const app = initializeApp(firebaseConfig);
+
+// App Check protects the shared Gemini quota. If enforcement is disabled in
+// the console, AI still works without a valid token.
+if (RECAPTCHA_SITE_KEY && !RECAPTCHA_SITE_KEY.startsWith("PASTE_")) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true
+    });
+  } catch (e) { console.warn("App Check init failed:", e); }
+}
+
+let geminiModel = null;
+try {
+  geminiModel = getGenerativeModel(getAI(app, { backend: new GoogleAIBackend() }), { model: AI_MODEL });
+} catch (e) { console.warn("Firebase AI init failed (AI disabled):", e); }
+
+window.aiReady = () => !!geminiModel;
+
+// json: true switches on strict-JSON response mode. system adds a
+// systemInstruction. images is a list of { mimeType, data } inline
+// attachments (base64 WITHOUT the data: prefix), sent after the prompt —
+// the vision path the whole scan runs on.
+window.aiLastCall = { engine: "gemini", fellBack: false, error: "" };
+window.askGemini = async function askGemini(prompt, opts = {}) {
+  window.aiLastCall = { engine: "gemini", fellBack: false, error: "" };
+  return askGeminiDirect(prompt, opts);
+};
+
+// An over-large budget is a 400 rather than a long answer, so it is clamped
+// rather than failing the page outright.
+const GEMINI_MAX_OUTPUT = 32000;
+
+async function askGeminiDirect(prompt, { maxOutputTokens = 512, temperature = 0.3, json = false, system = "", images = [], thinkingLevel = AI_THINK_MIN } = {}) {
+  if (!geminiModel) throw new Error("AI is not configured yet");
+  maxOutputTokens = Math.min(maxOutputTokens || 512, GEMINI_MAX_OUTPUT);
+  const parts = [{ text: prompt }];
+  for (const img of images) {
+    if (img && img.data) parts.push({ inlineData: { mimeType: img.mimeType || "image/jpeg", data: img.data } });
+  }
+
+  async function run(level) {
+    const generationConfig = { maxOutputTokens, temperature, thinkingConfig: { thinkingLevel: level } };
+    if (json) generationConfig.responseMimeType = "application/json";
+    const request = { contents: [{ role: "user", parts }], generationConfig };
+    if (system) request.systemInstruction = { parts: [{ text: system }] };
+    const res = await geminiModel.generateContent(request);
+    return (res.response.text() || "").trim();
+  }
+
+  // A level the model does not know is a 400, so fall back to the floor
+  // rather than failing the page outright. Retrying is only worth anything
+  // while the floor is not what was asked for: retrying AI_THINK_MIN at
+  // AI_THINK_MIN would just send the same rejected request a second time.
+  try { return await run(thinkingLevel); }
+  catch (e) {
+    if (thinkingLevel === AI_THINK_MIN) throw e;
+    console.warn("thinkingLevel " + thinkingLevel + " rejected, retrying at " + AI_THINK_MIN + ":", e);
+    return run(AI_THINK_MIN);
+  }
+}
+</script>
+</body>
+</html>
