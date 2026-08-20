@@ -228,5 +228,29 @@ ok('the run waits for the notebook before answering',
 ok('a live repaint yields to whatever is being typed',
    /body\.contains\(document\.activeElement\)/.test(html));
 
+/* ---------- Three buttons, two tabs ----------
+   The screen is the whole point of this app: a phone held over a worksheet,
+   one thumb. Pinned so a later change cannot quietly grow a third tab or a
+   fourth control back onto it. */
+const camBar = html.slice(html.indexOf('<div class="camBar'), html.indexOf('</div>', html.indexOf('id="readBtn"')));
+ok('the camera bar carries exactly three controls',
+   (camBar.match(/<button/g) || []).length === 3, camBar.slice(0, 80));
+ok('gallery on the left, shutter in the middle, done on the right',
+   camBar.indexOf('id="galleryBtn"') < camBar.indexOf('id="cameraBtn"') &&
+   camBar.indexOf('id="cameraBtn"') < camBar.indexOf('id="readBtn"'));
+ok('the count rides on the gallery button', /id="shotBadge"/.test(camBar));
+ok('✓ starts out of reach — there is nothing to read yet', /id="readBtn"[^>]*disabled/.test(camBar));
+const tabBar = html.slice(html.indexOf('<nav class="tabs'), html.indexOf('</nav>'));
+ok('there are exactly two tabs', (tabBar.match(/<button/g) || []).length === 2);
+ok('and they are Snap and How to use', /data-tab="snap"/.test(tabBar) && /data-tab="how"/.test(tabBar));
+ok('the camera bar belongs to the Snap tab alone',
+   /camBar'\)\.classList\.toggle\('hidden', !on \|\| _tab !== 'snap'\)/.test(html));
+ok('nothing but the settings survived on the snap screen',
+   !/id="scanLevel"[\s\S]{0,400}id="scanPad"/.test(html) &&
+   html.indexOf('id="scanLevel"') > html.indexOf('id="howPage"'));
+/* The trap this app was built around, still pinned. */
+ok('the picker is emptied before the files are queued',
+   /input\.value = '';\s*\n\s*if \(files\.length\) addShots\(files\);/.test(html));
+
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

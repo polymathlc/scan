@@ -13,17 +13,25 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 
 ## What it does
 
-1. **Add your pictures.** Take a photo of each page, or choose several out of the gallery at once.
-   On a computer you can drag them in or paste one. Pages can be reordered and removed.
-2. **Read & answer.** The pictures go up three at a time as one run, so a question that carries on
-   over the page is stitched back together instead of coming back as two halves. Every question
-   printed on the pages is answered — multiple choice, fill in the blank, open-ended and lettered
-   parts alike.
-3. **Copy or print.** Nothing is saved anywhere: a photographed paper is somebody's work, so it
-   lives in the tab and leaves through those two buttons.
+Three buttons and two tabs. The **Snap** tab is a camera:
 
-Pick the amount of explanation you want: the answer alone, the answer with a short reason, or the
-answer with the full working line by line.
+|  |  |
+| --- | --- |
+| 🖼 **left** | your gallery — and the badge on it is how many pages you have so far |
+| 📷 **middle** | the shutter: one photo per page, in the order they are printed |
+| ✓ **right** | read the lot and answer every question on them |
+
+That is the whole interaction. The pictures go up three at a time as **one run**, so a question
+that carries on over the page is stitched back together instead of coming back as two halves, and
+every question printed on the pages is answered — multiple choice, fill in the blank, open-ended
+and lettered parts alike.
+
+Then **Copy** or **Print**. Nothing is saved anywhere: a photographed paper is somebody's work, so
+it lives in the tab and leaves through those two buttons.
+
+The **How to use** tab holds the instructions and the only settings there are — how much
+explanation you want (answer alone, a short reason, or the full working), and optionally the level
+and subject, which just narrow which of your teaching notes apply.
 
 ## The answers are the teacher's, not the model's
 

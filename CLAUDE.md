@@ -67,6 +67,27 @@ step, and ship a change to the shape in both repos together**:
 - **The page SAYS whether it is grounded** (`groundingSummary`). An ungrounded answer looks
   identical to a grounded one, so the teacher would otherwise never know the notes were not read.
 
+## The screen: three buttons and two tabs (v1.2.0)
+- **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
+  else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
+  hand), **the shutter in the middle**, **✓ on the right**. That is the whole interaction — a phone
+  held over a worksheet, one thumb. Anything added to that bar has to earn its place against the
+  three that are there.
+- **Every setting lives on the How-to-use tab**, because a picker on the snap screen is a decision
+  demanded before the first photo. The explanation depth defaults to *answer + full working*; the
+  level and subject default to *Any* and only narrow which teaching notes apply, so leaving them
+  alone is a correct answer rather than an unfinished one.
+- **✓ is the only thing that spends money**, so it is the only control that changes state while a
+  run is going: it becomes a spinner, and the other two go flat. A second run started on top of the
+  first is the one mistake this screen can make.
+- **`renderCamBar` is the ONE place the bar is painted** — the badge, the face, the three disabled
+  states and the empty-screen prompt — and `renderShots` calls it. Two painters would drift the
+  moment a picture failed to open.
+- The camera bar is **fixed to the viewport with `env(safe-area-inset-bottom)`** and belongs to the
+  Snap tab alone: a shutter under the instructions is a button that does the wrong thing.
+- Run **`node tools/scan-tests.mjs`** after touching the screen — it pins the three controls, their
+  order, the two tabs and the settings staying off the snap screen.
+
 ## The scan itself
 - **The pictures are read as ONE RUN, never one question per picture.** They go up `SCAN_BATCH` (3)
   at a time as several images in a single vision call and the model decides where each question
