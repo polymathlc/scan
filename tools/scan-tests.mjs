@@ -208,5 +208,25 @@ ok('a reply cut off mid-value is repaired',
 ok('an unescaped quote inside an answer survives',
    api._parseAIJson('{"questions":[{"answer":"it is called "evaporation""}]}').questions[0].answer.includes('evaporation'));
 
+/* ---------- The notebook is LIVE ----------
+   Pinned as source, because a one-shot read looks identical to a listener
+   until the day somebody types a note in Ans Key mid-lesson: this tab would
+   go on answering against the notebook as it stood at sign-in, and nothing
+   anywhere would say so. */
+ok('the notebook is watched, not fetched once', /notesCollRef\(owner\)\.onSnapshot\(/.test(html));
+ok('the style profile Ans Key grows is watched too', /styleDocRef\(owner\)\.onSnapshot\(/.test(html));
+ok('the listeners come down when the account changes',
+   /stopTeachingNotes\(\);/.test(html.slice(html.indexOf('auth.onAuthStateChanged'), html.indexOf('auth.onAuthStateChanged') + 700)));
+ok('a first-load waiter is released when the listeners go, never left hanging',
+   /_notesPending/.test(html) && /waiting\.forEach/.test(html));
+ok('a superseded attach stands down instead of racing', /_notesAttachSeq/.test(html));
+/* The scan awaits the notes before it writes a word — that is what makes a
+   note typed seconds earlier reach the very next answer. */
+ok('the run waits for the notebook before answering',
+   /await loadTeachingNotes\(false\);/.test(html));
+/* A repaint must never eat what the admin is half way through typing. */
+ok('a live repaint yields to whatever is being typed',
+   /body\.contains\(document\.activeElement\)/.test(html));
+
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

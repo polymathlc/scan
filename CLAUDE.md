@@ -38,6 +38,27 @@ step, and ship a change to the shape in both repos together**:
   teacher has written on their own worksheets. Nothing photographed here is an answer the teacher
   wrote, so there is nothing honest for this app to add to it. Do not add a harvest path without
   deciding first whose answers those are.
+- **The notebook is LIVE, and that is what makes it shared rather than
+  copied.** `loadTeachingNotes` attaches an `onSnapshot` listener (and one on
+  the style doc), not a one-shot `.get()`. A single read at sign-in meant this
+  tab held whatever the notebook said when the teacher signed in and never
+  looked again: a note typed in Ans Key mid-lesson reached the app it was
+  typed in and NO other, so the same question was answered against two
+  different notebooks depending on which tab it was answered in — and nothing
+  anywhere said so. Three rules hold it together: **`_notesDetach` releases
+  anyone waiting on the first snapshot** (a waiter holding a promise whose
+  listener has just been unsubscribed is never answered, and `runScan` awaits
+  that promise — the scan would simply never start); **`_notesAttachSeq`**
+  makes a superseded attach stand down rather than race the one that replaced
+  it; and **the listeners come down on every account change**, or one
+  account's notes go on grounding the next person to sign in on the device.
+  **`runScan` awaits the notebook before it writes a word**, so a note typed
+  seconds earlier is obeyed by the very next answer.
+- **A live repaint yields to whatever is being typed.** `renderNotesBody`
+  rebuilds the whole window, so a snapshot arriving while the admin is half
+  way through an upload comment would silently empty the box. The window waits
+  for the next render instead — the notes are already live in every prompt
+  whatever the screen happens to show.
 - **Only the admin sees the notes window and only the admin ever writes.** A student's device reads
   the notes (the scan runs there) and learns whose notes to read from the Portal's `config/admin`
   pointer — the same document students there resolve the question bank from — remembered in
@@ -80,15 +101,19 @@ step, and ship a change to the shape in both repos together**:
   is dropped instead of landing among the new answers.
 
 ## House rules
-- After touching **the grounding or the scan run** (`aiGrounding`, `notesBlock`, `guidanceBlock`,
-  `styleBlock`, `noteAppliesHere`, `notesRelevant`, `groundingSummary`, `_scanNewItem`,
-  `_scanFoldRows`, `SCAN_SYS`, `SCAN_DETAIL_RULE`, `_parseAIJson`), run
+- After touching **the grounding, the live notebook or the scan run**
+  (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `notesRelevant`,
+  `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
+  `_notesLiveRepaint`, `_scanNewItem`, `_scanFoldRows`, `SCAN_SYS`, `SCAN_DETAIL_RULE`,
+  `_parseAIJson`), run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
   against stubs. Every failure here is silent and the app carries on looking perfectly right: a
   digest that comes back empty is an answer that is no longer the teacher's, key facts leaking into
   a marking digest is the answer handed to the marker, a continuation that stops folding turns one
   question into two halves each with half an answer, and a page number that is batch-local rather
-  than global cites the wrong page on every answer after the third.
+  than global cites the wrong page on every answer after the third. The listener is in there for
+  the same reason: a one-shot read looks exactly like a live one until the day somebody types a
+  note in Ans Key mid-lesson, and then this app is quietly a day behind the one next to it.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.
