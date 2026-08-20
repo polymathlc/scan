@@ -466,7 +466,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.0.0';
+var APP_VERSION = 'v1.1.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -656,6 +656,11 @@ var notesOwnerUid = '';
 var notesLoaded = false;
 var notesLoading = null;      // in-flight load, so ten callers make one read
 var notesBusy = false;        // an upload is going on
+var _notesUnsub = null;       // the live listener on the shared notebook
+var _styleUnsub = null;       // …and on the style profile Ans Key grows
+var notesWatching = '';       // whose notebook those listeners are on
+var _notesAttachSeq = 0;      // bumped per attach, so a superseded one stands down
+var _notesPending = [];       // first-load waiters, released if the listeners go
 
 /* How much of the notebook reaches a prompt. Every AI call pays for these
    tokens, so they are deliberately tight — the digest is a reminder of house
@@ -704,35 +709,120 @@ async function resolveNotesOwner() {
   return '';
 }
 
-/* Notes + style profile in one go. A read that is denied (a student whose
-   rules do not allow the teacher's notes, an offline device) is not an error
-   worth showing — the AI carries on ungrounded. */
+/* ---- The notebook is LIVE, not a one-shot read ----
+   It is ONE collection, written from three apps. A single `.get()` at sign-in
+   meant this tab held whatever the notebook said when the teacher signed in
+   and never looked again: a note typed in Ans Key mid-lesson reached the app
+   it was typed in and NO other, so the same question was answered against two
+   different notebooks depending on which tab it was answered in — and nothing
+   anywhere said so. A listener is what makes "one notebook grounds three
+   apps" true rather than true-at-sign-in.
+
+   A read that is denied (a student whose rules do not allow the teacher's
+   notes, an offline device) is not an error worth showing — the AI carries on
+   ungrounded, exactly as it did before any of this existed. */
+function _notesApplySnap(snap) {
+  var list = [];
+  snap.forEach(function (d) {
+    var n = d.data();
+    if (n) { n.id = d.id; list.push(n); }
+  });
+  list.sort(function (a, b) {
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+  });
+  teachingNotes = list;
+  notesLoaded = true;
+  _notesLiveRepaint();
+}
+
+/* A note arriving while the window is open should show up there too — but
+   never at the cost of what the admin is in the middle of typing.
+   renderNotesBody() rebuilds the whole body, so a repaint fired while they
+   are half way through an upload comment would silently empty the box; the
+   window simply waits for the next render instead, and the notes are already
+   live in every prompt whatever the screen shows. */
+function _notesLiveRepaint() {
+  try {
+    if (_answers.length) renderAnswers();   // the line naming what is being applied
+    var modal = $('notesModal');
+    if (!modal || !modal.classList.contains('open')) return;
+    var body = $('notesBody');
+    if (!body) return;
+    if (document.activeElement && body.contains(document.activeElement)) return;
+    var comment = $('notesComment');
+    var typed = comment ? comment.value : '';
+    renderNotesBody();
+    if (typed) {
+      var again = $('notesComment');
+      if (again) again.value = typed;
+    }
+  } catch (e) { console.warn('Teaching notes repaint', e); }
+}
+
+/* Take the listeners down, and RELEASE anyone waiting on the first snapshot.
+   That second half is not tidiness: `runScan` awaits the first load, so a
+   waiter left holding a promise whose listener has just been unsubscribed
+   would never be answered and the scan would simply never start. */
+function _notesDetach() {
+  [_notesUnsub, _styleUnsub].forEach(function (u) { if (u) { try { u(); } catch (e) {} } });
+  _notesUnsub = null;
+  _styleUnsub = null;
+  notesWatching = '';
+  var waiting = _notesPending;
+  _notesPending = [];
+  waiting.forEach(function (fn) { try { fn(); } catch (e) {} });
+}
+
+function stopTeachingNotes() {
+  _notesAttachSeq++;          // supersede any attach still resolving its owner
+  _notesDetach();
+  notesLoaded = false;
+  notesLoading = null;
+  teachingNotes = [];
+  aiStyle = null;
+}
+
 function loadTeachingNotes(force) {
-  if (notesLoaded && !force) return Promise.resolve(teachingNotes);
-  if (notesLoading) return notesLoading;
+  // Already watching this notebook: it is current by definition, so `force`
+  // has nothing left to do but wait for the first snapshot.
+  if (_notesUnsub && notesWatching === notesOwner()) {
+    return notesLoading || Promise.resolve(teachingNotes);
+  }
+  if (notesLoading && !force) return notesLoading;
+  var mine = ++_notesAttachSeq;
+  var superseded = function () { return mine !== _notesAttachSeq; };
   notesLoading = resolveNotesOwner().then(function (owner) {
-    if (!owner) { notesLoading = null; return teachingNotes; }
-    return Promise.all([
-      notesCollRef(owner).get().then(function (snap) {
-        var list = [];
-        snap.forEach(function (d) {
-          var n = d.data();
-          if (n) { n.id = d.id; list.push(n); }
-        });
-        list.sort(function (a, b) {
-          return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
-        });
-        teachingNotes = list;
-      }).catch(function (e) { console.warn('Teaching notes could not be read', e); }),
-      styleDocRef(owner).get().then(function (snap) {
+    if (superseded() || !owner) return teachingNotes;
+    if (_notesUnsub && notesWatching === owner) return teachingNotes;
+    _notesDetach();
+    notesWatching = owner;
+    return new Promise(function (resolve) {
+      var left = 2;
+      var finish = function () { resolve(teachingNotes); };
+      var done = function () { if (--left <= 0) finish(); };
+      _notesPending.push(finish);   // released if these listeners are taken down first
+      var settledNotes = false, settledStyle = false;
+      _notesUnsub = notesCollRef(owner).onSnapshot(function (snap) {
+        _notesApplySnap(snap);
+        if (!settledNotes) { settledNotes = true; done(); }
+      }, function (e) {
+        console.warn('Teaching notes could not be read', e);
+        if (!settledNotes) { settledNotes = true; done(); }
+      });
+      // The style profile is grown in Ans Key, so it changes under this app
+      // too — a rebuild there should reach the next answer written here.
+      _styleUnsub = styleDocRef(owner).onSnapshot(function (snap) {
         aiStyle = snap.exists ? snap.data() : null;
-      }).catch(function (e) { console.warn('AI style profile could not be read', e); })
-    ]).then(function () {
-      notesLoaded = true;
-      notesLoading = null;
-      if ($('notesModal').classList.contains('open')) renderNotesBody();
-      return teachingNotes;
+        _notesLiveRepaint();
+        if (!settledStyle) { settledStyle = true; done(); }
+      }, function (e) {
+        console.warn('AI style profile could not be read', e);
+        if (!settledStyle) { settledStyle = true; done(); }
+      });
     });
+  }).then(function (v) {
+    if (!superseded()) notesLoading = null;
+    return v;
   });
   return notesLoading;
 }
@@ -1806,12 +1896,11 @@ function signOut() { auth.signOut(); }
 
 auth.onAuthStateChanged(function (user) {
   currentUser = user || null;
-  // Whatever the last account had is dropped first — the new one keeps only
-  // what its own read is allowed to bring back.
-  teachingNotes = [];
-  aiStyle = null;
-  notesLoaded = false;
-  notesLoading = null;
+  // Whatever the last account had is dropped first, listeners included — one
+  // left running would go on feeding one account's notes to the next person
+  // to sign in on the same device. The new account keeps only what its own
+  // read is allowed to bring back.
+  stopTeachingNotes();
   renderAuth();
   if (user) loadTeachingNotes(true).then(function () { renderAnswers(); });
 });

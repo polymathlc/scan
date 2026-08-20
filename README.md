@@ -40,6 +40,10 @@ apps ground all three.
 - **🧠 Your learned style** — read here, learned in **Ans Key**. Press *Learn from this worksheet*
   there on a worksheet you have already answered and every answer written here sharpens with it.
 
+**The notebook is live.** Type a note in Ans Key mid-lesson and the very next question answered
+here obeys it — no reload, nothing to press. The same goes the other way and for the Learning
+Portal: one notebook, three apps, always the same one.
+
 The page says which of those it is applying, under the answers. An ungrounded answer looks exactly
 like a grounded one, so it says so rather than leaving you to guess.
 
