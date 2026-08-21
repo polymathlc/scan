@@ -5,9 +5,10 @@ Guidance for Claude when working in this repo.
 ## App
 - `index.html` — **"Scan & Answer"**. One self-contained file (markup + CSS + JS) on the shared
   `mathgen--app` Firebase project with Google sign-in. Photograph a worksheet or an exam paper —
-  or pick pictures out of the gallery — and **every question printed on them is read and
-  answered**. Nothing is saved anywhere: a photographed paper is somebody's work, so it lives in
-  the tab and leaves through Copy or Print.
+  or pick pictures out of the gallery — and **every question printed on them is read: what the
+  student has already written is MARKED, what is still blank is ANSWERED**. Four subjects:
+  Science, Mathematics, English, Chinese. Nothing is saved anywhere: a photographed paper is
+  somebody's work, so it lives in the tab and leaves through Copy or Print.
 - Version badge (`APP_VERSION`, shown in the header) is hard-coded — bump it on every change.
 
 ## The AI is the Ans Key app's, ported whole
@@ -17,15 +18,20 @@ step, and ship a change to the shape in both repos together**:
 - **`aiGrounding(kind)` is the ONE door.** Every AI call in this app appends it to its system
   prompt. Adding an AI feature means calling it too — grounding one call site and not another is
   how the app ends up answering in the teacher's voice on one button and not the next.
-  `kind` is `'answer'` (writing an answer), `'mark'` (marking) or `'teach'` (explaining); marking
-  gets the marking standards and never the exemplar answers.
+  `kind` is `'answer'` (writing an answer), `'mark'` (marking), **`'scan'` (this app's own run —
+  it answers the blanks AND marks what is written, so it gets everything `'answer'` gets PLUS the
+  marking standard)** or `'teach'` (explaining). **`'mark'` gets the marking standards and never
+  the key facts or the exemplar answers** — a marker handed the answer stops marking against the
+  paper. `'scan'` is the exception on purpose: it is writing the answer anyway.
 - **The authority order is stated in the digest and never changes**: what the paper itself prints
   wins, then the teacher's general guidance, then the notes and the style, and ordinary syllabus
   knowledge only where they say nothing.
 - **`guidance` is the hand-typed note and it is the ONLY field that reaches every `kind`.** It goes
   in verbatim through `guidanceBlock()`, ahead of `notesBlock`/`styleBlock`. Nothing is sent to the
-  AI when one is saved: it is a note with empty `subjects`/`levels` (so it applies everywhere) and
-  empty `keywords`/`keyFacts`/`markingStandards`, written straight to Firestore.
+  AI when one is saved: it is a note with empty `levels` and empty
+  `keywords`/`keyFacts`/`markingStandards`, written straight to Firestore. `subjects` is empty too
+  unless the admin picked one in the ✍️ modal — **the picker defaults to "Every subject", so
+  leaving it alone keeps what a typed note has always meant.**
 - **ONE notebook, three apps.** The notes live at `users/{adminUid}/teachingNotes/{id}` — the same
   collection Ans Key and the Science Learning Portal (`polymathlc/cer`) read and write. Keep the
   fields compatible: `topics` is reserved for the Portal's syllabus list and this app writes it
@@ -66,6 +72,33 @@ step, and ship a change to the shape in both repos together**:
   ungrounded, exactly as it did before the feature existed.
 - **The page SAYS whether it is grounded** (`groundingSummary`). An ungrounded answer looks
   identical to a grounded one, so the teacher would otherwise never know the notes were not read.
+
+## Four subjects, and marking (v1.3.0)
+- **`SUBJECTS` is the ONE list.** Science, Mathematics, English, Chinese. The settings picker, the
+  ✍️ note picker, `SUBJECT_OK` (what a note may be tagged with), `subjectLabel` and
+  `SCAN_SUBJECT_RULE` all read it, so a fifth subject is one entry rather than six edits that have
+  to agree. Both `<select>`s are filled by `fillSubjects()` — never hand-write an `<option>`.
+- **`'both'` is Ans Key's old maths-and-science pairing** and notes written then still carry it.
+  `noteSubjects()` spells it out as `['math','science']`: it must go on grounding those two and
+  must NOT quietly grow to cover the two subjects that did not exist when it was written.
+- **Marking is automatic and has no setting.** A picker asking "mark or answer?" is a decision
+  demanded before the app has even seen the page, and the honest answer is usually *both*.
+  `SCAN_MARK_RULE` is the rule: something written is marked, nothing written is answered, and a
+  page holding both comes back holding both.
+- **The correct answer is worked out FIRST, from the printed question alone.** A model that reads
+  the pupil's "1.4" before it does the sum agrees with it far too often, and an app that agrees
+  with a wrong answer is worse than no app. `SCAN_MARK_RULE` and the `'scan'` authority order both
+  say so; the old "IGNORE it" line is gone because ignoring it was never the point — not being
+  swayed by it was.
+- **A blank is NEVER marked wrong.** `_scanNewItem` drops a `verdict`, `marks` and `feedback` that
+  came back with an empty `studentAnswer`, because a red cross on an untouched worksheet is the one
+  mistake this feature can make. `it.marked` is `!!studentAnswer` and nothing else.
+- **The three verdicts are `correct` / `partial` / `wrong`** (`SCAN_VERDICTS`). Anything else the
+  model invents is dropped, but the question still shows as marked with what the student wrote —
+  half a mark is better than silently losing their work off the card.
+- **`renderTally` says nothing when nothing was attempted.** A fresh worksheet must not be
+  announced as a score of zero out of nothing.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
 
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
@@ -115,6 +148,9 @@ step, and ship a change to the shape in both repos together**:
   sinks the rest of the paper**: those pages are marked failed and the run carries on.
 - **The thumbnails' page numbers count only the pictures actually SENT.** A picture that could not
   be opened holds no page number, or every answer after it cites a page one out.
+- **The run both answers and marks, so it is grounded as `aiGrounding('scan')`.** Grounded as a
+  plain `'answer'` call it would mark a whole paper without ever being told how this teacher marks,
+  and every card would still look perfectly right.
 - **`thinkingLevel: 'high'` is what decides whether the answers are right.** A P5 word problem is
   four or five steps of units and model drawing, and a model answering off the top of its head gets
   them wrong. Do not turn it down to save tokens.
@@ -123,16 +159,18 @@ step, and ship a change to the shape in both repos together**:
 
 ## House rules
 - After touching **the grounding, the live notebook or the scan run**
-  (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `notesRelevant`,
-  `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
+  (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
+  `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
   `_notesLiveRepaint`, `_scanNewItem`, `_scanFoldRows`, `SCAN_SYS`, `SCAN_DETAIL_RULE`,
-  `_parseAIJson`), run
+  `SCAN_MARK_RULE`, `SCAN_SUBJECT_RULE`, `SUBJECTS`, `_parseAIJson`), run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
   against stubs. Every failure here is silent and the app carries on looking perfectly right: a
   digest that comes back empty is an answer that is no longer the teacher's, key facts leaking into
   a marking digest is the answer handed to the marker, a continuation that stops folding turns one
   question into two halves each with half an answer, and a page number that is batch-local rather
-  than global cites the wrong page on every answer after the third. The listener is in there for
+  than global cites the wrong page on every answer after the third. A verdict kept on a blank puts
+  a red cross on a question nobody attempted, and a note tagged `english` that grounds a Chinese
+  paper is the wrong notebook answering. The listener is in there for
   the same reason: a one-shot read looks exactly like a live one until the day somebody types a
   note in Ans Key mid-lesson, and then this app is quietly a day behind the one next to it.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move

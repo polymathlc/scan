@@ -244,6 +244,41 @@
   .whyLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
   .whyText { font-size: 0.88rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
 
+  /* ---------- Marking ----------
+     A marked card wears its verdict on the edge, so a page of them reads as a
+     column of ticks and crosses before a word of it is read. */
+  .ansCard.marked { border-left: 4px solid var(--line); }
+  .ansCard.mCorrect { border-left-color: #43A047; }
+  .ansCard.mPartial { border-left-color: #E8A54B; }
+  .ansCard.mWrong { border-left-color: #E53935; }
+  .verdict {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: .03em;
+    border-radius: 999px; padding: 3px 12px; border: 1px solid transparent; white-space: nowrap;
+  }
+  .verdict.mCorrect { background: #EFF8EF; color: #1F5F23; border-color: #CFE7D0; }
+  .verdict.mPartial { background: #FDF4E3; color: #7A5410; border-color: #E7BD72; }
+  .verdict.mWrong { background: #FCEDEB; color: #8C2E1D; border-color: #EFC6BF; }
+  .verdict.mBlank { background: var(--bg-soft); color: var(--ink-faint); border-color: var(--line); }
+  .ansMarks { font-size: 0.74rem; font-weight: 700; color: var(--ink-soft); }
+  .youBox { margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--line); }
+  .youLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
+  .youText { font-size: 0.92rem; margin-top: 4px; white-space: pre-wrap; }
+  .youBox.mWrong { background: #FCEDEB; border-color: #EFC6BF; }
+  .youBox.mPartial { background: #FDF4E3; border-color: #E7BD72; }
+  .youBox.mCorrect { background: #F4FAF4; border-color: #CFE7D0; }
+  .fbBox { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: #FFFBF3; border: 1px solid #F0DCB4; }
+  .fbLabel { font-size: 0.72rem; font-weight: 700; color: #7A5410; letter-spacing: .03em; text-transform: uppercase; }
+  .fbText { font-size: 0.9rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
+  .tallyRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .tallyRow:empty { display: none; }
+  .tally {
+    font-size: 0.76rem; font-weight: 600; border-radius: 999px;
+    padding: 5px 13px; border: 1px solid var(--line); background: var(--bg-soft); color: var(--ink-soft);
+  }
+  .tally.mCorrect { background: #EFF8EF; color: #1F5F23; border-color: #CFE7D0; }
+  .tally.mPartial { background: #FDF4E3; color: #7A5410; border-color: #E7BD72; }
+  .tally.mWrong { background: #FCEDEB; color: #8C2E1D; border-color: #EFC6BF; }
+
   .empty {
     color: var(--ink-faint); text-align: center; padding: 40px 18px;
     border: 1px dashed var(--line); border-radius: var(--radius); font-size: 0.9rem;
@@ -395,6 +430,8 @@
     <h2>Photograph the questions. Get the answers.</h2>
     <p class="sub">Take a photo of a worksheet or an exam paper — or pick pictures out of your gallery —
       and every question on them is read and answered, in your teacher's own words.
+      Science, Maths, English and Chinese alike. Anything already written on the page is
+      <b>marked</b> and given feedback; anything still blank is answered.
       A question that runs over onto the next page is fine: add both pictures and they are read as one paper.</p>
     <div class="rowBtns"><button class="btn btnPrimary btnBig" id="signInBtn2">Sign in with Google</button></div>
   </section>
@@ -431,6 +468,8 @@
             <button class="btn" id="printAnswersBtn">🖨 Print</button>
           </div>
         </div>
+        <div class="tallyRow" id="markTally"></div>
+        <p class="sub" id="markSummary" style="margin-top:10px"></p>
         <p class="sub" id="answersNote" style="margin-top:10px"></p>
       </div>
       <div id="answersList"></div>
@@ -448,6 +487,16 @@
         <li><b>Press ✓ when the paper is complete.</b> Every question printed on the pages comes back answered — multiple choice, fill in the blank, open-ended and lettered parts alike.</li>
       </ol>
       <p class="sub" style="margin-top:6px">A question that carries on over the page is fine: the pages are read as one paper, so it is stitched back together instead of coming back as two halves.</p>
+      <h3 style="margin-top:22px">It marks what is already written</h3>
+      <p class="sub" style="margin-top:6px">You do not have to choose. Every question is looked at for an answer already written on
+        the paper: where there is one it is <b>marked</b> — right, partly right or wrong — with a line or two of feedback
+        saying exactly where it went wrong and what to do instead, and the correct answer beside it. Where the question is
+        still blank it is simply answered. A page holding some of each comes back with some of each.</p>
+      <p class="sub" style="margin-top:10px">The correct answer is always worked out from scratch first, so what the student
+        wrote can never talk the app into the wrong answer.</p>
+      <h3 style="margin-top:22px">Four subjects</h3>
+      <p class="sub" style="margin-top:6px">Science, Mathematics, English and Chinese. A Chinese paper is answered and marked
+        in Chinese; an English comprehension gets an answer in full sentences, and a maths question gets the working line by line.</p>
       <p class="sub" style="margin-top:14px">Nothing is saved anywhere. Your paper lives in this tab and leaves through <b>Copy</b> or <b>Print</b>.</p>
     </div>
 
@@ -476,10 +525,10 @@
         </div>
         <div class="field">
           <label for="scanSubject">Subject <span class="hint">(optional)</span></label>
+          <!-- Filled from SUBJECTS, the one list, so a subject cannot exist in
+               the picker and not in the note tags. -->
           <select id="scanSubject">
             <option value="">Any subject</option>
-            <option value="science">Science</option>
-            <option value="math">Mathematics</option>
           </select>
         </div>
       </div>
@@ -528,6 +577,15 @@
         <label for="qnText">The note</label>
         <textarea id="qnText" rows="6" placeholder="e.g. Always give the answer in a full sentence and name the process — “evaporation”, not “it dries up”."></textarea>
       </div>
+      <!-- A note is a house rule for EVERY subject unless it says otherwise: the
+           picker starts on "Every subject" so leaving it alone keeps what a note
+           has always meant, and a rule that is only about Chinese can now say so. -->
+      <div class="fieldRow">
+        <label for="qnSubject">Which subject <span class="hint">(optional — a note left on “Every subject” applies to all four)</span></label>
+        <select id="qnSubject">
+          <option value="">Every subject</option>
+        </select>
+      </div>
       <div class="tnStatus" id="qnStatus" style="display:none"></div>
     </div>
     <div class="modalFoot">
@@ -543,7 +601,7 @@
     <div class="modalHead"><h2>✎ Edit these notes</h2></div>
     <div class="modalBody">
       <div class="fieldRow"><label for="nteTitle">Title</label><input type="text" id="nteTitle"></div>
-      <div class="fieldRow"><label for="nteSubjects">Subjects <span class="hint">(math, science — blank means every subject)</span></label><input type="text" id="nteSubjects"></div>
+      <div class="fieldRow"><label for="nteSubjects">Subjects <span class="hint">(math, science, english, chinese — blank means every subject)</span></label><input type="text" id="nteSubjects"></div>
       <div class="fieldRow"><label for="nteLevels">Levels <span class="hint">(P3, P4, P5, P6, S1 — blank means every level)</span></label><input type="text" id="nteLevels"></div>
       <div class="fieldRow"><label for="nteGuide">General guidance <span class="hint">(obeyed word for word on every question)</span></label><textarea id="nteGuide" rows="4"></textarea></div>
       <div class="fieldRow"><label for="nteKeywords">Keywords <span class="hint">(comma separated)</span></label><textarea id="nteKeywords" rows="3"></textarea></div>
@@ -584,7 +642,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.2.0';
+var APP_VERSION = 'v1.3.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -625,8 +683,25 @@ function isAdmin(user) { return !!user && user.email === ADMIN_EMAIL; }
    other Polymath apps use, so a note tagged P5 there means P5 here. */
 var LEVELS = ['P3', 'P4', 'P5', 'P6', 'S1'];
 function levelLabel(l) { return l === 'S1' ? 'Sec 1' : (l || ''); }
+
+/* Every subject the centre teaches. The list is the ONE place a subject is
+   declared: the picker, the note tags, what the AI is told a subject is worth
+   and what a note is allowed to be tagged with all read it, so adding a fifth
+   subject is one entry rather than six edits that have to agree. */
+var SUBJECTS = [
+  { value: 'science', label: 'Science' },
+  { value: 'math',    label: 'Mathematics' },
+  { value: 'english', label: 'English' },
+  { value: 'chinese', label: 'Chinese' }
+];
+var SUBJECT_OK = {};
+SUBJECTS.forEach(function (s) { SUBJECT_OK[s.value] = 1; });
 function subjectLabel(s) {
-  return s === 'math' ? 'Mathematics' : s === 'science' ? 'Science' : s === 'both' ? 'Maths & Science' : '';
+  // 'both' is Ans Key's old maths-and-science pairing, from before there were
+  // four subjects. Notes written then still carry it, so it is still read.
+  if (s === 'both') return 'Maths & Science';
+  for (var i = 0; i < SUBJECTS.length; i++) if (SUBJECTS[i].value === s) return SUBJECTS[i].label;
+  return '';
 }
 
 /* What the notes are being applied to right now. The scan has no worksheet
@@ -950,12 +1025,27 @@ function loadTeachingNotes(force) {
    neither is general and applies to everything. If nothing matches what is
    being scanned the whole notebook is used rather than none of it — a
    teacher who uploaded notes expects them to be read. */
+/* The subjects a note is tagged with, with Ans Key's old 'both' spelled out.
+   'both' meant maths AND science back when those were the only two subjects
+   there were, so a note carrying it must go on grounding those two papers and
+   must NOT quietly start grounding an English one. */
+function noteSubjects(n) {
+  var raw = Array.isArray(n && n.subjects) ? n.subjects : [];
+  var out = [];
+  raw.forEach(function (v) {
+    var t = String(v || '').toLowerCase().trim();
+    if (!t) return;
+    var add = t === 'both' ? ['math', 'science'] : [t];
+    add.forEach(function (x) { if (out.indexOf(x) === -1) out.push(x); });
+  });
+  return out;
+}
 function noteAppliesHere(n) {
   var subj = wsMeta.subject || '';
   var lvl = wsMeta.level || '';
-  var subs = Array.isArray(n.subjects) ? n.subjects.filter(Boolean) : [];
+  var subs = noteSubjects(n);
   var lvls = Array.isArray(n.levels) ? n.levels.filter(Boolean) : [];
-  if (subs.length && subj && subs.indexOf(subj) === -1 && subs.indexOf('both') === -1 && subj !== 'both') return false;
+  if (subs.length && subj && subs.indexOf(subj) === -1) return false;
   if (lvls.length && lvl && lvls.indexOf(lvl) === -1) return false;
   return true;
 }
@@ -1002,7 +1092,9 @@ function styleBlock(kind) {
   var marking = String(p.markingStandards || '').trim().slice(0, 500);
   if (rules) bits.push('How this teacher writes answers: ' + rules);
   if (phrasing) bits.push('Phrasing: ' + phrasing);
-  if (kind === 'mark' && marking) bits.push('How this teacher marks: ' + marking);
+  // 'scan' writes the answers AND marks what the student wrote, so it needs
+  // the marking standard as much as a pure marking call does.
+  if ((kind === 'mark' || kind === 'scan') && marking) bits.push('How this teacher marks: ' + marking);
   var kw = (Array.isArray(p.keywords) ? p.keywords : []).slice(0, 24)
              .map(function (s) { return String(s).trim(); }).filter(Boolean);
   if (kw.length) bits.push('Words the teacher uses again and again: ' + kw.join(', ') + '.');
@@ -1024,7 +1116,12 @@ function styleBlock(kind) {
 
 /* ---- The notebook, in prompt form ----
    kind: 'answer'  writing an answer or an answer key
-         'mark'    marking a student's answer
+         'mark'    marking a student's answer — the marking standards, never
+                   the key facts and never the exemplar answers, because a
+                   marker handed the answer stops marking against the paper
+         'scan'    the run this app is: it writes the answer to every blank AND
+                   marks every answer already written on the page, so it needs
+                   what 'answer' gets PLUS the marking standard
          'teach'   explaining */
 function notesBlock(kind) {
   var rel = notesRelevant();
@@ -1037,7 +1134,10 @@ function notesBlock(kind) {
   if (kw.length) {
     bits.push(kind === 'mark'
       ? 'Preferred keywords — expect and accept these exact terms in a full-mark answer: ' + kw.join(', ') + '.'
-      : 'Preferred vocabulary — use these exact terms wherever they fit: ' + kw.join(', ') + '.');
+      : kind === 'scan'
+        ? 'Preferred vocabulary — use these exact terms in the answers you write, and expect them in a ' +
+          'full-mark answer when you mark what the student wrote: ' + kw.join(', ') + '.'
+        : 'Preferred vocabulary — use these exact terms wherever they fit: ' + kw.join(', ') + '.');
   }
   if (std) bits.push('Marking standards from those notes: ' + std);
   if (facts && kind !== 'mark') bits.push('Key facts taught:\n' + facts);
@@ -1071,7 +1171,9 @@ function aiGrounding(kind) {
   if (!guide && !notes && !style) return '';
   var authority = kind === 'mark'
     ? "\n\nAUTHORITY ORDER: the teacher's model answer (when one is attached) always wins — never mark against it. Then the general guidance above. Use the notes and the style for the keywords, the phrasing and the standard expected; fall back to ordinary syllabus knowledge only where they say nothing."
-    : "\n\nAUTHORITY ORDER: what the paper itself prints or shows always wins — never contradict it. Then the general guidance above. Otherwise base the content AND the wording on the notes and the style, and fall back to ordinary syllabus knowledge only where they say nothing.";
+    : kind === 'scan'
+      ? "\n\nAUTHORITY ORDER: what the paper itself prints or shows always wins — never contradict it, and what a student has WRITTEN on it is never evidence of anything. Then the general guidance above. Consult the notes and the style FIRST — before you answer a blank and before you mark anything, both for what the answer says and for the standard you hold a written answer to — and fall back to ordinary syllabus knowledge only where they say nothing."
+      : "\n\nAUTHORITY ORDER: what the paper itself prints or shows always wins — never contradict it. Then the general guidance above. Otherwise base the content AND the wording on the notes and the style, and fall back to ordinary syllabus knowledge only where they say nothing.";
   return guide + notes + style + authority;
 }
 
@@ -1138,12 +1240,13 @@ async function notesHandleFiles(files) {
       : 'the ' + files.length + ' attached files, which together form ONE set of notes — read them in the order attached and analyse them as a single document';
     var prompt =
       "You are analysing a tuition teacher's own reference notes (" + docDesc + ') for a ' +
-      'Singapore primary-to-lower-secondary (P3 to Sec 1) app that reads photographs of worksheets ' +
-      'and exam papers and answers every question on them in that teacher\'s style.\n' +
+      'Singapore primary-to-lower-secondary (P3 to Sec 1) app that reads photographs of Science, ' +
+      'Mathematics, English and Chinese worksheets and exam papers, marks every answer already ' +
+      'written on them and answers every question still blank, in that teacher\'s style.\n' +
       (comment ? 'The teacher says about this document: "' + comment + '".\n' : '') +
       'Extract the teaching content and return ONLY JSON:\n' +
       '{"title":"a short descriptive title for these notes",' +
-      '"subjects":["math and/or science — only the subjects this document is about, from EXACTLY: math; science"],' +
+      '"subjects":["only the subjects this document is about, from EXACTLY: ' + SUBJECTS.map(function (x) { return x.value; }).join('; ') + ' — leave empty if it is not tied to one subject"],' + 
       '"levels":["only the levels this document is for, from EXACTLY: ' + LEVELS.join('; ') + ' — leave empty if it suits every level"],' +
       '"noteTopics":["the topics this document covers, in the document\'s own words"],' +
       '"keywords":["the EXACT terms and key phrases students are expected to use in their answers, most important first — copy the document\'s own wording"],' +
@@ -1151,13 +1254,15 @@ async function notesHandleFiles(files) {
       '"keyFacts":"the key facts, rules, formulas and methods taught, one short line each, separated by \\n (plain text, at most 1500 characters)"}\n' +
       'Rules:\n- 10 to 40 keywords, each 1-4 words, no duplicates, most important first.\n' +
       '- "subjects" and "levels" only from the lists given, and only when the document really is limited to them; an empty list means it applies to everything.\n' +
+      '- The document may be written in Chinese: keep the keywords, the marking standards and the key ' +
+      'facts in the language the students have to use them in, and give the title in that language too.\n' +
       '- Plain text only, no markdown.';
     var raw = await window.askGemini(prompt, {
       system: 'You read a teacher\'s notes and return strict JSON. No markdown, no commentary.',
       maxOutputTokens: 3072, temperature: 0.2, json: true, images: media
     });
     var p = _parseAIJson(raw) || {};
-    var subjOk = { math: 1, science: 1 };
+    var subjOk = SUBJECT_OK;
     var note = {
       title: styleTrim(p.title, 140) || files[0].name || 'Untitled notes',
       fileName: files.map(function (f) { return f.name || ''; }).filter(Boolean).join(', '),
@@ -1218,6 +1323,7 @@ function quickNoteStatus(msg) {
 function openQuickNoteModal() {
   if (!isAdmin(currentUser)) return;
   quickNoteStatus('');
+  if ($('qnSubject')) $('qnSubject').value = '';
   $('quickNoteModal').classList.add('open');
   setTimeout(function () { if ($('qnText')) $('qnText').focus(); }, 50);
 }
@@ -1232,6 +1338,9 @@ async function quickNoteSave() {
     return;
   }
   var typed = ($('qnTitle') ? $('qnTitle').value : '').trim();
+  // Left on "Every subject" a note carries no subject at all, which is what a
+  // typed note has always meant and what makes it a house rule everywhere.
+  var qnSubj = ($('qnSubject') ? $('qnSubject').value : '').trim();
   var note = {
     title: styleTrim(typed, 140) || quickNoteTitleFrom(text),
     fileName: '',
@@ -1240,7 +1349,7 @@ async function quickNoteSave() {
     noteKind: 'guidance',
     topics: [],
     noteTopics: [],
-    subjects: [],
+    subjects: SUBJECT_OK[qnSubj] ? [qnSubj] : [],
     levels: [],
     keywords: [],
     markingStandards: '',
@@ -1259,10 +1368,13 @@ async function quickNoteSave() {
     teachingNotes.unshift(note);
     if ($('qnText')) $('qnText').value = '';
     if ($('qnTitle')) $('qnTitle').value = '';
+    if ($('qnSubject')) $('qnSubject').value = '';
     quickNoteStatus('');
     closeQuickNoteModal();
     renderNotesBody();
-    toast('✅ Noted — the AI follows “' + note.title + '” from now on.', 5000);
+    toast('✅ Noted — the AI follows “' + note.title + '”' +
+      (note.subjects.length ? ' on every ' + subjectLabel(note.subjects[0]) + ' paper' : '') +
+      ' from now on.', 5000);
   } catch (e) {
     console.error('Quick note failed', e);
     quickNoteStatus('Could not save: ' + ((e && e.message) || e));
@@ -1309,7 +1421,7 @@ function notesEditClose() {
 async function notesEditSave() {
   var n = teachingNotes.filter(function (x) { return x.id === noteEditId; })[0];
   if (!n || !isAdmin(currentUser)) { notesEditClose(); return; }
-  var subjOk = { math: 1, science: 1 };
+  var subjOk = SUBJECT_OK;
   n.title = styleTrim($('nteTitle').value, 140) || n.fileName || 'Untitled notes';
   n.subjects = $('nteSubjects').value.split(',').map(function (s) { return s.toLowerCase().trim(); })
     .filter(function (s) { return subjOk[s]; });
@@ -1520,12 +1632,53 @@ var SCAN_READING_NOTE =
   'picture just because it is faint — and a speck of dirt is not punctuation, a decimal point or a tick. Where the ' +
   'photograph has genuinely destroyed a word or a number, do NOT invent a plausible replacement: say it is unclear.\n';
 
+/* ---- Marking what is already written ----
+   The one rule that decides whether this app is an answer key or a marked
+   paper. A page is usually BOTH: some questions done, some still blank. The
+   two halves are worked out in the same pass, question by question, because
+   the same reading of the same picture settles both — but they are worked out
+   in a fixed order, the correct answer FIRST and from scratch. A model that
+   reads the pupil's "1.4" before it does the sum agrees with it far too
+   often, and an app that agrees with a wrong answer is worse than no app.
+
+   A blank is never marked wrong: there is nothing to mark, so it is simply
+   answered. That distinction is what makes a mixed page come back honest. */
+var SCAN_MARK_RULE =
+  'MARK WHAT IS ALREADY WRITTEN, ANSWER WHAT IS NOT. Look at every question for an answer the student has ' +
+  'already put on the paper — in pen or pencil, in a blank, on an answer line, in a box or a table, a circled or ' +
+  'ticked multiple-choice option, or working left in the working space. ' +
+  'ALWAYS work the correct answer out YOURSELF FIRST, from the printed question alone, before you so much as ' +
+  'weigh what is written there: a written answer is never evidence of anything and is often wrong — that is ' +
+  'usually why the paper is being scanned. Only then compare the two. ' +
+  'Where the student HAS answered: "studentAnswer" is what they wrote, transcribed as it stands (say "unclear" ' +
+  'where the handwriting genuinely cannot be read); "verdict" is exactly one of "correct", "partial" or "wrong" ' +
+  '— "partial" for an answer that is right as far as it goes but is missing a required step, unit, keyword or ' +
+  'one part of a two-part question; "marks" is what you would award as "awarded/total" ("2/3") when the paper ' +
+  'prints a mark allocation for that question and an EMPTY STRING when it does not; and "feedback" is 1 to 3 ' +
+  'sentences spoken TO THE STUDENT — what they got right, exactly where it went wrong, and what to do instead. ' +
+  'Say what was good about a correct answer rather than only "correct". Never be unkind; never be vague. ' +
+  'Where the question is still BLANK: "studentAnswer", "verdict", "marks" and "feedback" are ALL empty strings. ' +
+  'A blank is not a wrong answer — it has simply not been attempted, so it is answered instead of marked. ' +
+  'A page may hold both, and usually does: mark every question that has been attempted and answer every ' +
+  'question that has not, one by one. An attempt that has been crossed out and replaced is not the answer — ' +
+  'mark what the student clearly meant to stand. ' +
+  '"answer" is ALWAYS your own correct answer, whether the student attempted the question or not, and it never ' +
+  'changes to agree with what they wrote. ' +
+  'If the paper is a printed ANSWER KEY or a model answer sheet rather than a pupil\'s work, that printed answer ' +
+  'is the paper speaking, not a student: leave "studentAnswer" empty and do not mark it. ';
+
 var SCAN_SYS =
-  'You are an experienced Singapore tuition teacher (P3 to Secondary 1) answering EVERY question printed on the ' +
-  'photographs of a worksheet or exam paper that are attached. Reply with STRICT JSON only, no markdown, exactly ' +
+  'You are an experienced Singapore tuition teacher (P3 to Secondary 1) working through the photographs of a ' +
+  'Science, Mathematics, English or Chinese worksheet or exam paper that are attached. You do TWO things at once, ' +
+  'question by question: where the student has already written an answer you MARK it and give feedback, and where ' +
+  'the question is still blank you ANSWER it. Reply with STRICT JSON only, no markdown, exactly ' +
   'this shape: {"questions":[{"continuation":false,"number":"16","page":1,"type":"mcq","question":"the printed ' +
   'wording","options":[{"label":"1","text":"…"}],"option":"2","answer":"(2) the option\'s wording",' +
-  '"explanation":"why this is the answer"}]}. Rules: one entry for every question actually PRINTED on the ' +
+  '"explanation":"why this is the answer","studentAnswer":"what the student wrote, or an empty string",' +
+  '"verdict":"correct | partial | wrong, or an empty string when nothing was written",' +
+  '"marks":"2/3 when the paper prints a mark allocation, otherwise an empty string",' +
+  '"feedback":"what to say to the student about what they wrote, or an empty string"}]}. ' +
+  'Rules: one entry for every question actually PRINTED on the ' +
   'attached pictures, in the order they appear, keeping the paper\'s own numbering in "number" ("16", "3a"). ' +
   'ONE ENTRY PER LETTERED PART: a question printed as 8(a) and 8(b) is TWO entries, numbered "8(a)" and "8(b)", ' +
   'because they are answered separately. ' +
@@ -1546,9 +1699,42 @@ var SCAN_SYS =
   'marker needs — the value with its unit, or one or two short sentences. ' +
   'Work every question out properly before you answer it: set the working out step by step, then check the ' +
   'arithmetic back against the numbers printed on the page. A quick wrong answer is worse than no answer. ' +
-  'If someone has already written an answer on the paper, IGNORE it and work the answer out yourself — it may ' +
-  'well be wrong; that is often why the paper is being scanned. ' +
+  SCAN_MARK_RULE +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+/* ---- What each subject is worth marks for ----
+   The same reading of the same photograph, held to four different standards:
+   a maths answer without its unit and a Chinese answer written in English are
+   both wrong for reasons that have nothing to do with each other. When the
+   picker is on "Any subject" all four go in and the paper decides. */
+var SCAN_SUBJECT_RULE = {
+  science: 'Science: answer in full sentences and NAME the process or the scientific term rather than describing it ' +
+    'loosely ("evaporation", not "it dries up"). A cause-and-effect answer must say what happened AND why. When ' +
+    'marking, an answer missing the required term is "partial" at best, however right the idea behind it is.',
+  math: 'Mathematics: give the working line by line with the numbers substituted in, and the final answer WITH its ' +
+    'unit; a model or bar-model approach is described in words. Check the arithmetic back against the numbers ' +
+    'printed on the page. When marking, follow the student\'s own working and say which line it went wrong on: a ' +
+    'right method with one slip is "partial", and a right number with no working on a "show your working" ' +
+    'question is "partial" too.',
+  english: 'English: comprehension answers are full sentences in the student\'s own words, lifting from the passage ' +
+    'only where the question asks for evidence. For grammar, vocabulary, cloze, editing and synthesis give the ' +
+    'exact word or form that belongs in the blank and name the rule behind it in the explanation. For a ' +
+    'composition or another long piece of writing do NOT rewrite it: say what a strong response needs, and when ' +
+    'the student has written one, mark it on content, language and organisation together. When marking shorter ' +
+    'answers, a wrong tense, plural or spelling of a required word is not a full-mark answer.',
+  chinese: 'Chinese (华文): write the "answer" and the "explanation" IN CHINESE, in the characters the paper itself ' +
+    'uses (simplified unless the paper is in traditional), and the "feedback" in Chinese too. 汉语拼音 questions ' +
+    'are answered in pinyin with tone marks. For 词语、成语、病句、填空 and 造句 give the exact character, word or ' +
+    'corrected sentence that belongs, then one short line of reason. For 阅读理解 answer in full Chinese sentences. ' +
+    'When marking, a wrong character (错别字) or a word used out of its collocation is not a full-mark answer even ' +
+    'where the meaning comes through.'
+};
+function scanSubjectRule() {
+  var one = SCAN_SUBJECT_RULE[wsMeta.subject || ''];
+  if (one) return 'THIS SUBJECT: ' + one + '\n';
+  return 'THE SUBJECT IS WHATEVER THE PAPER IS — work it out from the pages themselves and hold it to that ' +
+    'standard:\n' + SUBJECTS.map(function (x) { return '• ' + SCAN_SUBJECT_RULE[x.value]; }).join('\n') + '\n';
+}
 
 var SCAN_DETAIL_RULE = {
   short: '"explanation" is an empty string for every question — the answer alone is wanted this time.',
@@ -1740,7 +1926,10 @@ function _scanPrompt(n, from, total, carry) {
   return 'The attached ' + (n === 1 ? 'picture is page ' + from : n + ' pictures are pages ' + from + '–' + (from + n - 1)) +
       ' of ' + total + ' of a Singapore worksheet or exam paper, in order. ' + who + '\n' +
     SCAN_READING_NOTE +
-    'Find EVERY question printed on these pages and answer each one.\n' +
+    scanSubjectRule() +
+    'Find EVERY question printed on these pages. Work the correct answer to each one out yourself first. Then, ' +
+    'question by question: where the student has written something, mark it and write them feedback; where the ' +
+    'question is blank, leave the marking fields empty and just give the answer.\n' +
     (carry ? 'The page before these ended part-way through this question: "' + carry + '". If these pages carry it on, ' +
              'the FIRST entry you return must have "continuation": true and hold only the rest of it — its wording, ' +
              'and the answer to the WHOLE question now that you can see all of it.\n' : '') +
@@ -1748,6 +1937,11 @@ function _scanPrompt(n, from, total, carry) {
     SCAN_DETAIL_RULE[detail] + '\n' +
     'Count the questions on these pages, then check your reply has that many entries before you send it.';
 }
+
+/* The three verdicts, and nothing else. Anything the model invents beyond
+   them ("almost", "see feedback") is not a verdict this app can colour a card
+   with, so it is dropped rather than shown as one. */
+var SCAN_VERDICTS = { correct: 1, partial: 1, wrong: 1 };
 
 function _scanNewItem(r, batchStart, batchLen) {
   if (!r || typeof r !== 'object') return null;
@@ -1766,6 +1960,16 @@ function _scanNewItem(r, batchStart, batchLen) {
   // rather than pointing at a page that is not there.
   var page = parseInt(r.page, 10);
   if (!(page >= 1 && page <= batchLen)) page = 1;
+
+  // What the student wrote is what decides whether this question was MARKED.
+  // A verdict with nothing written behind it is dropped, and so is the
+  // feedback that came with it: a blank is a question to answer, never a
+  // question to mark wrong, and a red cross on an untouched worksheet is the
+  // one mistake this feature can make.
+  var studentAnswer = _scanStr(r.studentAnswer, 900);
+  var verdict = String(r.verdict == null ? '' : r.verdict).toLowerCase().trim();
+  if (!SCAN_VERDICTS[verdict]) verdict = '';
+  var marked = !!studentAnswer;
   return {
     number: _scanStr(r.number, 16),
     page: batchStart + page,          // 1-based across the whole run
@@ -1775,7 +1979,15 @@ function _scanNewItem(r, batchStart, batchLen) {
     options: options,
     option: option,
     answer: answer,
-    explanation: _scanStr(r.explanation, 2400)
+    explanation: _scanStr(r.explanation, 2400),
+    marked: marked,
+    studentAnswer: studentAnswer,
+    // A written answer the model could not bring itself to judge still shows
+    // as marked, with no verdict chip — half a mark is better than silently
+    // dropping the student's work off the card.
+    verdict: marked ? verdict : '',
+    marks: marked ? _scanStr(r.marks, 12) : '',
+    feedback: marked ? _scanStr(r.feedback, 1200) : ''
   };
 }
 
@@ -1800,6 +2012,17 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
       if (it.answer) prev.answer = it.answer;
       if (it.explanation) prev.explanation = it.explanation;
       if (it.type === 'mcq') prev.type = 'mcq';
+      // The student may have written their answer on either half of a question
+      // that runs over the page, so the marking is merged rather than
+      // replaced — but this half is the one that could see the whole question,
+      // so where it judged anything, its judgement stands.
+      if (it.marked) {
+        prev.marked = true;
+        if (it.studentAnswer) prev.studentAnswer = it.studentAnswer;
+        if (it.verdict) prev.verdict = it.verdict;
+        if (it.marks) prev.marks = it.marks;
+        if (it.feedback) prev.feedback = it.feedback;
+      }
       return;
     }
     into.push(it);
@@ -1847,7 +2070,10 @@ async function runScan() {
         var raw = await window.askGemini(
           _scanPrompt(batch.length, start + 1, total, carry),
           {
-            system: SCAN_SYS + aiGrounding('answer'),
+            // 'scan' is the kind that answers the blanks AND marks what is
+            // already written, so the digest carries the key facts the answers
+            // need and the marking standard the marks are held to.
+            system: SCAN_SYS + aiGrounding('scan'),
             // The budget has to cover the thinking as well as the answers: a
             // page of multiple-choice questions is 15-20 entries, not the 4
             // or 5 an open-ended page comes to.
@@ -1907,8 +2133,10 @@ async function runScan() {
       ? 'None of those pages could be read — try a sharper, straighter photo in better light.'
       : 'No questions were found on those pictures.', 6000);
   } else {
-    toast('✅ ' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' answered' +
-      (failedPages.length ? ' — page ' + failedPages.join(', ') + ' could not be read' : '') + '.', 6000);
+    var t = markTally();
+    toast('✅ ' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' read' +
+      (t.marked ? ' — ' + t.marked + ' marked, ' + t.blank + ' answered' : ' — all answered') +
+      (failedPages.length ? '. Page ' + failedPages.join(', ') + ' could not be read' : '') + '.', 6000);
   }
 }
 
@@ -1916,6 +2144,31 @@ async function runScan() {
 function ansPageLabel(it) {
   if (it.endPage && it.endPage !== it.page) return 'pages ' + it.page + '–' + it.endPage;
   return 'page ' + it.page;
+}
+
+/* How the run went: how many questions were already attempted, how those went,
+   and how many were still blank and have simply been answered. One pass, so
+   the card colours, the chips at the top and the closing toast can never
+   disagree about the same paper. */
+function markTally() {
+  var t = { total: _answers.length, marked: 0, blank: 0, correct: 0, partial: 0, wrong: 0, unjudged: 0 };
+  _answers.forEach(function (it) {
+    if (!it.marked) { t.blank++; return; }
+    t.marked++;
+    if (it.verdict === 'correct') t.correct++;
+    else if (it.verdict === 'partial') t.partial++;
+    else if (it.verdict === 'wrong') t.wrong++;
+    else t.unjudged++;
+  });
+  return t;
+}
+var VERDICT_FACE = {
+  correct: { cls: 'mCorrect', chip: '✓ Correct', word: 'correct' },
+  partial: { cls: 'mPartial', chip: '~ Partly right', word: 'partly right' },
+  wrong:   { cls: 'mWrong',   chip: '✗ Wrong', word: 'wrong' }
+};
+function verdictFace(v) {
+  return VERDICT_FACE[v] || { cls: 'mBlank', chip: '✎ Marked', word: 'marked' };
 }
 
 function answerCardHtml(it, i) {
@@ -1928,16 +2181,62 @@ function answerCardHtml(it, i) {
       }).join('') + '</ul>'
     : '';
   var ans = it.answer || (it.option ? '(' + it.option + ')' : '');
-  return '<div class="ansCard">' +
+  var face = verdictFace(it.verdict);
+  // The answer box is labelled for what it IS. On an unmarked question it is
+  // "Answer"; on a marked one the student already has an answer of their own
+  // on the paper, and this is the one they should have written.
+  return '<div class="ansCard' + (it.marked ? ' marked ' + face.cls : '') + '">' +
     '<div class="ansHead">' +
       '<span class="ansNum">' + escHtml(it.number || String(i + 1)) + '</span>' +
       '<span class="ansPage">' + escHtml(ansPageLabel(it)) + (it.type === 'mcq' ? ' · multiple choice' : '') + '</span>' +
+      (it.marked ? '<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>' : '') +
+      (it.marked && it.marks ? '<span class="ansMarks">' + escHtml(it.marks) + '</span>' : '') +
     '</div>' +
     (it.question ? '<div class="ansQ">' + escHtml(it.question) + '</div>' : '') +
     opts +
-    (ans ? '<div class="ansBox"><div class="ansLabel">Answer</div><div class="ansText">' + escHtml(ans) + '</div></div>' : '') +
+    (it.marked && it.studentAnswer
+      ? '<div class="youBox ' + face.cls + '"><div class="youLabel">What you wrote</div>' +
+        '<div class="youText">' + escHtml(it.studentAnswer) + '</div></div>'
+      : '') +
+    (ans ? '<div class="ansBox"><div class="ansLabel">' + (it.marked ? 'Correct answer' : 'Answer') + '</div>' +
+      '<div class="ansText">' + escHtml(ans) + '</div></div>' : '') +
+    (it.marked && it.feedback
+      ? '<div class="fbBox"><div class="fbLabel">Feedback</div><div class="fbText">' + escHtml(it.feedback) + '</div></div>'
+      : '') +
     (it.explanation ? '<div class="whyBox"><div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
   '</div>';
+}
+
+/* The chips above the answers. Nothing was attempted on the paper — the
+   ordinary case, a fresh worksheet — and there is nothing to say, so the row
+   stays empty rather than announcing a score of zero out of nothing. */
+function renderTally() {
+  var row = $('markTally');
+  var line = $('markSummary');
+  if (!row || !line) return;
+  var t = markTally();
+  if (!t.marked) {
+    row.innerHTML = '';
+    line.textContent = '';
+    line.style.display = 'none';
+    return;
+  }
+  var chips = [];
+  if (t.correct) chips.push({ cls: 'mCorrect', text: '✓ ' + t.correct + ' correct' });
+  if (t.partial) chips.push({ cls: 'mPartial', text: '~ ' + t.partial + ' partly right' });
+  if (t.wrong) chips.push({ cls: 'mWrong', text: '✗ ' + t.wrong + ' wrong' });
+  if (t.unjudged) chips.push({ cls: '', text: '✎ ' + t.unjudged + ' marked' });
+  if (t.blank) chips.push({ cls: '', text: '✎ ' + t.blank + ' answered for you' });
+  row.innerHTML = chips.map(function (c) {
+    return '<span class="tally' + (c.cls ? ' ' + c.cls : '') + '">' + escHtml(c.text) + '</span>';
+  }).join('');
+  line.style.display = '';
+  line.textContent = t.marked + ' of ' + t.total + ' question' + (t.total === 1 ? '' : 's') +
+    ' had already been answered on the paper and ' + (t.marked === 1 ? 'has' : 'have') + ' been marked' +
+    (t.blank
+      ? (t.blank === 1 ? '. The other one was blank and has been answered'
+                       : '. The other ' + t.blank + ' were blank and have been answered')
+      : '') + '.';
 }
 
 function renderAnswers() {
@@ -1949,13 +2248,16 @@ function renderAnswers() {
   } else {
     list.innerHTML = _answers.map(answerCardHtml).join('');
   }
+  var tally = markTally();
   $('answersTitle').textContent = _answers.length
-    ? 'Answers (' + _answers.length + ')'
+    ? (tally.marked ? 'Marked & answered (' + _answers.length + ')' : 'Answers (' + _answers.length + ')')
     : 'Answers';
+  renderTally();
   var ground = groundingSummary();
+  var did = tally.marked ? 'Marked and answered' : 'Written';
   $('answersNote').textContent = ground.length
-    ? 'Written against your own ' + ground.join(', ') + '.'
-    : 'No teaching notes are being applied — these are ordinary syllabus answers.';
+    ? did + ' against your own ' + ground.join(', ') + '.'
+    : 'No teaching notes are being applied — this is the ordinary syllabus standard.';
   $('copyAnswersBtn').disabled = !_answers.length;
   $('printAnswersBtn').disabled = !_answers.length;
   renderGroundingLine();
@@ -1968,13 +2270,13 @@ function renderGroundingLine() {
   if (!el) return;
   var ground = groundingSummary();
   el.textContent = ground.length
-    ? 'Every answer is written against your own ' + ground.join(', ') +
-      ' — the same notebook your Ans Key app and the Science Learning Portal use. ' +
+    ? 'Your own ' + ground.join(', ') + ' are consulted first — before a blank is answered and before ' +
+      'a written answer is marked — from the same notebook your Ans Key app and the Science Learning Portal use. ' +
       'Add a note in any of them and the very next answer here follows it.'
     : (isAdmin(currentUser)
-        ? 'No teaching notes are being applied yet, so these are ordinary syllabus answers. ' +
-          'Press ✍️ Add a note at the top and the very next answer follows it.'
-        : 'No teaching notes are being applied, so these are ordinary syllabus answers.');
+        ? 'No teaching notes are being applied yet, so questions are answered and marked to the ordinary ' +
+          'syllabus standard. Press ✍️ Add a note at the top and the very next answer follows it.'
+        : 'No teaching notes are being applied, so questions are answered and marked to the ordinary syllabus standard.');
 }
 
 function answersAsText() {
@@ -1983,13 +2285,29 @@ function answersAsText() {
   var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
   if (lvl || subj) head.push([lvl, subj].filter(Boolean).join(' '));
   head.push(_answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleString('en-SG'));
+  // What was marked belongs in the copy too: a marked paper copied out as a
+  // bare answer key would lose the half of the run the student needs most.
+  var t = markTally();
+  if (t.marked) {
+    head.push(t.marked + ' marked (' + [
+      t.correct ? t.correct + ' correct' : '',
+      t.partial ? t.partial + ' partly right' : '',
+      t.wrong ? t.wrong + ' wrong' : ''
+    ].filter(Boolean).join(', ') + ')');
+    if (t.blank) head.push(t.blank + ' blank, answered');
+  }
   return head.join(' · ') + '\n\n' + _answers.map(function (it, i) {
     var lines = [(it.number || (i + 1)) + '. ' + (it.question || '')];
     (it.options || []).forEach(function (o) {
       var right = it.option && String(o.label).toLowerCase() === String(it.option).toLowerCase();
       lines.push('   (' + o.label + ') ' + o.text + (right ? '  ✓' : ''));
     });
-    lines.push('   Answer: ' + (it.answer || ('(' + it.option + ')')));
+    if (it.marked) {
+      lines.push('   You wrote: ' + (it.studentAnswer || '(unclear)') +
+        '  — ' + verdictFace(it.verdict).word + (it.marks ? ' (' + it.marks + ')' : ''));
+    }
+    lines.push('   ' + (it.marked ? 'Correct answer: ' : 'Answer: ') + (it.answer || ('(' + it.option + ')')));
+    if (it.marked && it.feedback) lines.push('   Feedback: ' + it.feedback);
     if (it.explanation) lines.push('   Why: ' + it.explanation);
     return lines.join('\n');
   }).join('\n\n');
@@ -2066,6 +2384,22 @@ auth.onAuthStateChanged(function (user) {
   });
 })();
 
+/* Both subject pickers — the one that says which paper is being scanned and
+   the one that says which paper a typed note is about — are filled from
+   SUBJECTS, so the four subjects are declared exactly once. */
+(function fillSubjects() {
+  ['scanSubject', 'qnSubject'].forEach(function (id) {
+    var sel = $(id);
+    if (!sel) return;
+    SUBJECTS.forEach(function (sub) {
+      var o = document.createElement('option');
+      o.value = sub.value;
+      o.textContent = sub.label;
+      sel.appendChild(o);
+    });
+  });
+})();
+
 /* The level and the subject are the context the notes are matched against,
    so remembering them is remembering which notes apply. */
 var SCAN_PREF_KEY = 'scanPrefs';
@@ -2073,7 +2407,7 @@ var SCAN_PREF_KEY = 'scanPrefs';
   try {
     var p = JSON.parse(localStorage.getItem(SCAN_PREF_KEY) || '{}');
     if (p.level && LEVELS.indexOf(p.level) !== -1) $('scanLevel').value = p.level;
-    if (p.subject) $('scanSubject').value = p.subject;
+    if (p.subject && SUBJECT_OK[p.subject]) $('scanSubject').value = p.subject;
     if (p.detail) $('scanDetail').value = p.detail;
   } catch (e) {}
   syncMeta();
