@@ -85,7 +85,10 @@
   .btnDanger { color: var(--danger); }
 
   /* ---------- Layout ---------- */
-  main { max-width: 900px; margin: 0 auto; padding: 24px 20px calc(120px + env(safe-area-inset-bottom, 0px)); }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 20px 28px; }
+  /* Only the Snap tab sits under the dock, so only the Snap tab pays for it —
+     the How tab would otherwise end in a screenful of nothing. */
+  #scanPage { padding-bottom: calc(200px + env(safe-area-inset-bottom, 0px)); }
   .card {
     background: var(--bg); border: 1px solid var(--line);
     border-radius: var(--radius); box-shadow: var(--shadow-card);
@@ -138,13 +141,46 @@
   .snapDrop { transition: background .15s ease; border-radius: var(--radius); }
   .snapDrop.over { background: #FFFBF3; outline: 2px dashed var(--accent-deep); outline-offset: 6px; }
 
-  /* ---------- The camera bar: gallery · shutter · done ---------- */
-  .camBar {
+  /* ---------- The bottom dock: what you want to say, then the three buttons ----------
+     One fixed panel holding both rows, so the ask box cannot drift out of
+     reach of the shutter on a phone. The camera bar itself is unchanged and
+     is still the only thing with buttons in it. */
+  .camDock {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 18px; padding: 14px 32px calc(14px + env(safe-area-inset-bottom, 0px));
     background: var(--bg); border-top: 1px solid var(--line);
     box-shadow: 0 -2px 16px rgba(0,0,0,0.06);
+  }
+  .askRow { display: flex; align-items: flex-end; gap: 10px; padding: 12px 20px 0; }
+  .askRow textarea {
+    flex: 1; min-width: 0; resize: none; font-family: var(--font);
+    /* 16px on touch is what actually stops iOS zooming into the field. */
+    font-size: 16px; line-height: 1.5; color: var(--ink);
+    background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: 16px; padding: 11px 16px; max-height: 132px; overflow-y: auto;
+  }
+  .askRow textarea:focus { outline: none; border-color: var(--accent-deep); background: var(--bg); }
+  .askRow textarea:disabled { opacity: .5; }
+  .askBtn {
+    width: 46px; height: 46px; flex: none; display: grid; place-items: center;
+    font-size: 19px; background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: 14px; cursor: pointer; box-shadow: var(--shadow-btn);
+    transition: transform .08s ease, background .15s ease, opacity .15s ease;
+  }
+  /* hidden is an attribute, and display:grid would win over it. */
+  .askBtn[hidden] { display: none; }
+  .askBtn:active:not(:disabled) { transform: scale(0.94); }
+  .askBtn:disabled { opacity: .38; cursor: default; box-shadow: none; }
+  .askBtn.on { background: #FCEDEB; border-color: #EFC6BF; animation: micpulse 1.5s ease-in-out infinite; }
+  @keyframes micpulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(229,57,53,.34); }
+    50% { box-shadow: 0 0 0 9px rgba(229,57,53,0); }
+  }
+  @media (prefers-reduced-motion: reduce) { .askBtn.on { animation: none; } }
+
+  /* ---------- The camera bar: gallery · shutter · done ---------- */
+  .camBar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 18px; padding: 14px 32px calc(14px + env(safe-area-inset-bottom, 0px));
   }
   .camSide {
     position: relative; width: 62px; height: 62px; flex: none;
@@ -384,8 +420,10 @@
     .brandOrg { display: none; }
     header .btn { padding: 10px 12px; }
     #whoAmI { display: none; }
-    main { padding: 18px 14px calc(120px + env(safe-area-inset-bottom, 0px)); }
+    main { padding: 18px 14px 22px; }
+    #scanPage { padding-bottom: calc(192px + env(safe-area-inset-bottom, 0px)); }
     .camBar { padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); }
+    .askRow { padding: 10px 14px 0; }
     .card { padding: 20px 18px; }
     .tnPanel, .tnCard { padding: 18px 16px; }
     .tnRow { flex-direction: column; gap: 3px; }
@@ -393,7 +431,7 @@
     .ansCard { padding: 18px 16px; }
   }
   @media print {
-    header, .tabs, .camBar, .noPrint, #toast, .modalBack { display: none !important; }
+    header, .tabs, .camBar, .camDock, .noPrint, #toast, .modalBack { display: none !important; }
     body { background: #fff; }
     main { max-width: none; padding: 0; }
     .ansCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
@@ -441,8 +479,8 @@
 
     <div id="snapEmpty" class="snapEmpty">
       <div class="padIcon">📷</div>
-      <div class="padTitle">Photograph the page</div>
-      <div class="padSub" id="padSub">One photo per page. Then press ✓.</div>
+      <div class="padTitle">Photograph the page — or just ask</div>
+      <div class="padSub" id="padSub">One photo per page, then press ✓.<br>Or type your question below and press ✓ with no photo at all.</div>
     </div>
 
     <!-- The picker's value is cleared BEFORE the files are queued: an input
@@ -468,6 +506,7 @@
             <button class="btn" id="printAnswersBtn">🖨 Print</button>
           </div>
         </div>
+        <p class="sub" id="askedLine" style="margin-top:10px;display:none"></p>
         <div class="tallyRow" id="markTally"></div>
         <p class="sub" id="markSummary" style="margin-top:10px"></p>
         <p class="sub" id="answersNote" style="margin-top:10px"></p>
@@ -487,6 +526,17 @@
         <li><b>Press ✓ when the paper is complete.</b> Every question printed on the pages comes back answered — multiple choice, fill in the blank, open-ended and lettered parts alike.</li>
       </ol>
       <p class="sub" style="margin-top:6px">A question that carries on over the page is fine: the pages are read as one paper, so it is stitched back together instead of coming back as two halves.</p>
+      <h3 style="margin-top:22px">Say what you want, in writing or out loud</h3>
+      <p class="sub" style="margin-top:6px">The box above the three buttons takes a typed question, and the 🎤 beside it takes a
+        spoken one where your browser can hear you. Say a Chinese question in Chinese and set the subject to Chinese — the
+        dictation listens in the language of the paper.</p>
+      <ul class="howList" style="margin-top:12px">
+        <li><b>With photos</b> — what you ask governs the run. “Only question 5” does question 5 and leaves the rest out;
+          “check my working on the last page” checks that; “P5 maths, test on Friday” is taken as background and every
+          question is still done.</li>
+        <li><b>With no photo at all</b> — press ✓ with just the box filled in and it simply answers what you asked.
+          Ask for five practice questions and five come back, one card each.</li>
+      </ul>
       <h3 style="margin-top:22px">It marks what is already written</h3>
       <p class="sub" style="margin-top:6px">You do not have to choose. Every question is looked at for an answer already written on
         the paper: where there is one it is <b>marked</b> — right, partly right or wrong — with a line or two of feedback
@@ -537,14 +587,25 @@
   </section>
 </main>
 
-<!-- The three buttons: your gallery, the shutter, and done. -->
-<div class="camBar hidden" id="camBar">
-  <button class="camSide" id="galleryBtn" title="Choose pictures from your gallery">
-    <span id="galleryFace">🖼</span>
-    <span class="camBadge hidden" id="shotBadge">0</span>
-  </button>
-  <button class="shutter" id="cameraBtn" title="Take a photo">📷</button>
-  <button class="camSide camDone" id="readBtn" title="Read and answer" disabled>✓</button>
+<!-- The bottom dock: say what you want, then the three buttons.
+     The ask row is a row of its OWN — the camera bar below it still carries
+     exactly three controls, which is the whole point of that bar. -->
+<div class="camDock hidden" id="camDock">
+  <div class="askRow" id="askBar">
+    <textarea id="askText" rows="1" maxlength="1200"
+      placeholder="Ask a question, or say what to do with these pages…"></textarea>
+    <!-- Shown only where the browser really has dictation, so it is never a
+         button that does nothing. -->
+    <button class="askBtn" id="micBtn" type="button" title="Dictate" hidden>🎤</button>
+  </div>
+  <div class="camBar hidden" id="camBar">
+    <button class="camSide" id="galleryBtn" title="Choose pictures from your gallery">
+      <span id="galleryFace">🖼</span>
+      <span class="camBadge hidden" id="shotBadge">0</span>
+    </button>
+    <button class="shutter" id="cameraBtn" title="Take a photo">📷</button>
+    <button class="camSide camDone" id="readBtn" title="Read and answer" disabled>✓</button>
+  </div>
 </div>
 
 <!-- ---------- 📚 Teaching notes ---------- -->
@@ -642,7 +703,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.3.0';
+var APP_VERSION = 'v1.4.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -1621,6 +1682,18 @@ var _shotSeq = 0;
 var _answers = [];               // [{ number, page, question, options[], option, answer, explanation }]
 var _scanning = false;
 var _scanRun = 0;                // bumped on every run, so a stale reply is dropped
+var _askedFor = '';              // what the last run was asked, shown above its answers
+
+/* ---- What the student typed or said ----
+   A photograph is not the only way to ask. The box in the dock takes a
+   question or an instruction, and it is read at the moment ✓ is pressed —
+   there is no second copy of it to fall out of step with the box. */
+var ASK_MAX_CHARS = 1200;
+function askText() {
+  var el = $('askText');
+  if (!el) return '';
+  return String(el.value == null ? '' : el.value).trim().slice(0, ASK_MAX_CHARS);
+}
 
 /* ---- What a photograph of a paper actually looks like ----
    Shared with the Learning Portal's readers word for word. */
@@ -1700,6 +1773,49 @@ var SCAN_SYS =
   'Work every question out properly before you answer it: set the working out step by step, then check the ' +
   'arithmetic back against the numbers printed on the page. A quick wrong answer is worse than no answer. ' +
   SCAN_MARK_RULE +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+/* ---- The instruction, alongside the pages ----
+   What the student asks is not decoration on top of the scan: it decides what
+   the run IS. "Only question 5" that still came back with the whole paper
+   would be an app that did not listen, and the twenty cards it returned would
+   bury the one that was asked for. So the instruction leads the prompt and is
+   given authority over the sweep — but never over the syllabus: background
+   ("P5 maths, test on Friday") is context, not an order to stop reading. */
+var SCAN_ASK_WITH_PAGES_RULE =
+  'THEIR INSTRUCTION GOVERNS THIS RUN. If it names particular questions ("only question 5", "just the last page", ' +
+  '"explain 3(b) again"), do THOSE and leave the rest out entirely — do not return the whole paper anyway. ' +
+  'If it asks for something specific about the pages ("what topic is this", "check my working", "mark it out of ' +
+  '10"), that is the job. If the pages hold no printed question at all but their instruction asks something ' +
+  'about what is shown — a diagram, a graph, a photograph of a model — answer their question in ONE entry, with ' +
+  '"number" left empty and "question" set to what they asked. If the instruction is only background ("P5 maths", ' +
+  '"test on Friday", "sorry my handwriting is messy"), take it as context and carry on with every question on ' +
+  'the pages as usual. Never ignore it, and never let it stop you marking what has already been written.\n';
+
+/* ---- Asking with no paper at all ----
+   Press ✓ with nothing but the box filled in and there is no page to read, so
+   there is no paper shape to come back in either: the reply is one entry, or
+   one entry per thing asked for, and the cards, the Copy and the Print are
+   the same ones the scan uses. */
+var SCAN_ASK_SYS =
+  'You are an experienced Singapore tuition teacher (P3 to Secondary 1) answering a student who has typed or ' +
+  'spoken a question to you. NOTHING was photographed — there is only what they asked — so answer it from what ' +
+  'they said alone and do exactly what they asked, nothing else. Reply with STRICT JSON only, no markdown, ' +
+  'exactly this shape: {"answers":[{"heading":"a short line naming what this part is","answer":"the answer ' +
+  'itself","explanation":"the working or the reasoning","studentAnswer":"","verdict":"","marks":"",' +
+  '"feedback":""}]}. ' +
+  'Rules: ONE entry when they asked one thing. When they asked for SEVERAL things — five practice questions, a ' +
+  'list of formulas, three worked examples — return ONE ENTRY PER THING, in the order asked, so they come back ' +
+  'as separate cards. "heading" is short: the question being answered, or "Question 3", or the topic. Never ' +
+  'leave both "answer" and "explanation" empty. ' +
+  'If they have told you the answer THEY got and are asking whether it is right, mark it: "studentAnswer" is ' +
+  'the answer they said they gave, "verdict" is exactly one of "correct", "partial" or "wrong", "marks" is ' +
+  '"awarded/total" only if they told you what it is out of, and "feedback" is 1 to 3 sentences spoken to them. ' +
+  'If they gave no answer of their own, leave all four of those fields empty — never invent an answer of ' +
+  'theirs in order to mark it. ' +
+  'Answer in the language they asked in: a question asked in Chinese is answered in Chinese. ' +
+  'If what they sent is not something you can act on — a greeting, or a few stray words — say so in one entry, ' +
+  'kindly, and say what to send instead. Never turn a school question away for having no picture with it. ' +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
 
 /* ---- What each subject is worth marks for ----
@@ -1896,12 +2012,102 @@ function renderCamBar() {
 
   $('galleryBtn').disabled = _scanning;
   $('cameraBtn').disabled = _scanning;
+  // Either half is enough to press ✓ with: pages, or a typed question, or
+  // both. A ✓ that stayed flat while a question sat in the box would be the
+  // app refusing to answer something it can perfectly well answer.
+  var ask = askText();
   var done = $('readBtn');
-  done.disabled = _scanning || !ready.length;
+  done.disabled = _scanning || (!ready.length && !ask);
   done.innerHTML = _scanning ? '<span class="camSpin"></span>' : '✓';
-  done.title = _scanning ? 'Reading…' : 'Read and answer';
+  done.title = _scanning ? 'Working…' : (ready.length ? 'Read and answer' : 'Answer what you asked');
+
+  var box = $('askText');
+  if (box) box.disabled = _scanning;
+  renderMic();
 
   $('snapEmpty').classList.toggle('hidden', _shots.length > 0);
+}
+
+/* ---- Dictation ----
+   The Web Speech API where the browser really has it, and nothing at all
+   where it does not: the 🎤 is only shown when it will work, because a
+   button that silently does nothing is worse than no button. It listens in
+   the language of the paper — a 华文 question dictated as English phonetics
+   comes back as nonsense. */
+var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+var _rec = null;
+var _recOn = false;
+var _recBase = '';               // what was already in the box when listening started
+function micAvailable() { return !!SpeechRec; }
+function micLang() { return wsMeta.subject === 'chinese' ? 'zh-CN' : 'en-SG'; }
+function renderMic() {
+  var b = $('micBtn');
+  if (!b) return;
+  b.hidden = !micAvailable();
+  b.classList.toggle('on', _recOn);
+  b.textContent = _recOn ? '⏹' : '🎤';
+  b.title = _recOn ? 'Stop dictating' : 'Dictate your question';
+  b.disabled = _scanning;
+}
+function micStop() {
+  if (_rec) { try { _rec.stop(); } catch (e) {} }
+  _recOn = false;
+  renderMic();
+}
+function micStart() {
+  if (!micAvailable() || _scanning) return;
+  var box = $('askText');
+  if (!box) return;
+  // Dictation ADDS to what is already typed rather than replacing it, so a
+  // half-typed question can be finished out loud.
+  _recBase = box.value ? box.value.replace(/\s+$/, '') + ' ' : '';
+  var settled = '';
+  var rec = new SpeechRec();
+  _rec = rec;
+  rec.lang = micLang();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.onresult = function (ev) {
+    var interim = '';
+    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+      var t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) settled += t;
+      else interim += t;
+    }
+    box.value = (_recBase + settled + interim).slice(0, ASK_MAX_CHARS);
+    askGrow();
+    renderCamBar();
+  };
+  rec.onerror = function (e) {
+    var code = (e && e.error) || '';
+    _recOn = false;
+    renderMic();
+    // Silence and a deliberate stop are not failures worth a message.
+    if (code === 'no-speech' || code === 'aborted') return;
+    toast(code === 'not-allowed' || code === 'service-not-allowed'
+      ? 'Dictation needs permission to use the microphone — allow it and try again.'
+      : 'Dictation stopped. Type it instead?', 5000);
+  };
+  rec.onend = function () { _recOn = false; renderMic(); };
+  try {
+    rec.start();
+    _recOn = true;
+    renderMic();
+  } catch (e) {
+    _recOn = false;
+    renderMic();
+    toast('Dictation could not start — type it instead.', 4000);
+  }
+}
+function micToggle() { if (_recOn) micStop(); else micStart(); }
+
+/* The box grows with what is in it, up to the height the CSS allows, so a
+   three-line question is not read through a one-line slot. */
+function askGrow() {
+  var box = $('askText');
+  if (!box) return;
+  box.style.height = 'auto';
+  box.style.height = Math.min(box.scrollHeight, 132) + 'px';
 }
 
 function scanProgress(done, total, msg) {
@@ -1918,12 +2124,15 @@ function _scanStr(v, cap) {
   return s.length > cap ? s.slice(0, cap) : s;
 }
 
-function _scanPrompt(n, from, total, carry) {
+function _scanPrompt(n, from, total, carry, ask) {
   var detail = scanDetail();
   var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
   var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
   var who = (lvl || subj) ? 'It is a ' + [lvl, subj].filter(Boolean).join(' ') + ' paper.' : '';
-  return 'The attached ' + (n === 1 ? 'picture is page ' + from : n + ' pictures are pages ' + from + '–' + (from + n - 1)) +
+  ask = _scanStr(ask, ASK_MAX_CHARS);
+  return (ask ? 'THIS IS WHAT THE STUDENT ASKED ABOUT THESE PAGES, word for word — read it FIRST:\n"' + ask + '"\n' +
+                SCAN_ASK_WITH_PAGES_RULE : '') +
+    'The attached ' + (n === 1 ? 'picture is page ' + from : n + ' pictures are pages ' + from + '–' + (from + n - 1)) +
       ' of ' + total + ' of a Singapore worksheet or exam paper, in order. ' + who + '\n' +
     SCAN_READING_NOTE +
     scanSubjectRule() +
@@ -1943,6 +2152,81 @@ function _scanPrompt(n, from, total, carry) {
    with, so it is dropped rather than shown as one. */
 var SCAN_VERDICTS = { correct: 1, partial: 1, wrong: 1 };
 
+/* The whole of an ask with no paper: what they said, who they are, the
+   standard for the subject, and how much explanation they want. */
+function _askPrompt(ask, detail) {
+  var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
+  var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
+  var who = (lvl || subj) ? 'The student is doing ' + [lvl, subj].filter(Boolean).join(' ') + '.\n' : '';
+  return 'THIS IS WHAT THE STUDENT ASKED, word for word — do exactly this:\n"' +
+      _scanStr(ask, ASK_MAX_CHARS) + '"\n' +
+    who +
+    scanSubjectRule() +
+    (SCAN_DETAIL_RULE[detail] || SCAN_DETAIL_RULE.normal) + '\n' +
+    'Nothing was photographed, so there is no paper to read: answer what they asked from what they said alone.';
+}
+
+/* The marking fields, read the same way wherever they come from — a photo of
+   a worksheet or a student typing "I got 16, is that right?". ONE place, so
+   the rule that holds the whole feature honest holds in both: what the
+   student answered is what decides whether anything is marked, and a verdict
+   with nothing behind it is dropped along with the feedback that came with
+   it. A cross on a question nobody attempted is the one mistake this can
+   make. */
+function _markFields(r) {
+  var studentAnswer = _scanStr(r && r.studentAnswer, 900);
+  var verdict = String(r && r.verdict == null ? '' : r.verdict).toLowerCase().trim();
+  if (!SCAN_VERDICTS[verdict]) verdict = '';
+  var marked = !!studentAnswer;
+  return {
+    marked: marked,
+    studentAnswer: studentAnswer,
+    // A written answer the model could not bring itself to judge still shows
+    // as marked, with no verdict chip — half a mark is better than silently
+    // dropping the student's work off the card.
+    verdict: marked ? verdict : '',
+    marks: marked ? _scanStr(r && r.marks, 12) : '',
+    feedback: marked ? _scanStr(r && r.feedback, 1200) : ''
+  };
+}
+
+/* One part of a reply to an ask that came with no paper. It is filed as an
+   ordinary answer card so Copy, Print and the marking all work unchanged —
+   `kind` is the only thing that says where it came from, and it is what keeps
+   a page number off a card that never had a page. */
+function _askNewItem(r) {
+  if (!r || typeof r !== 'object') return null;
+  var answer = _scanStr(r.answer, 2000);
+  var explanation = _scanStr(r.explanation, 4000);
+  if (!answer && !explanation) return null;
+  var mk = _markFields(r);
+  return {
+    kind: 'ask',
+    number: _scanStr(r.number, 16),
+    page: 0,
+    endPage: 0,
+    type: 'open',
+    question: _scanStr(r.heading, 300),
+    options: [],
+    option: '',
+    answer: answer,
+    explanation: explanation,
+    marked: mk.marked,
+    studentAnswer: mk.studentAnswer,
+    verdict: mk.verdict,
+    marks: mk.marks,
+    feedback: mk.feedback
+  };
+}
+function _askFoldRows(rows, into) {
+  var made = 0;
+  (rows || []).forEach(function (r) {
+    var it = _askNewItem(r);
+    if (it) { into.push(it); made++; }
+  });
+  return made;
+}
+
 function _scanNewItem(r, batchStart, batchLen) {
   if (!r || typeof r !== 'object') return null;
   var question = _scanStr(r.question, 1400);
@@ -1961,16 +2245,9 @@ function _scanNewItem(r, batchStart, batchLen) {
   var page = parseInt(r.page, 10);
   if (!(page >= 1 && page <= batchLen)) page = 1;
 
-  // What the student wrote is what decides whether this question was MARKED.
-  // A verdict with nothing written behind it is dropped, and so is the
-  // feedback that came with it: a blank is a question to answer, never a
-  // question to mark wrong, and a red cross on an untouched worksheet is the
-  // one mistake this feature can make.
-  var studentAnswer = _scanStr(r.studentAnswer, 900);
-  var verdict = String(r.verdict == null ? '' : r.verdict).toLowerCase().trim();
-  if (!SCAN_VERDICTS[verdict]) verdict = '';
-  var marked = !!studentAnswer;
+  var mk = _markFields(r);
   return {
+    kind: 'page',
     number: _scanStr(r.number, 16),
     page: batchStart + page,          // 1-based across the whole run
     endPage: batchStart + page,
@@ -1980,14 +2257,11 @@ function _scanNewItem(r, batchStart, batchLen) {
     option: option,
     answer: answer,
     explanation: _scanStr(r.explanation, 2400),
-    marked: marked,
-    studentAnswer: studentAnswer,
-    // A written answer the model could not bring itself to judge still shows
-    // as marked, with no verdict chip — half a mark is better than silently
-    // dropping the student's work off the card.
-    verdict: marked ? verdict : '',
-    marks: marked ? _scanStr(r.marks, 12) : '',
-    feedback: marked ? _scanStr(r.feedback, 1200) : ''
+    marked: mk.marked,
+    studentAnswer: mk.studentAnswer,
+    verdict: mk.verdict,
+    marks: mk.marks,
+    feedback: mk.feedback
   };
 }
 
@@ -2031,14 +2305,121 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
   return madeOn;
 }
 
+/* ---- The pages, batch by batch ----
+   Unchanged by the ask except that the ask goes in the prompt: it may narrow
+   the run to one question, or add nothing but context, and either way the
+   pages are still read as ONE run with the continuation stitching them. */
+async function _runPages(run, shots, ask, detail, failedPages) {
+  var total = shots.length;
+  var carry = '';
+  for (var start = 0; start < total; start += SCAN_BATCH) {
+    if (run !== _scanRun) return;                 // a newer run took over
+    var batch = shots.slice(start, start + SCAN_BATCH);
+    batch.forEach(function (s) { s.status = 'reading'; });
+    renderShots();
+    scanProgress(start, total,
+      '✨ Reading page ' + (start + 1) + (batch.length > 1 ? '–' + (start + batch.length) : '') +
+      ' of ' + total + '…' + (_answers.length ? '  (' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' so far)' : ''));
+
+    var rows;
+    try {
+      var raw = await window.askGemini(
+        _scanPrompt(batch.length, start + 1, total, carry, ask),
+        {
+          // 'scan' is the kind that answers the blanks AND marks what is
+          // already written, so the digest carries the key facts the answers
+          // need and the marking standard the marks are held to.
+          system: SCAN_SYS + aiGrounding('scan'),
+          // The budget has to cover the thinking as well as the answers: a
+          // page of multiple-choice questions is 15-20 entries, not the 4
+          // or 5 an open-ended page comes to.
+          maxOutputTokens: detail === 'full' ? 32000 : 20000,
+          effort: 'xhigh',        // ChatGPT, when an engine is wired in
+          thinkingLevel: 'high',  // Gemini — this is what decides whether the answers are right
+          temperature: 0.2,
+          json: true,
+          images: batch.map(function (s) { return { mimeType: s.mimeType, data: s.data }; })
+        });
+      var parsed = _parseAIJson(raw);
+      rows = Array.isArray(parsed) ? parsed : ((parsed && Array.isArray(parsed.questions)) ? parsed.questions : []);
+    } catch (err) {
+      // One unreadable batch must never sink the rest of the paper.
+      console.warn('scan: batch failed', err);
+      batch.forEach(function (s) {
+        s.status = 'error';
+        s.err = (err && err.message) || 'could not be read';
+        failedPages.push(shots.indexOf(s) + 1);
+      });
+      carry = '';
+      renderShots();
+      renderAnswers();
+      continue;
+    }
+    if (run !== _scanRun) return;
+
+    var madeOn = _scanFoldRows(rows, start, batch.length, _answers);
+    batch.forEach(function (s, k) {
+      var n = madeOn[start + k + 1] || 0;
+      s.n = n;
+      s.status = n ? 'done' : 'empty';
+    });
+    // Whatever the last entry was, the next batch may be continuing it.
+    var last = _answers[_answers.length - 1];
+    carry = last ? _scanStr(last.question, 220) : '';
+    renderShots();
+    renderAnswers();
+    scanProgress(Math.min(start + batch.length, total), total, '');
+  }
+}
+
+/* ---- The ask, with no paper behind it ----
+   One call, no batches, no pages. Everything downstream — the cards, the
+   marking, Copy, Print — is the scan's, so this path adds a prompt and a
+   parse and nothing else. Returns the error to report, or '' when it went
+   through. */
+async function _runAskAlone(run, ask, detail) {
+  scanProgress(0, 1, '✨ Thinking about what you asked…');
+  try {
+    var raw = await window.askGemini(_askPrompt(ask, detail), {
+      system: SCAN_ASK_SYS + aiGrounding('scan'),
+      maxOutputTokens: detail === 'full' ? 32000 : 20000,
+      effort: 'xhigh',
+      thinkingLevel: 'high',
+      temperature: 0.2,
+      json: true
+    });
+    if (run !== _scanRun) return '';
+    var parsed = _parseAIJson(raw);
+    var rows = Array.isArray(parsed)
+      ? parsed
+      : ((parsed && Array.isArray(parsed.answers)) ? parsed.answers
+         : ((parsed && Array.isArray(parsed.questions)) ? parsed.questions : []));
+    _askFoldRows(rows, _answers);
+    scanProgress(1, 1, '');
+    renderAnswers();
+    return '';
+  } catch (err) {
+    console.warn('ask: failed', err);
+    return (err && err.message) || 'that could not be answered';
+  }
+}
+
 async function runScan() {
   if (_scanning) return;
   var shots = _shots.filter(function (s) { return s.data; });
-  if (!shots.length) { toast('Add a picture first.'); return; }
+  var ask = askText();
+  // Either half is enough on its own: a photographed page with nothing said
+  // about it, or a question with no page behind it at all.
+  if (!shots.length && !ask) {
+    toast('Take a photo of the page, or type what you would like to ask.', 5000);
+    return;
+  }
   if (!window.askGemini || !window.aiReady || !window.aiReady()) {
     toast('AI is not available — check your connection and reload the page.', 5000);
     return;
   }
+  // Dictation left running would go on typing into the box under the answers.
+  micStop();
   // The notes are what make the answers the teacher's rather than the
   // model's, so they are in hand BEFORE a word is written.
   await loadTeachingNotes(false);
@@ -2046,74 +2427,18 @@ async function runScan() {
   var run = ++_scanRun;
   _scanning = true;
   _answers = [];
+  _askedFor = ask;
   var detail = scanDetail();
   var failedPages = [];
+  var askErr = '';
   shots.forEach(function (s) { s.status = ''; s.err = ''; s.n = 0; });
   renderShots();
   renderAnswers();
   $('answersWrap').classList.remove('hidden');
 
-  var total = shots.length;
-  var carry = '';
   try {
-    for (var start = 0; start < total; start += SCAN_BATCH) {
-      if (run !== _scanRun) return;                 // a newer run took over
-      var batch = shots.slice(start, start + SCAN_BATCH);
-      batch.forEach(function (s) { s.status = 'reading'; });
-      renderShots();
-      scanProgress(start, total,
-        '✨ Reading page ' + (start + 1) + (batch.length > 1 ? '–' + (start + batch.length) : '') +
-        ' of ' + total + '…' + (_answers.length ? '  (' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' so far)' : ''));
-
-      var rows;
-      try {
-        var raw = await window.askGemini(
-          _scanPrompt(batch.length, start + 1, total, carry),
-          {
-            // 'scan' is the kind that answers the blanks AND marks what is
-            // already written, so the digest carries the key facts the answers
-            // need and the marking standard the marks are held to.
-            system: SCAN_SYS + aiGrounding('scan'),
-            // The budget has to cover the thinking as well as the answers: a
-            // page of multiple-choice questions is 15-20 entries, not the 4
-            // or 5 an open-ended page comes to.
-            maxOutputTokens: detail === 'full' ? 32000 : 20000,
-            effort: 'xhigh',        // ChatGPT, when an engine is wired in
-            thinkingLevel: 'high',  // Gemini — this is what decides whether the answers are right
-            temperature: 0.2,
-            json: true,
-            images: batch.map(function (s) { return { mimeType: s.mimeType, data: s.data }; })
-          });
-        var parsed = _parseAIJson(raw);
-        rows = Array.isArray(parsed) ? parsed : ((parsed && Array.isArray(parsed.questions)) ? parsed.questions : []);
-      } catch (err) {
-        // One unreadable batch must never sink the rest of the paper.
-        console.warn('scan: batch failed', err);
-        batch.forEach(function (s) {
-          s.status = 'error';
-          s.err = (err && err.message) || 'could not be read';
-          failedPages.push(shots.indexOf(s) + 1);
-        });
-        carry = '';
-        renderShots();
-        renderAnswers();
-        continue;
-      }
-      if (run !== _scanRun) return;
-
-      var madeOn = _scanFoldRows(rows, start, batch.length, _answers);
-      batch.forEach(function (s, k) {
-        var n = madeOn[start + k + 1] || 0;
-        s.n = n;
-        s.status = n ? 'done' : 'empty';
-      });
-      // Whatever the last entry was, the next batch may be continuing it.
-      var last = _answers[_answers.length - 1];
-      carry = last ? _scanStr(last.question, 220) : '';
-      renderShots();
-      renderAnswers();
-      scanProgress(Math.min(start + batch.length, total), total, '');
-    }
+    if (shots.length) await _runPages(run, shots, ask, detail, failedPages);
+    else askErr = await _runAskAlone(run, ask, detail);
   } finally {
     if (run === _scanRun) {
       _scanning = false;
@@ -2122,16 +2447,22 @@ async function runScan() {
       renderAnswers();
     }
   }
+  if (run !== _scanRun) return;                   // a newer run owns the answers now
 
   // A paper that numbers nothing still has to be readable, so anything that
-  // came back without a number is numbered by where it sits on the paper.
-  _answers.forEach(function (it, i) { if (!it.number) it.number = String(i + 1); });
+  // came back without a number is numbered by where it sits on the paper. An
+  // answer to a typed question was never numbered on a page, so it is left
+  // alone — a "1." in front of a reply is a page number it never had.
+  _answers.forEach(function (it, i) { if (!it.number && it.kind !== 'ask') it.number = String(i + 1); });
   renderAnswers();
 
   if (!_answers.length) {
-    toast(failedPages.length
-      ? 'None of those pages could be read — try a sharper, straighter photo in better light.'
+    toast(askErr ? 'That could not be answered: ' + askErr
+      : !shots.length ? 'Nothing came back — try saying it another way.'
+      : failedPages.length ? 'None of those pages could be read — try a sharper, straighter photo in better light.'
       : 'No questions were found on those pictures.', 6000);
+  } else if (!shots.length) {
+    toast('✅ Answered.', 4000);
   } else {
     var t = markTally();
     toast('✅ ' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' read' +
@@ -2162,6 +2493,13 @@ function markTally() {
   });
   return t;
 }
+/* A run with no paper behind it counts the same way but READS differently:
+   an entry nobody attempted is an answer, not "a blank we filled in for you"
+   — there was no blank, only a question asked. */
+function answersAreAllAsk() {
+  return !!_answers.length && _answers.every(function (it) { return it.kind === 'ask'; });
+}
+
 var VERDICT_FACE = {
   correct: { cls: 'mCorrect', chip: '✓ Correct', word: 'correct' },
   partial: { cls: 'mPartial', chip: '~ Partly right', word: 'partly right' },
@@ -2182,16 +2520,20 @@ function answerCardHtml(it, i) {
     : '';
   var ans = it.answer || (it.option ? '(' + it.option + ')' : '');
   var face = verdictFace(it.verdict);
+  // An answer to a typed question was never on a page, so it gets no page
+  // label and no number chip it did not earn — the head disappears entirely
+  // rather than sitting there empty.
+  var isAsk = it.kind === 'ask';
+  var head = [];
+  if (it.number || !isAsk) head.push('<span class="ansNum">' + escHtml(it.number || String(i + 1)) + '</span>');
+  if (!isAsk) head.push('<span class="ansPage">' + escHtml(ansPageLabel(it)) + (it.type === 'mcq' ? ' · multiple choice' : '') + '</span>');
+  if (it.marked) head.push('<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>');
+  if (it.marked && it.marks) head.push('<span class="ansMarks">' + escHtml(it.marks) + '</span>');
   // The answer box is labelled for what it IS. On an unmarked question it is
   // "Answer"; on a marked one the student already has an answer of their own
   // on the paper, and this is the one they should have written.
   return '<div class="ansCard' + (it.marked ? ' marked ' + face.cls : '') + '">' +
-    '<div class="ansHead">' +
-      '<span class="ansNum">' + escHtml(it.number || String(i + 1)) + '</span>' +
-      '<span class="ansPage">' + escHtml(ansPageLabel(it)) + (it.type === 'mcq' ? ' · multiple choice' : '') + '</span>' +
-      (it.marked ? '<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>' : '') +
-      (it.marked && it.marks ? '<span class="ansMarks">' + escHtml(it.marks) + '</span>' : '') +
-    '</div>' +
+    (head.length ? '<div class="ansHead">' + head.join('') + '</div>' : '') +
     (it.question ? '<div class="ansQ">' + escHtml(it.question) + '</div>' : '') +
     opts +
     (it.marked && it.studentAnswer
@@ -2210,6 +2552,18 @@ function answerCardHtml(it, i) {
 /* The chips above the answers. Nothing was attempted on the paper — the
    ordinary case, a fresh worksheet — and there is nothing to say, so the row
    stays empty rather than announcing a score of zero out of nothing. */
+/* What this run was asked, said back above its answers. An instruction that
+   narrowed the run — "only question 5" — is the reason there is one card
+   here instead of twenty, and a page of answers that never says so looks like
+   an app that missed the rest of the paper. */
+function renderAskedLine() {
+  var el = $('askedLine');
+  if (!el) return;
+  if (!_askedFor) { el.textContent = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.textContent = 'You asked: “' + _askedFor + '”';
+}
+
 function renderTally() {
   var row = $('markTally');
   var line = $('markSummary');
@@ -2225,11 +2579,15 @@ function renderTally() {
   if (t.correct) chips.push({ cls: 'mCorrect', text: '✓ ' + t.correct + ' correct' });
   if (t.partial) chips.push({ cls: 'mPartial', text: '~ ' + t.partial + ' partly right' });
   if (t.wrong) chips.push({ cls: 'mWrong', text: '✗ ' + t.wrong + ' wrong' });
+  var allAsk = answersAreAllAsk();
   if (t.unjudged) chips.push({ cls: '', text: '✎ ' + t.unjudged + ' marked' });
-  if (t.blank) chips.push({ cls: '', text: '✎ ' + t.blank + ' answered for you' });
+  if (t.blank) chips.push({ cls: '', text: '✎ ' + t.blank + (allAsk ? ' answered' : ' answered for you') });
   row.innerHTML = chips.map(function (c) {
     return '<span class="tally' + (c.cls ? ' ' + c.cls : '') + '">' + escHtml(c.text) + '</span>';
   }).join('');
+  // Nothing was on a paper, so there is no paper to describe — the chips
+  // already say everything true about a run that was only ever a question.
+  if (allAsk) { line.textContent = ''; line.style.display = 'none'; return; }
   line.style.display = '';
   line.textContent = t.marked + ' of ' + t.total + ' question' + (t.total === 1 ? '' : 's') +
     ' had already been answered on the paper and ' + (t.marked === 1 ? 'has' : 'have') + ' been marked' +
@@ -2242,16 +2600,21 @@ function renderTally() {
 function renderAnswers() {
   var list = $('answersList');
   if (!_answers.length) {
+    var noPages = !_shots.filter(function (s) { return s.data; }).length;
     list.innerHTML = _scanning
-      ? '<div class="empty">Reading the pages — the answers appear here as they come back.</div>'
-      : '<div class="empty">No questions were found on those pictures.</div>';
+      ? '<div class="empty">' + (noPages ? 'Working on what you asked…' : 'Reading the pages — the answers appear here as they come back.') + '</div>'
+      : '<div class="empty">' + (noPages ? 'Nothing came back — try saying it another way.' : 'No questions were found on those pictures.') + '</div>';
   } else {
     list.innerHTML = _answers.map(answerCardHtml).join('');
   }
   var tally = markTally();
-  $('answersTitle').textContent = _answers.length
-    ? (tally.marked ? 'Marked & answered (' + _answers.length + ')' : 'Answers (' + _answers.length + ')')
-    : 'Answers';
+  var asked = answersAreAllAsk();
+  $('answersTitle').textContent = !_answers.length
+    ? 'Answers'
+    : asked ? (_answers.length === 1 ? 'Your answer' : 'Your answer (' + _answers.length + ' parts)')
+    : tally.marked ? 'Marked & answered (' + _answers.length + ')'
+    : 'Answers (' + _answers.length + ')';
+  renderAskedLine();
   renderTally();
   var ground = groundingSummary();
   var did = tally.marked ? 'Marked and answered' : 'Written';
@@ -2284,7 +2647,10 @@ function answersAsText() {
   var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
   var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
   if (lvl || subj) head.push([lvl, subj].filter(Boolean).join(' '));
-  head.push(_answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleString('en-SG'));
+  if (_askedFor) head.push('Asked: “' + _askedFor + '”');
+  var allAsk = answersAreAllAsk();
+  head.push(_answers.length + (allAsk ? ' answer' : ' question') + (_answers.length === 1 ? '' : 's') +
+    ' · ' + new Date().toLocaleString('en-SG'));
   // What was marked belongs in the copy too: a marked paper copied out as a
   // bare answer key would lose the half of the run the student needs most.
   var t = markTally();
@@ -2294,10 +2660,12 @@ function answersAsText() {
       t.partial ? t.partial + ' partly right' : '',
       t.wrong ? t.wrong + ' wrong' : ''
     ].filter(Boolean).join(', ') + ')');
-    if (t.blank) head.push(t.blank + ' blank, answered');
+    if (t.blank) head.push(t.blank + (allAsk ? ' answered' : ' blank, answered'));
   }
   return head.join(' · ') + '\n\n' + _answers.map(function (it, i) {
-    var lines = [(it.number || (i + 1)) + '. ' + (it.question || '')];
+    var lines = [it.kind === 'ask'
+      ? (it.question || 'Answer')
+      : (it.number || (i + 1)) + '. ' + (it.question || '')];
     (it.options || []).forEach(function (o) {
       var right = it.option && String(o.label).toLowerCase() === String(it.option).toLowerCase();
       lines.push('   (' + o.label + ') ' + o.text + (right ? '  ✓' : ''));
@@ -2421,6 +2789,9 @@ function syncMeta() {
     }));
   } catch (e) {}
   if (_answers.length) renderAnswers();   // the note under the answers names the notes being applied
+  // A 华文 question dictated as English phonetics comes back as nonsense, so
+  // a language already being listened for is restarted in the new one.
+  if (_recOn) { micStop(); micStart(); }
 }
 $('scanLevel').addEventListener('change', syncMeta);
 $('scanSubject').addEventListener('change', syncMeta);
@@ -2436,7 +2807,11 @@ function showTab(name) {
   $('tabHow').classList.toggle('on', _tab === 'how');
   $('scanPage').classList.toggle('hidden', !on || _tab !== 'snap');
   $('howPage').classList.toggle('hidden', !on || _tab !== 'how');
+  $('camDock').classList.toggle('hidden', !on || _tab !== 'snap');
   $('camBar').classList.toggle('hidden', !on || _tab !== 'snap');
+  // Left listening under the How tab it would go on typing into a box nobody
+  // can see.
+  if (_tab !== 'snap') micStop();
   if (_tab === 'how') renderGroundingLine();
 }
 $('tabSnap').addEventListener('click', function () { showTab('snap'); });
@@ -2464,6 +2839,18 @@ $('cameraBtn').addEventListener('click', function () { $('cameraInput').click();
 $('galleryBtn').addEventListener('click', function () { $('galleryInput').click(); });
 
 $('readBtn').addEventListener('click', runScan);
+
+/* The ask box and the 🎤. Typing is what makes ✓ reachable with no photo at
+   all, so every keystroke repaints the bar. */
+$('askText').addEventListener('input', function () { askGrow(); renderCamBar(); });
+$('micBtn').addEventListener('click', micToggle);
+/* Enter sends, Shift+Enter makes a new line — on a phone the keyboard's own
+   return key is the natural way to finish a question. */
+$('askText').addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  if (!$('readBtn').disabled) runScan();
+});
 $('copyAnswersBtn').addEventListener('click', copyAnswers);
 $('printAnswersBtn').addEventListener('click', function () { window.print(); });
 
@@ -2501,7 +2888,8 @@ document.addEventListener('paste', function (e) {
 });
 if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) {
   // A phone has neither of these, which is why the buttons are the headline.
-  $('padSub').innerHTML = 'One photo per page. Then press ✓.<br>You can also drag pictures in, or paste one with Ctrl&nbsp;+&nbsp;V.';
+  $('padSub').innerHTML = 'One photo per page, then press ✓ — or type your question below and press ✓ with no photo at all.' +
+    '<br>You can also drag pictures in, or paste one with Ctrl&nbsp;+&nbsp;V.';
 }
 
 /* Teaching notes window */
@@ -2522,6 +2910,7 @@ $('noteEditSaveBtn').addEventListener('click', notesEditSave);
 $('noteEditModal').addEventListener('click', function (e) { if (e.target === $('noteEditModal')) notesEditClose(); });
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
+  if (_recOn) { micStop(); return; }
   if ($('noteEditModal').classList.contains('open')) notesEditClose();
   else if ($('quickNoteModal').classList.contains('open')) closeQuickNoteModal();
   else if ($('notesModal').classList.contains('open')) closeNotesModal();
@@ -2547,6 +2936,8 @@ window.removeShot = removeShot;
 
 renderAuth();
 renderShots();
+askGrow();
+renderMic();
 </script>
 
 <script type="module">
