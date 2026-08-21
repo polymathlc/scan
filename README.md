@@ -3,6 +3,7 @@
 Photograph a worksheet or an exam paper — or pick pictures out of the gallery — and every question
 printed on them is read: whatever the student has already written is **marked**, whatever is still
 blank is **answered**, in the teacher's own words. Science, Mathematics, English and Chinese.
+Type or dictate a question alongside the photo — or with no photo at all.
 
 Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app` Firebase project:
 
@@ -22,6 +23,8 @@ Three buttons and two tabs. The **Snap** tab is a camera:
 | 📷 **middle** | the shutter: one photo per page, in the order they are printed |
 | ✓ **right** | read the lot: mark what has been answered, answer what has not |
 
+Above those three there is a box to type in, and a 🎤 beside it where your browser can hear you.
+
 That is the whole interaction. The pictures go up three at a time as **one run**, so a question
 that carries on over the page is stitched back together instead of coming back as two halves, and
 every question printed on the pages is dealt with — multiple choice, fill in the blank, open-ended
@@ -34,6 +37,19 @@ The **How to use** tab holds the instructions and the only settings there are �
 explanation you want (answer alone, a short reason, or the full working), and optionally the level
 and subject, which narrow which of your teaching notes apply and which standard the paper is held
 to.
+
+## Say what you want, in writing or out loud
+
+- **With photos** — what you ask governs the run. *“Only question 5”* does question 5 and leaves the
+  rest out; *“check my working on the last page”* checks that; *“P5 maths, test on Friday”* is taken
+  as background and every question is still done. It never stops the marking.
+- **With no photo at all** — press ✓ with just the box filled in and it answers what you asked. Ask
+  for five practice questions and five come back, one card each. Tell it the answer you got and it
+  marks that instead.
+
+The 🎤 appears only where the browser really has dictation, and it listens in the language of the
+paper — set the subject to Chinese and it listens in Chinese. What you asked is shown above the
+answers and travels with **Copy**, so one card where you expected twenty always says why.
 
 ## It marks what is already written
 

@@ -7,8 +7,9 @@ Guidance for Claude when working in this repo.
   `mathgen--app` Firebase project with Google sign-in. Photograph a worksheet or an exam paper —
   or pick pictures out of the gallery — and **every question printed on them is read: what the
   student has already written is MARKED, what is still blank is ANSWERED**. Four subjects:
-  Science, Mathematics, English, Chinese. Nothing is saved anywhere: a photographed paper is
-  somebody's work, so it lives in the tab and leaves through Copy or Print.
+  Science, Mathematics, English, Chinese. **A typed or dictated question is the other way in**:
+  with pages it governs the run, with no pages it *is* the run. Nothing is saved anywhere: a
+  photographed paper is somebody's work, so it lives in the tab and leaves through Copy or Print.
 - Version badge (`APP_VERSION`, shown in the header) is hard-coded — bump it on every change.
 
 ## The AI is the Ans Key app's, ported whole
@@ -100,12 +101,44 @@ step, and ship a change to the shape in both repos together**:
   announced as a score of zero out of nothing.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## Asking, in writing or out loud (v1.4.0)
+- **A photograph is not the only way in.** `askText()` reads the box in the dock at the moment ✓ is
+  pressed — there is no second copy of it to fall out of step with what is on screen.
+- **Two paths, one set of cards.** `_runPages` is the scan as it always was, with the ask woven
+  into `_scanPrompt`; `_runAskAlone` is one call with no images at all. Both end in `_answers`, so
+  the cards, the marking, Copy and Print are written ONCE. `kind` (`'page'` / `'ask'`) is the only
+  thing that says where an entry came from, and it is what keeps a page number and a question
+  number off a card that never had either.
+- **The ask GOVERNS a run that has pages** (`SCAN_ASK_WITH_PAGES_RULE`). "Only question 5" that
+  still came back with the whole paper would be an app that did not listen, and the twenty cards
+  it returned would bury the one that was asked for. Background ("P5 maths, test on Friday") is
+  context, not an order to stop reading — and an instruction NEVER stops the marking.
+- **`_markFields` is the ONE door for the marking fields**, used by `_scanNewItem` and
+  `_askNewItem` alike, so "a blank is never marked wrong" holds on both paths rather than being
+  written twice and drifting.
+- **The ask-alone call is grounded too** — `SCAN_ASK_SYS + aiGrounding('scan')`. Grounding one call
+  site and not another is exactly what the one-door rule exists to prevent.
+- **✓ is reachable with a question and no picture at all.** `renderCamBar` disables it only when
+  there is neither: `!ready.length && !ask`.
+- **Dictation is feature-detected, never assumed.** The 🎤 is `hidden` in the markup and unhidden
+  by `renderMic()` only where `SpeechRecognition` really exists — a button that silently does
+  nothing is worse than no button. It listens in `micLang()`: `zh-CN` on a Chinese paper, `en-SG`
+  otherwise, because a 华文 question dictated as English phonetics comes back as nonsense.
+  `micStop()` runs before a run, when the tab is left and on Escape.
+- **The page SAYS what it was asked** (`renderAskedLine`, and the Copy header). One card where
+  twenty were expected is only honest if the instruction that narrowed the run is on screen.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
   hand), **the shutter in the middle**, **✓ on the right**. That is the whole interaction — a phone
   held over a worksheet, one thumb. Anything added to that bar has to earn its place against the
   three that are there.
+- **The ask row is a row of its OWN** (`#askBar`, inside `#camDock`, above `#camBar`). Grown into
+  the camera bar it would be a fourth control on the one bar that is allowed exactly three. The
+  dock is what is fixed to the viewport now, with `env(safe-area-inset-bottom)`; the bar inside it
+  is an ordinary flex row, and **`#scanPage` carries the bottom padding that clears the dock** so
+  the How tab does not end in a screenful of nothing.
 - **Every setting lives on the How-to-use tab**, because a picker on the snap screen is a decision
   demanded before the first photo. The explanation depth defaults to *answer + full working*; the
   level and subject default to *Any* and only narrow which teaching notes apply, so leaving them
@@ -161,8 +194,10 @@ step, and ship a change to the shape in both repos together**:
 - After touching **the grounding, the live notebook or the scan run**
   (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
   `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
-  `_notesLiveRepaint`, `_scanNewItem`, `_scanFoldRows`, `SCAN_SYS`, `SCAN_DETAIL_RULE`,
-  `SCAN_MARK_RULE`, `SCAN_SUBJECT_RULE`, `SUBJECTS`, `_parseAIJson`), run
+  `_notesLiveRepaint`, `_scanNewItem`, `_scanFoldRows`, `_markFields`, `_askNewItem`,
+  `_askFoldRows`, `_askPrompt`, `_scanPrompt`, `SCAN_SYS`, `SCAN_DETAIL_RULE`, `SCAN_MARK_RULE`,
+  `SCAN_SUBJECT_RULE`, `SCAN_ASK_SYS`, `SCAN_ASK_WITH_PAGES_RULE`, `SUBJECTS`, `_parseAIJson`),
+  run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
   against stubs. Every failure here is silent and the app carries on looking perfectly right: a
   digest that comes back empty is an answer that is no longer the teacher's, key facts leaking into
@@ -170,7 +205,8 @@ step, and ship a change to the shape in both repos together**:
   question into two halves each with half an answer, and a page number that is batch-local rather
   than global cites the wrong page on every answer after the third. A verdict kept on a blank puts
   a red cross on a question nobody attempted, and a note tagged `english` that grounds a Chinese
-  paper is the wrong notebook answering. The listener is in there for
+  paper is the wrong notebook answering, and an instruction that stops governing the run turns
+  "only question 5" back into the whole paper with nothing on screen to say why. The listener is in there for
   the same reason: a one-shot read looks exactly like a live one until the day somebody types a
   note in Ans Key mid-lesson, and then this app is quietly a day behind the one next to it.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move

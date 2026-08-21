@@ -49,6 +49,9 @@ function $(id) { return null; }
 function toast() {}
 function confirm() { return true; }
 var document = { getElementById: () => null, createElement: () => ({ getContext: () => ({}) }) };
+/* No dictation in node, which is exactly the case the app has to survive:
+   the 🎤 is only shown where the browser really has the Web Speech API. */
+var window = {};
 var localStorage = { getItem: () => null, setItem: () => {} };
 var db = { collection: () => ({ doc: () => ({
   collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: false }) }),
@@ -66,7 +69,9 @@ const api = new Function(prelude + json + grounding + scan + `
     noteAppliesHere, noteSubjects, notesRelevant, notesBlock, guidanceBlock, styleBlock,
     aiGrounding, groundingSummary, notesKeywordList,
     _parseAIJson, _scanNewItem, _scanFoldRows, _scanStr, _scanPrompt, scanSubjectRule,
-    SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE
+    _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
+    SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
+    SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE
   };
 `)();
 api.meta = { level: 'P5', subject: 'science' };
@@ -348,6 +353,90 @@ ok('the feedback is addressed to the student',
 ok('marks are only claimed where the paper prints them',
    /EMPTY STRING when it does not/.test(api.SCAN_MARK_RULE));
 
+/* ---------- Asking, in writing or out loud ----------
+   Two ways in that have to meet in the same place: an instruction ALONGSIDE
+   the pages, which governs what the run does with them, and an instruction
+   with NO pages, which is the whole run. Both end in the same answer cards,
+   so Copy, Print and the marking are the scan's and are not written twice. */
+api.meta = { level: 'P5', subject: 'math' };
+const withAsk = api._scanPrompt(2, 1, 4, '', 'Only question 5 please');
+ok('what the student asked leads the prompt',
+   withAsk.indexOf('Only question 5 please') >= 0 &&
+   withAsk.indexOf('Only question 5 please') < withAsk.indexOf('ABOUT THE IMAGES'));
+ok('the instruction is given authority over the sweep',
+   /THEIR INSTRUCTION GOVERNS THIS RUN/.test(withAsk));
+ok('naming questions really does narrow the run',
+   /do THOSE and leave the rest out entirely/.test(withAsk));
+ok('background is context, not an order to stop reading',
+   /take it as context and carry on with every question/.test(withAsk));
+ok('an instruction never stops the marking',
+   /never let it stop you marking what has already been written/.test(withAsk));
+ok('a page with a diagram and no printed question is still answerable',
+   /pages hold no printed question at all/.test(withAsk));
+
+/* No ask, no ask block: the ordinary scan is not paying for a section that
+   says nothing, and it is not being told about an instruction it never got. */
+const noAsk = api._scanPrompt(2, 1, 4, '');
+ok('no instruction means no instruction block', !/THIS IS WHAT THE STUDENT ASKED/.test(noAsk));
+ok('the ordinary scan is unchanged by the feature', /Find EVERY question printed/.test(noAsk));
+
+/* Asked with nothing photographed. */
+const alone = api._askPrompt('Give me five practice questions on fractions', 'full');
+ok('the ask with no paper carries what was said', alone.includes('five practice questions on fractions'));
+ok('it says plainly there is no paper', /Nothing was photographed/.test(alone));
+ok('it still carries the subject standard', alone.includes('Mathematics:'));
+ok('it still carries the explanation depth', alone.includes(api.SCAN_DETAIL_RULE.full));
+
+ok('one thing asked comes back as one entry, several as several',
+   /ONE ENTRY PER THING/.test(api.SCAN_ASK_SYS));
+ok('a question asked in Chinese is answered in Chinese',
+   /asked in Chinese is answered in Chinese/.test(api.SCAN_ASK_SYS));
+ok('a school question is never turned away for having no picture',
+   /never turn a school question away/i.test(api.SCAN_ASK_SYS));
+ok('the ask can mark an answer the student typed themselves',
+   /"correct", "partial" or "wrong"/.test(api.SCAN_ASK_SYS));
+ok('but it never invents an answer of theirs to mark',
+   /never invent an answer of\s+theirs in order to mark it/.test(api.SCAN_ASK_SYS));
+
+/* The reply is filed as an ordinary answer card — with no page, because it
+   never had one. */
+let asked = [];
+api._askFoldRows([
+  { heading: 'Question 1', answer: '3/4', explanation: 'Add the numerators.' },
+  { heading: '', answer: '', explanation: '' },
+  null,
+  { heading: 'Question 2', answer: '1/2', explanation: '' }
+], asked);
+ok('every part of the reply is its own card', asked.length === 2);
+ok('a reply card knows it was never on a page',
+   asked[0].kind === 'ask' && asked[0].page === 0);
+ok('the heading becomes the question line', asked[0].question === 'Question 1');
+ok('an empty part is dropped rather than filed as a blank card',
+   asked.every(x => x.answer || x.explanation));
+
+/* The blank-is-never-marked-wrong rule is ONE rule and holds on both paths. */
+asked = [];
+api._askFoldRows([
+  { heading: 'Q', answer: '8', verdict: 'wrong', feedback: 'Careless.' },
+  { heading: 'Q', answer: '8', studentAnswer: '16', verdict: 'wrong', feedback: 'You added.' }
+], asked);
+ok('a verdict with nothing of the student behind it is dropped here too',
+   asked[0].marked === false && asked[0].verdict === '' && asked[0].feedback === '');
+ok('an answer the student typed IS marked',
+   asked[1].marked === true && asked[1].verdict === 'wrong' && asked[1].studentAnswer === '16');
+ok('both paths read the marking through the same door',
+   api._markFields({ studentAnswer: 'x', verdict: 'PARTIAL' }).verdict === 'partial' &&
+   api._markFields({ verdict: 'wrong' }).marked === false);
+
+/* Dictation is feature-detected, never assumed: node has no Web Speech API
+   and neither does Firefox, and a 🎤 that does nothing is worse than none. */
+ok('dictation is detected, not assumed', api.micAvailable() === false);
+api.meta = { level: 'P5', subject: 'chinese' };
+ok('the mic listens in the language of the paper', api.micLang() === 'zh-CN');
+api.meta = { level: 'P5', subject: 'english' };
+ok('and in English for everything else', api.micLang() === 'en-SG');
+api.meta = { level: 'P5', subject: 'science' };
+
 /* ---------- The prompt's promises ---------- */
 ok('every question is answered, MCQ included', /Multiple-choice questions are NOT/.test(api.SCAN_SYS));
 ok('a lettered part is its own entry', /ONE ENTRY PER LETTERED PART/.test(api.SCAN_SYS));
@@ -414,6 +503,30 @@ ok('all four subjects are declared in ONE list',
      new RegExp("value: '" + v + "'").test(html.slice(html.indexOf('var SUBJECTS = ['), html.indexOf('var SUBJECT_OK')))));
 ok('the subject picker is filled from that list, never hand-written',
    /fillSubjects/.test(html) && !/<option value="chinese"/.test(html));
+
+/* The ask row is a row of its OWN. Grown into the camera bar it would make a
+   fourth control on the one bar that is allowed exactly three. */
+const dock = html.slice(html.indexOf('<div class="camDock'), html.indexOf('id="camDock"') + 4000);
+ok('the ask row is inside the dock, above the camera bar',
+   dock.indexOf('id="askBar"') >= 0 && dock.indexOf('id="askBar"') < dock.indexOf('id="camBar"'));
+ok('the box takes typing and the 🎤 takes speech',
+   /id="askText"/.test(dock) && /id="micBtn"/.test(dock));
+ok('the 🎤 starts hidden and is only shown where it works',
+   /id="micBtn"[^>]*hidden/.test(html) && /b\.hidden = !micAvailable\(\)/.test(html));
+ok('the dock belongs to the Snap tab, exactly as the bar does',
+   /camDock'\)\.classList\.toggle\('hidden', !on \|\| _tab !== 'snap'\)/.test(html));
+ok('✓ is reachable with a question and no picture at all',
+   /done\.disabled = _scanning \|\| \(!ready\.length && !ask\);/.test(html));
+ok('a run with no pages takes the ask-alone path',
+   /if \(shots\.length\) await _runPages\([\s\S]{0,120}else askErr = await _runAskAlone\(/.test(html));
+ok('the ask-alone call is grounded too — the one door',
+   /system: SCAN_ASK_SYS \+ aiGrounding\('scan'\),/.test(html));
+ok('dictation is stopped before a run, and when the tab is left',
+   /micStop\(\);/.test(html.slice(html.indexOf('async function runScan'), html.indexOf('async function runScan') + 1400)) &&
+   /if \(_tab !== 'snap'\) micStop\(\);/.test(html));
+ok('what was asked is said back above the answers',
+   /renderAskedLine/.test(html) && /You asked: /.test(html));
+ok('Copy carries what was asked', /Asked: /.test(html));
 
 /* ---------- Three buttons, two tabs ----------
    The screen is the whole point of this app: a phone held over a worksheet,
