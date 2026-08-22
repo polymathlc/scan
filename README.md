@@ -106,6 +106,13 @@ the portal once and the whole paper is filed the moment it has been read.
 | 📘 English Learning Portal | `polymathlc/english` |
 | 📕 Chinese Learning Portal | `polymathlc/chinese` |
 
+**Each question goes to the app for its own subject.** The subject is worked out from the question
+itself, so a pile holding two subjects files itself correctly and a maths question never lands in
+the science list. The button on the card says where it is going *before* you press it, and you can
+always choose a different list. Set **Subject** in the settings and the whole paper goes to that one
+app instead. A question whose subject cannot be told is never guessed at — it stays on the card for
+you to send by hand, and the toast says how many.
+
 It lands in **vetting**, never in the bank. The card is highlighted **purple** there and says it
 came from this app, because a scanned question is not like a typed one: it was read by a model from
 a picture of somebody's worksheet, the wording may be half a line short, **the diagram is not there
