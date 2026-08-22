@@ -321,6 +321,36 @@
   }
   .hidden { display: none !important; }
 
+  /* ---------- 📥 Sending a scanned question to a vetting list (admin) ----------
+     PURPLE, and the SAME purple the four portals paint the card with when it
+     lands there. One colour for "this came off a photograph", so the button
+     pressed here and the card that turns up in the Science, Maths, English or
+     Chinese vetting list are plainly the same thing. */
+  .ansSend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .btnScan { border-color: #C9A6E8; color: #6B2FA0; background: #FAF5FF; }
+  .btnScan:hover:not(:disabled) { background: #F3E8FF; }
+  .sentChip {
+    font-size: 0.74rem; font-weight: 700; color: #6B2FA0; white-space: nowrap;
+    background: #F3E8FF; border: 1px solid #C9A6E8; border-radius: 999px; padding: 4px 12px;
+  }
+  /* One tap per portal: on a phone a picker with a Send button underneath is
+     two decisions where there is only one to make. */
+  .vetPick { display: flex; flex-direction: column; gap: 10px; }
+  .vetTarget {
+    display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%;
+    padding: 14px 16px; border-radius: var(--radius-sm); border: 1px solid var(--line);
+    background: var(--bg); cursor: pointer; font: inherit; color: inherit;
+  }
+  .vetTarget:hover:not(:disabled) { border-color: #C9A6E8; background: #FAF5FF; }
+  .vetTarget:disabled { opacity: .55; cursor: default; }
+  .vetTargetName { font-size: 0.95rem; font-weight: 700; }
+  .vetTargetSub { font-size: 0.78rem; color: var(--ink-faint); line-height: 1.5; }
+  .vetSuggest {
+    align-self: flex-start; margin-top: 4px; font-size: 0.7rem; font-weight: 700;
+    color: #6B2FA0; background: #F3E8FF; border: 1px solid #C9A6E8;
+    border-radius: 999px; padding: 2px 10px;
+  }
+
   /* ---------- Modals ---------- */
   .modalBack {
     position: fixed; inset: 0; z-index: 200; display: none;
@@ -502,6 +532,7 @@
           <h2 id="answersTitle" style="margin:0">The answers</h2>
           <div class="spacer"></div>
           <div style="display:flex;gap:10px;flex:none;">
+            <button class="btn btnScan hidden" id="vetAllBtn" title="Add every question on this paper to a vetting list">📥 Send all to vetting</button>
             <button class="btn" id="copyAnswersBtn">📋 Copy</button>
             <button class="btn" id="printAnswersBtn">🖨 Print</button>
           </div>
@@ -550,6 +581,22 @@
       <p class="sub" style="margin-top:14px">Nothing is saved anywhere. Your paper lives in this tab and leaves through <b>Copy</b> or <b>Print</b>.</p>
     </div>
 
+    <!-- Admin only. A student's device runs this very same scan, so the card is
+         hidden for everybody else — and the door itself is shut in the code,
+         not merely covered over. -->
+    <div class="card hidden" id="howVetCard">
+      <h3>📥 Keeping a question you have just read</h3>
+      <p class="sub" style="margin-top:6px">Every answer card carries a <b>📥 Send to vetting</b> button, and the
+        header carries <b>📥 Send all to vetting</b> for a whole paper. Choose the portal it belongs to — Science,
+        Maths, English or Chinese — and the question, its options, its answer and the reason why are written straight
+        into that app's vetting list.</p>
+      <p class="sub" style="margin-top:10px">It lands in <b>vetting</b>, never in the bank: the card is highlighted
+        <b>purple</b> there and says it came from this app, so you know to check the wording and attach the diagram
+        before you approve it. The topic is left for you to choose — it belongs to that app's syllabus, not this one.</p>
+      <p class="sub" style="margin-top:10px">What the student wrote, the mark and the feedback stay here. A bank
+        question is the question, not somebody's marked answer to it.</p>
+    </div>
+
     <div class="card">
       <h3>Whose answers these are</h3>
       <p class="sub" id="howGrounding" style="margin-top:6px"></p>
@@ -571,6 +618,17 @@
           <label for="scanLevel">Level <span class="hint">(optional)</span></label>
           <select id="scanLevel">
             <option value="">Any level</option>
+          </select>
+        </div>
+        <!-- Admin only: a student's device runs this same scan, and nothing it
+             reads belongs in a question bank. Shown and hidden by
+             applyVetVisibility, never by this markup alone. -->
+        <div class="field hidden" id="scanAutoVetField">
+          <label for="scanAutoVet">📥 File every question read <span class="hint">(teacher only)</span></label>
+          <!-- Filled from VET_TARGETS, the one table, so a portal cannot exist
+               in the send window and not here. -->
+          <select id="scanAutoVet">
+            <option value="">Off — I'll send them myself</option>
           </select>
         </div>
         <div class="field">
@@ -677,6 +735,26 @@
   </div>
 </div>
 
+<!-- ---------- 📥 Send to a vetting list (admin) ---------- -->
+<div class="modalBack" id="vetModal">
+  <div class="modalCard">
+    <div class="modalHead"><h2>📥 Send to a vetting list</h2></div>
+    <div class="modalBody">
+      <p class="sub" id="vetWhat" style="margin-top:0"></p>
+      <!-- Built from VET_TARGETS, the one table, so a fifth portal appears
+           here by adding a row rather than by editing this markup. -->
+      <div class="vetPick" id="vetPick" style="margin-top:16px"></div>
+      <p class="hint" id="vetHint" style="margin-top:14px">Nothing is served to a student until you approve it there.
+        The card is highlighted purple and says it came from this app, so you can check the wording, attach the
+        diagram and choose the topic first.</p>
+      <div class="tnStatus" id="vetStatus" style="display:none"></div>
+    </div>
+    <div class="modalFoot">
+      <button class="btn" id="vetCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -703,7 +781,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.4.0';
+var APP_VERSION = 'v1.6.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2469,6 +2547,10 @@ async function runScan() {
       (t.marked ? ' — ' + t.marked + ' marked, ' + t.blank + ' answered' : ' — all answered') +
       (failedPages.length ? '. Page ' + failedPages.join(', ') + ' could not be read' : '') + '.', 6000);
   }
+
+  // 📥 File the whole paper, where the teacher has asked for that on the How
+  // tab. Admin only, and it says so when it has — see `_vetAutoFile`.
+  await _vetAutoFile();
 }
 
 /* ---- Showing the answers ---- */
@@ -2546,6 +2628,7 @@ function answerCardHtml(it, i) {
       ? '<div class="fbBox"><div class="fbLabel">Feedback</div><div class="fbText">' + escHtml(it.feedback) + '</div></div>'
       : '') +
     (it.explanation ? '<div class="whyBox"><div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
+    _vetCardFootHtml(it, i) +
   '</div>';
 }
 
@@ -2623,6 +2706,7 @@ function renderAnswers() {
     : 'No teaching notes are being applied — this is the ordinary syllabus standard.';
   $('copyAnswersBtn').disabled = !_answers.length;
   $('printAnswersBtn').disabled = !_answers.length;
+  renderVetAllBtn();
   renderGroundingLine();
 }
 
@@ -2701,6 +2785,375 @@ function _copyFallback(text) {
   document.body.removeChild(ta);
 }
 
+/* =====================================================================
+   📥 SENDING A SCANNED QUESTION TO A VETTING LIST   (admin only)
+   ---------------------------------------------------------------------
+   A question read off a photograph is a question the centre does not have.
+   Until now the only way one reached a bank was to be typed out again in the
+   portal it belongs to, so in practice it never was: the paper was marked,
+   the tab was closed, and the question went with it.
+
+   THIS IS THE ADMIN'S DOOR AND NOBODY ELSE'S. A student's device runs the
+   very same scan — that is the whole point of this app — so every entry point
+   is behind `isAdmin(currentUser)` AND `_vetSend` asks again before it writes.
+   Hiding a button is not the same as shutting a door.
+
+   IT LANDS IN VETTING, NEVER IN THE BANK. What comes back off a photograph
+   was read by a model from a picture of somebody's worksheet: the wording may
+   be half a line short, the diagram is not there at all, and the topic is a
+   guess. Vetting is the holding pen all four portals already keep for exactly
+   that, and every one of them draws the card in PURPLE and says it came from
+   here — see `source` below.
+
+   `VET_TARGETS` IS THE ONE TABLE: a subject, the portal it belongs to, the
+   collection that portal's vetting list lives in, and the SHAPE that portal's
+   questions take, one row each. A fifth portal is one entry rather than four
+   edits that have to agree.
+
+   `source: 'scan'` IS THE ONE FIELD THOSE FOUR APPS READ. Rename it here and
+   every card still lands, still renders and still approves — it simply stops
+   being purple and stops saying where it came from, with nothing anywhere to
+   say so.
+
+   THE CHILD'S WORK DOES NOT TRAVEL. What the student wrote, the verdict and
+   the feedback stay on the card here. A bank question is the QUESTION, its
+   options, its answer and why — a marked answer belonging to a named child
+   has no business in a bank thirty other children practise from.
+
+   NOTHING ELSE ABOUT THIS APP CHANGES. Nothing is saved on a scan, on a copy
+   or on a print; this is the one path that writes a question anywhere, and
+   only when the teacher presses the button.
+   ===================================================================== */
+
+var VET_SOURCE = 'scan';                 // the ONE field the four portals read
+var VET_SOURCE_APP = 'Scan & Answer';
+
+var VET_TARGETS = [
+  { key: 'science', short: 'Science', label: '🔬 Science Learning Portal',
+    sub: 'polymathlc/cer — the CER question bank', col: 'vetting',     build: _vetPortalDoc },
+  { key: 'math',    short: 'Maths',   label: '📐 Math Practice',
+    sub: 'polymathlc/math — the maths bank',       col: 'mathVetting', build: _vetMathDoc },
+  { key: 'english', short: 'English', label: '📘 English Learning Portal',
+    sub: 'polymathlc/english',                     col: 'vettingEn',   build: _vetPortalDoc },
+  { key: 'chinese', short: 'Chinese', label: '📕 Chinese Learning Portal',
+    sub: 'polymathlc/chinese — 华文',              col: 'vettingZh',   build: _vetPortalDoc }
+];
+function vetTarget(key) {
+  return VET_TARGETS.filter(function (t) { return t.key === key; })[0] || null;
+}
+
+/* ---- Turning one answer card into a question document ---- */
+
+function _vetId(prefix) {
+  return prefix + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+}
+/* A block's content is authored HTML in all four portals, so plain text
+   crosses into it ESCAPED, with the line breaks kept: a question printed over
+   three lines comes up as three lines in the editor rather than as one run-on
+   paragraph, and a "<" in a maths question is a less-than sign rather than the
+   start of a tag nobody typed. */
+function _vetHtml(s) {
+  var t = String(s == null ? '' : s).trim();
+  if (!t) return '';
+  return t.split(/\n+/).map(function (line) { return escHtml(line); }).join('<br>');
+}
+/* The heading the vetting card is found by. A list of forty "Untitled" is a
+   list nobody can read, so the opening of the question stands in until the
+   admin writes something better. */
+function _vetTitle(it) {
+  var q = String((it && it.question) || '').replace(/\s+/g, ' ').trim();
+  if (!q) return 'Scanned question';
+  if (q.length <= 72) return q;
+  return q.slice(0, 72).replace(/\s+\S*$/, '') + '…';
+}
+function _vetIsMcq(it) {
+  return !!(it && it.type === 'mcq' && (it.options || []).length >= 2);
+}
+/* Which option the paper's answer names. The model returns the LABEL it read
+   off the page — "3", "(B)", "b." — and all four portals store a POSITION, so
+   the label is matched against the options rather than trusted as an index.
+   A label that matches nothing returns -1 and the question arrives with
+   nothing ticked, which is the honest answer: guessing an option marks every
+   class that ever sits it against the wrong one. */
+function _vetCorrectIndex(it) {
+  var want = String((it && it.option) || '').replace(/[()\s.]/g, '').toLowerCase();
+  if (!want) return -1;
+  var opts = (it && it.options) || [];
+  for (var i = 0; i < opts.length; i++) {
+    if (String(opts[i].label || '').replace(/[()\s.]/g, '').toLowerCase() === want) return i;
+  }
+  return -1;
+}
+/* The three fields every document carries whatever shape it is in. */
+function _vetStamp(d) {
+  d.source = VET_SOURCE;
+  d.sourceApp = VET_SOURCE_APP;
+  d.scannedAt = new Date().toISOString();
+  return d;
+}
+
+/* Science, English and Chinese are one lineage and one shape: the answer
+   lives in a BLOCK, and an MCQ's correct option is the id of that option. */
+function _vetPortalDoc(it) {
+  var mcq = _vetIsMcq(it);
+  var blocks = [];
+  var qHtml = _vetHtml(it.question);
+  if (qHtml) blocks.push({ id: _vetId('b_'), type: 'text', content: qHtml });
+  if (mcq) {
+    var opts = it.options.map(function (o) {
+      return { id: _vetId('o_'), text: String(o.text || '').trim() };
+    });
+    var ci = _vetCorrectIndex(it);
+    blocks.push({ id: _vetId('b_'), type: 'mcq', options: opts, correctId: ci >= 0 ? opts[ci].id : null });
+  } else if (String(it.answer || '').trim()) {
+    blocks.push({ id: _vetId('b_'), type: 'plainanswer', content: _vetHtml(it.answer) });
+  }
+  /* An MCQ's answer IS its ticked option, so a written answer beside it would
+     be a second answer box the paper never had. It becomes the explanation
+     instead, and only where nothing else explains the question. */
+  var why = String(it.explanation || '').trim() || (mcq ? String(it.answer || '').trim() : '');
+  if (why) blocks.push({ id: _vetId('b_'), type: 'explanation', content: _vetHtml(why) });
+  return _vetStamp({
+    id: _vetId('q_'),
+    title: _vetTitle(it),
+    category: mcq ? 'Multiple Choice Question' : 'CER',
+    /* The topic is left BLANK on purpose. It is read off the destination app's
+       own syllabus list, which this app has never seen and must not carry a
+       copy of — a topic guessed from here files the question under a heading
+       nobody chose while looking perfectly filed. `topicConfidence: 'low'` is
+       the signal all three of those apps already draw a "⚠ check topic" badge
+       from, so the gap is on screen rather than merely absent. */
+    topic: '',
+    topicConfidence: 'low',
+    markingGuide: '',
+    tags: [],
+    blocks: blocks,
+    blanks: {},
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    createdBy: VET_SOURCE_APP
+  });
+}
+
+/* Math Practice files its answer on the QUESTION rather than in a block —
+   `expected` / `markingGuide`, an MCQ's options as plain strings and the
+   correct one as a position, with -1 meaning "not settled", which is that
+   app's own convention. A portal-shaped document written here would render
+   as a question with no answer at all and no error anywhere. */
+function _vetMathDoc(it) {
+  var mcq = _vetIsMcq(it);
+  var ci = mcq ? _vetCorrectIndex(it) : -1;
+  var q = _vetStamp({
+    id: _vetId('mq_'),
+    title: _vetTitle(it),
+    /* The level really is a field there, and the run already knows it when
+       the teacher set one — blank simply means they left it on "Any". */
+    level: wsMeta.level || '',
+    topic: '',
+    topics: [],
+    concept: '',
+    los: [],
+    blocks: [],
+    expected: '',
+    markingGuide: String(it.explanation || '').trim(),
+    createdAt: new Date().toISOString(),
+    createdBy: VET_SOURCE_APP
+  });
+  var qHtml = _vetHtml(it.question);
+  if (qHtml) q.blocks.push({ id: _vetId('b_'), type: 'text', content: qHtml });
+  if (mcq) {
+    q.options = it.options.map(function (o) { return String(o.text || '').trim(); });
+    q.correctOption = ci;
+  }
+  q.expected = String(it.answer || '').trim() ||
+    (ci >= 0 ? String(it.options[ci].text || '').trim() : '');
+  return q;
+}
+
+/* ---- The window ---- */
+
+var _vetPending = null;        // { idx } — idx null means the whole paper
+var _vetBusy = false;
+
+function _vetSentTargets(it) {
+  return (it && Array.isArray(it.sentTo)) ? it.sentTo : [];
+}
+function _vetMarkSent(it, key) {
+  if (!it) return;
+  if (!Array.isArray(it.sentTo)) it.sentTo = [];
+  if (it.sentTo.indexOf(key) === -1) it.sentTo.push(key);
+}
+function vetStatus(msg) {
+  var el = $('vetStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? '' : 'none';
+}
+/* Which questions this press is about — read at OPEN time and again at SEND
+   time from the same place, so a run that finished in between cannot send a
+   card the teacher never saw. */
+function _vetItems() {
+  if (!_vetPending) return [];
+  if (_vetPending.idx == null) return _answers.slice();
+  var it = _answers[_vetPending.idx];
+  return it ? [it] : [];
+}
+function renderVetPick() {
+  var wrap = $('vetPick');
+  if (!wrap) return;
+  var items = _vetItems();
+  var suggest = wsMeta.subject || '';
+  wrap.innerHTML = VET_TARGETS.map(function (t) {
+    /* A question already sitting in that portal's vetting list says so and
+       cannot be sent twice by a slip of the thumb — the same paper read again
+       is a fresh run and a fresh set of cards, so this only ever means
+       "you already pressed this". */
+    var already = items.length && items.every(function (it) { return _vetSentTargets(it).indexOf(t.key) !== -1; });
+    return '<button class="btn vetTarget" type="button" onclick="vetChoose(\'' + t.key + '\')"' +
+      (already || _vetBusy ? ' disabled' : '') + '>' +
+      '<span class="vetTargetName">' + escHtml(t.label) + '</span>' +
+      '<span class="vetTargetSub">' + escHtml(already ? 'Already in this vetting list' : t.sub) + '</span>' +
+      (t.key === suggest && !already ? '<span class="vetSuggest">the subject you set</span>' : '') +
+      '</button>';
+  }).join('');
+}
+function vetOpen(idx) {
+  if (!isAdmin(currentUser)) return;
+  if (_scanning) { toast('Wait until the paper has finished reading.', 3500); return; }
+  _vetPending = { idx: (typeof idx === 'number' ? idx : null) };
+  var items = _vetItems();
+  if (!items.length) { _vetPending = null; return; }
+  var what = _vetPending.idx == null
+    ? 'All ' + items.length + ' question' + (items.length === 1 ? '' : 's') + ' on this paper'
+    : 'This question';
+  $('vetWhat').textContent = what + ' will be added to the vetting list you choose.';
+  _vetBusy = false;
+  vetStatus('');
+  renderVetPick();
+  $('vetModal').classList.add('open');
+}
+function vetClose() {
+  if (_vetBusy) return;              // a write is in flight — losing the window loses the report
+  $('vetModal').classList.remove('open');
+  _vetPending = null;
+}
+/* `_vetSend` is the ONE writer, and the button and the automatic filing below
+   both go through it — two loops would be two places for the admin check, the
+   already-sent guard and the failure count to drift apart. It reports what
+   went and what did not; it never speaks to the screen itself. */
+async function _vetSend(t, items, onProgress) {
+  var r = { sent: 0, failed: 0, firstErr: '' };
+  /* Asked at the DOOR, not only at the button: a student's device runs this
+     same code, and hiding a button is not the same as shutting a door. */
+  if (!t || !isAdmin(currentUser)) return r;
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    if (_vetSentTargets(it).indexOf(t.key) !== -1) { r.sent++; continue; }
+    try {
+      var d = t.build(it);
+      await db.collection('users').doc(currentUser.uid).collection(t.col).doc(d.id).set(d);
+      _vetMarkSent(it, t.key);
+      r.sent++;
+    } catch (err) {
+      r.failed++;
+      if (!r.firstErr) r.firstErr = (err && err.message) || 'could not be written';
+      console.warn('vetting send failed', t.key, err);
+    }
+    if (onProgress) onProgress(i + 1, items.length);
+  }
+  return r;
+}
+/* Every question that would not go is REPORTED. A batch that quietly sent
+   nineteen of twenty reads exactly like one that sent all twenty. */
+function _vetReport(t, r) {
+  if (!r.failed) {
+    return '✅ ' + r.sent + ' question' + (r.sent === 1 ? '' : 's') + ' sent to the ' + t.short +
+      ' vetting list. Approve ' + (r.sent === 1 ? 'it' : 'them') + ' in that app when you have checked ' +
+      (r.sent === 1 ? 'it' : 'them') + '.';
+  }
+  if (r.sent) return '⚠ ' + r.sent + ' sent to ' + t.short + ', ' + r.failed + ' could not be — ' + r.firstErr;
+  return '⚠ Nothing could be sent to ' + t.short + ' — ' + r.firstErr;
+}
+
+async function vetChoose(key) {
+  var t = vetTarget(key);
+  if (!t || _vetBusy) return;
+  if (!isAdmin(currentUser)) { toast('Only the teacher’s account can send a question for vetting.', 4500); vetClose(); return; }
+  var items = _vetItems();
+  if (!items.length) { vetClose(); return; }
+  _vetBusy = true;
+  renderVetPick();
+  vetStatus('Sending ' + items.length + ' question' + (items.length === 1 ? '' : 's') + ' to ' + t.short + '…');
+
+  var r = await _vetSend(t, items, function (done, total) {
+    vetStatus('Sending… ' + done + ' of ' + total);
+  });
+
+  _vetBusy = false;
+  vetClose();
+  renderAnswers();
+  toast(_vetReport(t, r), r.failed ? 7000 : 6500);
+}
+
+/* ---- Filing every question automatically ----
+   Set once on the How tab and the whole paper is filed the moment it has been
+   read, which is what a teacher working through a pile of papers actually
+   wants — the button on the card is for the other case, where one question out
+   of twenty is worth keeping. It is OFF unless a portal is chosen, because the
+   subject cannot be guessed: "Any subject" reads a paper perfectly well and
+   says nothing about which of four banks the questions belong in.
+
+   It is not silent. The run's own toast is followed by this one, naming the
+   list and the count — questions filed somewhere the teacher was not told
+   about are questions nobody goes and vets. */
+function vetAutoTarget() {
+  var el = $('scanAutoVet');
+  if (!el || !isAdmin(currentUser)) return null;
+  return vetTarget(el.value || '');
+}
+async function _vetAutoFile() {
+  var t = vetAutoTarget();
+  if (!t || !_answers.length) return;
+  var items = _answers.slice();
+  var r = await _vetSend(t, items);
+  renderAnswers();
+  toast(_vetReport(t, r), r.failed ? 7000 : 6500);
+}
+
+/* The button on the card, because a question is worth keeping one at a time:
+   this one is a good question, the next one is the model reading a smudge.
+   📥 Send all in the header is the same door for a paper worth keeping whole. */
+function _vetCardFootHtml(it, i) {
+  if (!isAdmin(currentUser)) return '';
+  var chips = _vetSentTargets(it).map(function (k) {
+    var t = vetTarget(k);
+    return '<span class="sentChip">✓ In ' + escHtml(t ? t.short : k) + ' vetting</span>';
+  }).join('');
+  return '<div class="ansSend noPrint">' +
+    '<button class="btn btnScan" type="button" onclick="vetOpen(' + i + ')"' + (_scanning ? ' disabled' : '') +
+    '>📥 Send to vetting</button>' + chips + '</div>';
+}
+/* Shown only to the admin, and only once there is something to send. */
+function renderVetAllBtn() {
+  var b = $('vetAllBtn');
+  if (!b) return;
+  b.classList.toggle('hidden', !(isAdmin(currentUser) && _answers.length));
+  b.disabled = _scanning;
+}
+function applyVetVisibility() {
+  var admin = isAdmin(currentUser);
+  var card = $('howVetCard');
+  if (card) card.classList.toggle('hidden', !admin);
+  var field = $('scanAutoVetField');
+  /* Hidden, never CLEARED. This runs once before the sign-in has resolved and
+     again after it, so clearing here would wipe the teacher's own saved
+     setting on every load of the app. What stops a student on a shared device
+     filing anything is `vetAutoTarget`, which asks who is signed in at the
+     moment the paper is read — the guard belongs at the write, not here. */
+  if (field) field.classList.toggle('hidden', !admin);
+  renderVetAllBtn();
+}
+
 /* ================= Sign in ================= */
 function renderAuth() {
   var signedIn = !!currentUser;
@@ -2713,6 +3166,7 @@ function renderAuth() {
     : '';
   showTab(_tab);
   applyNotesVisibility();
+  applyVetVisibility();
 }
 
 function signIn() {
@@ -2755,6 +3209,19 @@ auth.onAuthStateChanged(function (user) {
 /* Both subject pickers — the one that says which paper is being scanned and
    the one that says which paper a typed note is about — are filled from
    SUBJECTS, so the four subjects are declared exactly once. */
+/* One row per portal, from VET_TARGETS — the one table — so a portal cannot
+   exist in the send window and not in this picker. */
+(function fillVetTargets() {
+  var sel = $('scanAutoVet');
+  if (!sel) return;
+  VET_TARGETS.forEach(function (t) {
+    var o = document.createElement('option');
+    o.value = t.key;
+    o.textContent = t.label;
+    sel.appendChild(o);
+  });
+})();
+
 (function fillSubjects() {
   ['scanSubject', 'qnSubject'].forEach(function (id) {
     var sel = $(id);
@@ -2777,6 +3244,7 @@ var SCAN_PREF_KEY = 'scanPrefs';
     if (p.level && LEVELS.indexOf(p.level) !== -1) $('scanLevel').value = p.level;
     if (p.subject && SUBJECT_OK[p.subject]) $('scanSubject').value = p.subject;
     if (p.detail) $('scanDetail').value = p.detail;
+    if (p.autoVet && vetTarget(p.autoVet)) $('scanAutoVet').value = p.autoVet;
   } catch (e) {}
   syncMeta();
 })();
@@ -2785,7 +3253,8 @@ function syncMeta() {
   wsMeta.subject = $('scanSubject').value || '';
   try {
     localStorage.setItem(SCAN_PREF_KEY, JSON.stringify({
-      level: wsMeta.level, subject: wsMeta.subject, detail: $('scanDetail').value
+      level: wsMeta.level, subject: wsMeta.subject, detail: $('scanDetail').value,
+      autoVet: $('scanAutoVet') ? $('scanAutoVet').value : ''
     }));
   } catch (e) {}
   if (_answers.length) renderAnswers();   // the note under the answers names the notes being applied
@@ -2793,6 +3262,12 @@ function syncMeta() {
   // a language already being listened for is restarted in the new one.
   if (_recOn) { micStop(); micStart(); }
 }
+$('scanAutoVet').addEventListener('change', function () {
+  syncMeta();
+  var t = vetAutoTarget();
+  toast(t ? 'Every question read will be filed in the ' + t.short + ' vetting list.'
+          : 'Questions will only be sent when you press 📥.', 4000);
+});
 $('scanLevel').addEventListener('change', syncMeta);
 $('scanSubject').addEventListener('change', syncMeta);
 $('scanDetail').addEventListener('change', syncMeta);
@@ -2853,6 +3328,7 @@ $('askText').addEventListener('keydown', function (e) {
 });
 $('copyAnswersBtn').addEventListener('click', copyAnswers);
 $('printAnswersBtn').addEventListener('click', function () { window.print(); });
+$('vetAllBtn').addEventListener('click', function () { vetOpen(null); });
 
 /* Drag, drop and paste — the desktop way in. A touchscreen has neither, which
    is why the camera and the gallery buttons are the headline. */
@@ -2870,7 +3346,7 @@ pad.addEventListener('drop', function (e) {
 document.addEventListener('paste', function (e) {
   if (!currentUser || _tab !== 'snap') return;
   if ($('notesModal').classList.contains('open') || $('quickNoteModal').classList.contains('open') ||
-      $('noteEditModal').classList.contains('open')) return;
+      $('noteEditModal').classList.contains('open') || $('vetModal').classList.contains('open')) return;
   var t = e.target;
   if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
   var items = (e.clipboardData && e.clipboardData.items) || [];
@@ -2905,13 +3381,16 @@ $('quickNoteBtn').addEventListener('click', openQuickNoteModal);
 $('quickNoteCancelBtn').addEventListener('click', closeQuickNoteModal);
 $('quickNoteSaveBtn').addEventListener('click', quickNoteSave);
 $('quickNoteModal').addEventListener('click', function (e) { if (e.target === $('quickNoteModal')) closeQuickNoteModal(); });
+$('vetCancelBtn').addEventListener('click', vetClose);
+$('vetModal').addEventListener('click', function (e) { if (e.target === $('vetModal')) vetClose(); });
 $('noteEditCancelBtn').addEventListener('click', notesEditClose);
 $('noteEditSaveBtn').addEventListener('click', notesEditSave);
 $('noteEditModal').addEventListener('click', function (e) { if (e.target === $('noteEditModal')) notesEditClose(); });
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
   if (_recOn) { micStop(); return; }
-  if ($('noteEditModal').classList.contains('open')) notesEditClose();
+  if ($('vetModal').classList.contains('open')) vetClose();
+  else if ($('noteEditModal').classList.contains('open')) notesEditClose();
   else if ($('quickNoteModal').classList.contains('open')) closeQuickNoteModal();
   else if ($('notesModal').classList.contains('open')) closeNotesModal();
 });
@@ -2933,6 +3412,8 @@ window.notesDelete = notesDelete;
 window.openQuickNoteModal = openQuickNoteModal;
 window.moveShot = moveShot;
 window.removeShot = removeShot;
+window.vetOpen = vetOpen;
+window.vetChoose = vetChoose;
 
 renderAuth();
 renderShots();
