@@ -11,6 +11,9 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | --- | --- | --- |
 | Science Learning Portal | `polymathlc/cer` | question bank, practice, the games |
 | Ans Key | `polymathlc/anskey` | the PDF worksheet annotator and answer keys |
+| Math Practice | `polymathlc/math` | the maths bank, practice, Nova Protocol |
+| English Learning Portal | `polymathlc/english` | the English bank and practice |
+| Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
 ## What it does
@@ -30,7 +33,7 @@ that carries on over the page is stitched back together instead of coming back a
 every question printed on the pages is dealt with — multiple choice, fill in the blank, open-ended
 and lettered parts alike.
 
-Then **Copy** or **Print**. Nothing is saved anywhere: a photographed paper is somebody's work, so
+Then **Copy** or **Print**. Nothing is saved anywhere — bar the teacher's own ✎ and 📥, below: a photographed paper is somebody's work, so
 it lives in the tab and leaves through those two buttons.
 
 The **How to use** tab holds the instructions and the only settings there are — how much
@@ -85,6 +88,35 @@ are scanning and can be widened to every subject in one tap.
 **The ✎ is the teacher's alone.** It is not drawn on a student's device and the window will not
 open there, because it is a door into the notebook that grounds all three apps — and a student's own
 non-standard answer is the one thing those notes must never learn from.
+
+## 📥 Keeping a question (teacher only)
+
+✎ Edit fixes the answer. **📥 Send to vetting** keeps the *question*: a question read off a
+photograph is one the centre does not have, and until now the only way it reached a bank was to be
+typed out again in the portal it belongs to.
+
+Every answer card carries **📥 Send to vetting** beside its ✎, the header carries **📥 Send all to
+vetting** for a whole paper, and the How-to-use tab carries **📥 File every question read** — set
+the portal once and the whole paper is filed the moment it has been read.
+
+| Portal | Repo |
+| --- | --- |
+| 🔬 Science Learning Portal | `polymathlc/cer` |
+| 📐 Math Practice | `polymathlc/math` |
+| 📘 English Learning Portal | `polymathlc/english` |
+| 📕 Chinese Learning Portal | `polymathlc/chinese` |
+
+It lands in **vetting**, never in the bank. The card is highlighted **purple** there and says it
+came from this app, because a scanned question is not like a typed one: it was read by a model from
+a picture of somebody's worksheet, the wording may be half a line short, **the diagram is not there
+at all**, and the topic is left for you to choose — it belongs to that app's syllabus, not this
+one. Nothing reaches a student until you approve it there.
+
+The question, its options, its answer and the reason why travel. What the student wrote, the mark
+and the feedback do not — a bank question is the question, not somebody's marked answer to it.
+
+**📥 is the teacher's alone**, like the ✎: the buttons are not drawn on a student's device and the
+write refuses as well.
 
 ## Four subjects
 
