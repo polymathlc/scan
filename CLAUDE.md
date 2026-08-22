@@ -183,7 +183,7 @@ step, and ship a change to the shape in both repos together**:
   button on every question is a button nobody can press.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
-## 📥 Keeping a question — into the four vetting lists (v1.6.0)
+## 📥 Keeping a question — into the four vetting lists (v1.6.0, routed by subject in v1.7.0)
 - **A question read off a photograph is a question the centre does not have.** Until now the only way
   one reached a bank was to be typed out again in the portal it belongs to, so in practice it never
   was: the paper was marked, the tab was closed, and the question went with it. Every answer card
@@ -200,6 +200,30 @@ step, and ship a change to the shape in both repos together**:
   Hiding a button is not the same as shutting a door. The card's button carries the ✎'s SECOND gate
   too — it is not drawn while a run is in flight, because this card may be folded into the one
   before it a second later and half a question is worse than none.
+- **`itemSubject` is the ONE place a question's LIST is decided** (v1.7.0), and the label on the card's
+  button, the send window, the automatic filing and the batch split all read it. Two answers to that
+  question is exactly how a maths question ends up in the science vetting list — approved by a
+  science teacher, sitting in a science bank, served to a science class, with nothing anywhere
+  reporting it because every step after the routing worked perfectly.
+  - **The model says the subject per QUESTION, not per paper.** `SCAN_SUBJECT_FIELD_RULE` is the ONE
+    fragment both prompts carry, and `_scanSubject` normalises the reply against `SUBJECTS` — the one
+    list — mapping the words a model reaches for ("Maths", "华文") and **dropping anything that is
+    not one of the four rather than bending it to a near one**. A pile photographed in one go is
+    very often more than one subject, and that is the case a per-paper answer cannot serve.
+  - **The teacher's own Subject picker OUTRANKS the model.** They are holding the paper: a pile they
+    have declared is Mathematics is Mathematics, whatever a single question looks like to a model
+    reading a photograph. That is also **the way to force a whole paper into one list** — one
+    control, the one that already exists and already sharpens the answers, rather than a second
+    control free to disagree with it. There is deliberately no "always file in the science list"
+    setting: routing every question the same way is the fault this section exists to prevent.
+  - **Nothing is filed on a guess.** No picker and no usable read → `''`, no destination, and the
+    question stays on its card with its 📥 and is COUNTED in the toast. A batch that quietly filed
+    fifteen of twenty reads exactly like one that filed all twenty.
+  - **The button on the card names the list before it is pressed** ("📥 Send to Maths vetting"), and
+    the window offers that list FIRST with the other three still there — only a person can overrule
+    a misread, and they can only do it if they can see it. A whole paper is offered
+    **📥 File each in its own app** with the split shown (`_vetGroupBySubject`) before it is pressed.
+  - A question stitched across a batch boundary takes the subject from whichever half could name it.
 - **`VET_TARGETS` is the ONE table**: a subject, the portal it belongs to, the collection that
   portal's vetting list really lives in (`vetting` / `mathVetting` / `vettingEn` / `vettingZh`) and
   the SHAPE that portal's questions take — one row each. A fifth portal is one entry rather than four
@@ -237,10 +261,9 @@ step, and ship a change to the shape in both repos together**:
   practise from.
 - **Plain text crosses into authored HTML escaped** (`_vetHtml`), with the line breaks kept: a "<" in
   a maths question is a less-than sign rather than the start of a tag nobody typed.
-- **Filing automatically is OFF unless a portal is chosen**, and it is never silent: the subject
-  cannot be guessed ("Any subject" reads a paper perfectly well and says nothing about which of four
-  banks a question belongs in), so the picker names the portal, and the run's own toast is followed
-  by one naming the list and the count. Questions filed somewhere the teacher was not told about are
+- **Filing automatically is Off or by-subject, and nothing else** (`vetAutoOn`), and it is never
+  silent: the run's own toast is followed by one naming EACH list, its count, and how many were left
+  behind for want of a subject. Questions filed somewhere the teacher was not told about are
   questions nobody goes and vets. `applyVetVisibility` HIDES that field for a student and never
   CLEARS it — it runs once before sign-in resolves and again after, so clearing there would wipe the
   teacher's own setting on every load; what stops a student filing anything is `vetAutoTarget`,
@@ -322,8 +345,10 @@ step, and ship a change to the shape in both repos together**:
   `_scanNewItem`, `_scanFoldRows`, `_markFields`, `_askNewItem`,
   `_askFoldRows`, `_askPrompt`, `_scanPrompt`, `SCAN_SYS`, `SCAN_DETAIL_RULE`, `SCAN_MARK_RULE`,
   `SCAN_SUBJECT_RULE`, `SCAN_ASK_SYS`, `SCAN_ASK_WITH_PAGES_RULE`, `SUBJECTS`, `_parseAIJson`,
-  `VET_TARGETS`, `VET_SOURCE`, `_vetSend`, `_vetPortalDoc`, `_vetMathDoc`, `_vetCorrectIndex`,
-  `_vetTitle`, `_vetHtml`, `_vetCardFootHtml`, `vetOpen`, `vetChoose`, `_vetAutoFile`),
+  `VET_TARGETS`, `VET_SOURCE`, `_vetSend`, `_vetSendBySubject`, `_vetPortalDoc`, `_vetMathDoc`,
+  `_vetCorrectIndex`, `_vetTitle`, `_vetHtml`, `_vetCardFootHtml`, `vetOpen`, `vetChoose`,
+  `vetChooseAuto`, `_vetAutoFile`, `SCAN_SUBJECT_FIELD_RULE`, `_scanSubject`, `itemSubject`,
+  `itemTarget`, `_vetGroupBySubject`),
   run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
   against stubs. Every failure here is silent and the app carries on looking perfectly right: a
@@ -340,7 +365,9 @@ step, and ship a change to the shape in both repos together**:
   cannot see: a document written in the wrong SHAPE renders as a question with no answer in it, a
   guessed option marks a whole class against the wrong word, a topic invented from here files the
   question under a heading nobody chose, and a `source` that stops saying `'scan'` lands a card
-  that is no longer purple and no longer says where it came from.
+  that is no longer purple and no longer says where it came from. The ROUTING is the worst of them:
+  a maths question sent to the science list is approved by a science teacher, sits in a science bank
+  and is served to a science class, and every step after the wrong turn works perfectly.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.

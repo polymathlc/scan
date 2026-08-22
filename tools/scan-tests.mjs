@@ -83,6 +83,7 @@ const api = new Function(prelude + json + grounding + scan + vet + `
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
+    _scanSubject, itemSubject, itemTarget, _vetGroupBySubject,
     set user(v) { currentUser = v; }
   };
 `)();
@@ -776,7 +777,7 @@ ok('a question with no wording still gets a name', api._vetTitle({ question: '' 
 api.user = { uid: 'kid1', email: 'a.student@example.com' };
 ok('a student is offered no way in at all', api._vetCardFootHtml(openItem, 0) === '');
 api.user = { uid: 'admin1', email: 'chungzhikai@gmail.com' };
-ok('the teacher is', /Send to vetting/.test(api._vetCardFootHtml(openItem, 0)));
+ok('the teacher is', /📥 Send to/.test(api._vetCardFootHtml(openItem, 0)));
 ok('and it never prints', /noPrint/.test(api._vetCardFootHtml(openItem, 0)));
 ok('a question already sent says which list it is in',
    /In Science vetting/.test(api._vetCardFootHtml(Object.assign({ sentTo: ['science'] }, openItem), 0)));
@@ -794,30 +795,102 @@ ok('a run still being read cannot be sent', /if \(_scanning\) \{ toast\(/.test(h
 ok('the button is not drawn on a card while the run is still arriving',
    /function _vetCardFootHtml[\s\S]{0,520}if \(_scanning \|\| !isAdmin\(currentUser\)\) return '';/.test(html));
 
+/* ---------- WHICH LIST A QUESTION BELONGS IN ----------
+   This is the half the whole feature rests on. A maths question filed in the
+   science vetting list is approved by a science teacher, sits in a science
+   bank and is served to a science class — and nothing anywhere reports it,
+   because every step after the routing works perfectly. */
+const mathQ = Object.assign({}, openItem, { subject: 'math' });
+const sciQ  = Object.assign({}, openItem, { subject: 'science' });
+const mystery = Object.assign({}, openItem, { subject: '' });
+
+/* What the model said, normalised against the ONE subject list. */
+ok('the four keys come through', ['science', 'math', 'english', 'chinese']
+   .every(k => api._scanSubject({ subject: k }) === k));
+ok('the words a model reaches for instead are understood',
+   api._scanSubject({ subject: 'Maths' }) === 'math' &&
+   api._scanSubject({ subject: 'MATHEMATICS' }) === 'math' &&
+   api._scanSubject({ subject: '华文' }) === 'chinese' &&
+   api._scanSubject({ subject: 'English Language' }) === 'english');
+ok('a subject that is not one of the four is DROPPED, never mapped to a near one',
+   api._scanSubject({ subject: 'physics' }) === '' &&
+   api._scanSubject({ subject: 'general knowledge' }) === '');
+ok('nothing said is nothing known',
+   api._scanSubject({}) === '' && api._scanSubject({ subject: '   ' }) === '');
+
+/* The picker outranks the model — the teacher is holding the paper. */
+api.meta = { level: 'P5', subject: 'math' };
+ok('a paper the teacher has named goes to that app whatever a question looks like',
+   api.itemSubject(sciQ) === 'math' && api.itemTarget(sciQ).key === 'math');
+/* …and on "Any subject" the question itself decides, which is what lets a
+   mixed pile file itself correctly. */
+api.meta = { level: 'P5', subject: '' };
+ok('on Any subject each question is routed by what IT asks',
+   api.itemSubject(mathQ) === 'math' && api.itemSubject(sciQ) === 'science');
+ok('a maths question never resolves to the science list',
+   api.itemTarget(mathQ).col === 'mathVetting' && api.itemTarget(sciQ).col === 'vetting');
+/* The one that matters most: nothing is filed on a guess. */
+ok('a question whose subject could not be told has NO destination',
+   api.itemSubject(mystery) === '' && api.itemTarget(mystery) === null);
+
+/* The split a whole paper is sent as. */
+api.meta = { level: 'P5', subject: '' };
+const split = api._vetGroupBySubject([mathQ, sciQ, mystery, mathQ]);
+ok('a mixed paper is split one batch per list', split.groups.length === 2);
+ok('…with every question in the batch for its own subject',
+   split.groups.every(g => g.items.every(it => api.itemSubject(it) === g.target.key)));
+ok('…and the maths batch really is the maths list',
+   split.groups.filter(g => g.target.key === 'math')[0].items.length === 2);
+ok('the ones that could not be placed are kept OUT of every batch',
+   split.unknown.length === 1 &&
+   !split.groups.some(g => g.items.indexOf(mystery) !== -1));
+ok('a paper nothing could be told about files nothing at all',
+   api._vetGroupBySubject([mystery, mystery]).groups.length === 0);
+ok('the button on the card names the list it is about to use',
+   /Send to Maths vetting/.test(api._vetCardFootHtml(mathQ, 0)) &&
+   /Send to Science vetting/.test(api._vetCardFootHtml(sciQ, 0)));
+ok('…and says only "vetting" when it does not know',
+   /Send to vetting</.test(api._vetCardFootHtml(mystery, 0)));
+/* The subject travels with a question stitched across a batch boundary. */
+ok('a continuation hands its subject to the half that has none',
+   /if \(it\.subject && !prev\.subject\) prev\.subject = it\.subject;/.test(html));
+ok('both prompts ask for it, through the ONE fragment',
+   (html.match(/SCAN_SUBJECT_FIELD_RULE \+/g) || []).length === 2);
+ok('the model is told to leave it EMPTY rather than guess',
+   /a wrong subject is worse than none/.test(html));
+api.meta = { level: 'P5', subject: 'science' };
+
 /* ---------- Filing the whole paper automatically ----------
    Set once on the How tab. Everything about it is admin-only and everything
    about it has to be SAID: questions filed somewhere the teacher was not told
    about are questions nobody ever goes and vets. */
-ok('the picker is built from the one table, never written out in the markup',
-   /function fillVetTargets\(\)[\s\S]{0,400}VET_TARGETS\.forEach/.test(html));
-ok('it starts Off, and Off is the empty value',
-   /<option value="">Off/.test(html));
+/* Two states and no more. A "file everything in the science list" option is
+   exactly how a maths question reaches the science bank, so forcing a whole
+   paper into one app is done by naming it in the SUBJECT picker — the one
+   control `itemSubject` already reads. */
+ok('the setting is Off or by-subject, and nothing else',
+   /<option value="">Off/.test(html) && /<option value="auto">/.test(html) &&
+   !/<option value="science"/.test(html));
 ok('the setting is remembered with the others',
-   /autoVet: \$\('scanAutoVet'\)/.test(html) && /if \(p\.autoVet && vetTarget\(p\.autoVet\)\)/.test(html));
+   /autoVet: \$\('scanAutoVet'\)/.test(html) && /if \(p\.autoVet === 'auto'\)/.test(html));
 ok('a run files the paper only after it has been read',
    /await _vetAutoFile\(\);/.test(html) &&
    html.indexOf('await _vetAutoFile();') > html.indexOf('async function runScan'));
-ok('an empty run files nothing', /if \(!t \|\| !_answers\.length\) return;/.test(html));
+ok('an empty run files nothing', /if \(!vetAutoOn\(\) \|\| !_answers\.length\) return;/.test(html));
 ok('it asks who is signed in at the moment the paper is read',
-   /function vetAutoTarget[\s\S]{0,160}!isAdmin\(currentUser\)/.test(html));
+   /function vetAutoOn[\s\S]{0,200}isAdmin\(currentUser\)/.test(html));
 ok('the field is hidden for a student and never cleared — that would wipe the setting',
    /if \(field\) field\.classList\.toggle\('hidden', !admin\);/.test(html));
-ok('what was filed, and where, is said out loud', /_vetReport\(t, r\)/.test(html));
-/* One writer. Two loops would be two places for the admin check, the
+ok('what was filed, and where, is said out loud', /_vetSplitReport\(r\)/.test(html));
+ok('the automatic filing routes by subject, never to one fixed list',
+   /await _vetSendBySubject\(_answers\.slice\(\)\)/.test(html));
+/* One writer. Several loops would be several places for the admin check, the
    already-sent guard and the failure count to drift apart. */
-ok('the button and the automatic filing share ONE writer',
+ok('every path writes through the ONE writer',
    (html.match(/await _vetSend\(/g) || []).length === 2 &&
    (html.match(/async function _vetSend\(/g) || []).length === 1);
+ok('…and the by-subject split goes through it too',
+   /async function _vetSendBySubject[\s\S]{0,700}await _vetSend\(g\.target, g\.items/.test(html));
 ok('…and the door is inside it', /async function _vetSend[\s\S]{0,320}!isAdmin\(currentUser\)\) return r;/.test(html));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');

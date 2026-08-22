@@ -376,6 +376,8 @@
   }
   .vetTarget:hover:not(:disabled) { border-color: #C9A6E8; background: #FAF5FF; }
   .vetTarget:disabled { opacity: .55; cursor: default; }
+  .vetTargetAuto { border-color: #C9A6E8; background: #FAF5FF; }
+  .vetTargetAuto .vetTargetName { color: #6B2FA0; }
   .vetTargetName { font-size: 0.95rem; font-weight: 700; }
   .vetTargetSub { font-size: 0.78rem; color: var(--ink-faint); line-height: 1.5; }
   .vetSuggest {
@@ -631,6 +633,11 @@
         header carries <b>📥 Send all to vetting</b> for a whole paper. Choose the portal it belongs to — Science,
         Maths, English or Chinese — and the question, its options, its answer and the reason why are written straight
         into that app's vetting list.</p>
+      <p class="sub" style="margin-top:10px"><b>Each question goes to the app for its own subject.</b> The subject is
+        worked out from the question itself, so a pile holding two subjects files itself correctly and a maths
+        question never lands in the science list. The button on the card says where it is going before you press it,
+        and you can always choose a different list. Set <b>Subject</b> in the settings and the whole paper goes to
+        that one app instead. A question whose subject cannot be told is never guessed at — it stays here.</p>
       <p class="sub" style="margin-top:10px">It lands in <b>vetting</b>, never in the bank: the card is highlighted
         <b>purple</b> there and says it came from this app, so you know to check the wording and attach the diagram
         before you approve it. The topic is left for you to choose — it belongs to that app's syllabus, not this one.</p>
@@ -662,17 +669,6 @@
             <option value="">Any level</option>
           </select>
         </div>
-        <!-- Admin only: a student's device runs this same scan, and nothing it
-             reads belongs in a question bank. Shown and hidden by
-             applyVetVisibility, never by this markup alone. -->
-        <div class="field hidden" id="scanAutoVetField">
-          <label for="scanAutoVet">📥 File every question read <span class="hint">(teacher only)</span></label>
-          <!-- Filled from VET_TARGETS, the one table, so a portal cannot exist
-               in the send window and not here. -->
-          <select id="scanAutoVet">
-            <option value="">Off — I'll send them myself</option>
-          </select>
-        </div>
         <div class="field">
           <label for="scanSubject">Subject <span class="hint">(optional)</span></label>
           <!-- Filled from SUBJECTS, the one list, so a subject cannot exist in
@@ -681,8 +677,25 @@
             <option value="">Any subject</option>
           </select>
         </div>
+        <!-- Admin only: a student's device runs this same scan, and nothing it
+             reads belongs in a question bank. Shown and hidden by
+             applyVetVisibility, never by this markup alone. It sits under the
+             Subject picker because that picker is what forces a whole paper
+             into one list — there is deliberately no second control here that
+             could disagree with it. -->
+        <div class="field hidden" id="scanAutoVetField">
+          <label for="scanAutoVet">📥 File every question read <span class="hint">(teacher only)</span></label>
+          <select id="scanAutoVet">
+            <option value="">Off — I'll send them myself</option>
+            <option value="auto">On — file each question in its own app</option>
+          </select>
+        </div>
       </div>
       <p class="hint" style="margin-top:12px">The level and subject only decide which of your teaching notes apply. Leave them on <i>Any</i> and they all do.</p>
+      <p class="hint hidden" id="scanAutoVetHint" style="margin-top:10px">Each question is filed in the app for
+        <b>its own subject</b>, worked out from the question itself — so a maths question on a science paper still
+        goes to Maths. Set <b>Subject</b> above and the whole paper goes to that one app instead. A question whose
+        subject cannot be told is left here for you to send by hand.</p>
     </div>
   </section>
 </main>
@@ -901,7 +914,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.6.0';
+var APP_VERSION = 'v1.7.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -1940,6 +1953,19 @@ var SCAN_MARK_RULE =
   'If the paper is a printed ANSWER KEY or a model answer sheet rather than a pupil\'s work, that printed answer ' +
   'is the paper speaking, not a student: leave "studentAnswer" empty and do not mark it. ';
 
+/* WHICH SUBJECT EACH QUESTION IS. Asked per QUESTION, not per paper, because
+   a pile photographed in one go is very often more than one subject — and
+   because this is what decides which app's vetting list the question is filed
+   in. A maths question filed in the science list is the one mistake that
+   feature can make, so the model is told to answer from the question itself
+   and to leave the field EMPTY rather than guess: nothing is ever filed on a
+   blank. It costs one short field per entry and nothing else. */
+var SCAN_SUBJECT_FIELD_RULE =
+  '"subject" is which of the four this question belongs to — exactly one of "science", "math", "english" or ' +
+  '"chinese" — worked out from what the question ITSELF asks. A set of photographs can hold more than one ' +
+  'subject, so file each question by what it asks rather than by what happens to be printed around it. If you ' +
+  'genuinely cannot tell, return an empty string: a wrong subject is worse than none. ';
+
 var SCAN_SYS =
   'You are an experienced Singapore tuition teacher (P3 to Secondary 1) working through the photographs of a ' +
   'Science, Mathematics, English or Chinese worksheet or exam paper that are attached. You do TWO things at once, ' +
@@ -1950,7 +1976,8 @@ var SCAN_SYS =
   '"explanation":"why this is the answer","studentAnswer":"what the student wrote, or an empty string",' +
   '"verdict":"correct | partial | wrong, or an empty string when nothing was written",' +
   '"marks":"2/3 when the paper prints a mark allocation, otherwise an empty string",' +
-  '"feedback":"what to say to the student about what they wrote, or an empty string"}]}. ' +
+  '"feedback":"what to say to the student about what they wrote, or an empty string",' +
+  '"subject":"science | math | english | chinese"}]}. ' +
   'Rules: one entry for every question actually PRINTED on the ' +
   'attached pictures, in the order they appear, keeping the paper\'s own numbering in "number" ("16", "3a"). ' +
   'ONE ENTRY PER LETTERED PART: a question printed as 8(a) and 8(b) is TWO entries, numbered "8(a)" and "8(b)", ' +
@@ -1972,6 +1999,7 @@ var SCAN_SYS =
   'marker needs — the value with its unit, or one or two short sentences. ' +
   'Work every question out properly before you answer it: set the working out step by step, then check the ' +
   'arithmetic back against the numbers printed on the page. A quick wrong answer is worse than no answer. ' +
+  SCAN_SUBJECT_FIELD_RULE +
   SCAN_MARK_RULE +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
 
@@ -2003,7 +2031,7 @@ var SCAN_ASK_SYS =
   'they said alone and do exactly what they asked, nothing else. Reply with STRICT JSON only, no markdown, ' +
   'exactly this shape: {"answers":[{"heading":"a short line naming what this part is","answer":"the answer ' +
   'itself","explanation":"the working or the reasoning","studentAnswer":"","verdict":"","marks":"",' +
-  '"feedback":""}]}. ' +
+  '"feedback":"","subject":"science | math | english | chinese"}]}. ' +
   'Rules: ONE entry when they asked one thing. When they asked for SEVERAL things — five practice questions, a ' +
   'list of formulas, three worked examples — return ONE ENTRY PER THING, in the order asked, so they come back ' +
   'as separate cards. "heading" is short: the question being answered, or "Question 3", or the topic. Never ' +
@@ -2014,6 +2042,7 @@ var SCAN_ASK_SYS =
   'If they gave no answer of their own, leave all four of those fields empty — never invent an answer of ' +
   'theirs in order to mark it. ' +
   'Answer in the language they asked in: a question asked in Chinese is answered in Chinese. ' +
+  SCAN_SUBJECT_FIELD_RULE +
   'If what they sent is not something you can act on — a greeting, or a few stray words — say so in one entry, ' +
   'kindly, and say what to send instead. Never turn a school question away for having no picture with it. ' +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
@@ -2390,6 +2419,23 @@ function _markFields(r) {
   };
 }
 
+/* The subject the model read off THIS question, normalised against SUBJECTS —
+   the one list. Anything it invents, and anything it left blank, comes back as
+   '' , and '' is never filed anywhere. The aliases are the words a model
+   reaches for when it is not copying the four keys back verbatim. */
+var _SCAN_SUBJ_ALIAS = {
+  maths: 'math', mathematics: 'math', 'math.': 'math',
+  sci: 'science', 'gen sci': 'science',
+  eng: 'english', 'english language': 'english',
+  zh: 'chinese', 'mother tongue': 'chinese', 'higher chinese': 'chinese',
+  '华文': 'chinese', '中文': 'chinese'
+};
+function _scanSubject(r) {
+  var v = String((r && r.subject) || '').toLowerCase().trim();
+  if (_SCAN_SUBJ_ALIAS[v]) v = _SCAN_SUBJ_ALIAS[v];
+  return SUBJECT_OK[v] ? v : '';
+}
+
 /* One part of a reply to an ask that came with no paper. It is filed as an
    ordinary answer card so Copy, Print and the marking all work unchanged —
    `kind` is the only thing that says where it came from, and it is what keeps
@@ -2402,6 +2448,7 @@ function _askNewItem(r) {
   var mk = _markFields(r);
   return {
     kind: 'ask',
+    subject: _scanSubject(r),
     number: _scanStr(r.number, 16),
     page: 0,
     endPage: 0,
@@ -2448,6 +2495,7 @@ function _scanNewItem(r, batchStart, batchLen) {
   var mk = _markFields(r);
   return {
     kind: 'page',
+    subject: _scanSubject(r),
     number: _scanStr(r.number, 16),
     page: batchStart + page,          // 1-based across the whole run
     endPage: batchStart + page,
@@ -2486,6 +2534,7 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
       if (it.answer) prev.answer = it.answer;
       if (it.explanation) prev.explanation = it.explanation;
       if (it.type === 'mcq') prev.type = 'mcq';
+      if (it.subject && !prev.subject) prev.subject = it.subject;
       // The student may have written their answer on either half of a question
       // that runs over the page, so the marking is merged rather than
       // replaced — but this half is the one that could see the whole question,
@@ -3328,6 +3377,44 @@ function _vetMathDoc(it) {
   return q;
 }
 
+/* ---- WHICH LIST A QUESTION BELONGS IN ----
+   `itemSubject` is the ONE place that is decided, and everything else — the
+   label on the card's button, the window, the automatic filing and the batch
+   split — reads it. Two answers to that question is how a maths question ends
+   up in the science list.
+
+   THE TEACHER'S OWN SUBJECT PICKER OUTRANKS THE MODEL. They are holding the
+   paper: a pile they have declared is Mathematics is Mathematics, whatever a
+   single question happens to look like to a model reading a photograph. That
+   is also the way to force a whole paper into one list — one control, the one
+   that already exists and that already sharpens the answers, rather than a
+   second control free to disagree with it.
+
+   On "Any subject" the model's per-QUESTION read decides, which is what lets a
+   photographed pile of mixed papers file itself correctly.
+
+   Neither available → '' , and NOTHING is filed on a blank. A question whose
+   subject could not be told waits for a hand and is reported; guessing it is
+   precisely the mistake this routing exists to prevent. */
+function itemSubject(it) {
+  if (wsMeta.subject && SUBJECT_OK[wsMeta.subject]) return wsMeta.subject;
+  return (it && SUBJECT_OK[it.subject]) ? it.subject : '';
+}
+function itemTarget(it) { return vetTarget(itemSubject(it)); }
+
+/* Split a run into one batch per destination list, keeping the ones that
+   cannot be placed aside rather than sending them somewhere plausible. */
+function _vetGroupBySubject(items) {
+  var by = {}, order = [], unknown = [];
+  (items || []).forEach(function (it) {
+    var t = itemTarget(it);
+    if (!t) { unknown.push(it); return; }
+    if (!by[t.key]) { by[t.key] = { target: t, items: [] }; order.push(t.key); }
+    by[t.key].items.push(it);
+  });
+  return { groups: order.map(function (k) { return by[k]; }), unknown: unknown };
+}
+
 /* ---- The window ---- */
 
 var _vetPending = null;        // { idx } — idx null means the whole paper
@@ -3360,8 +3447,35 @@ function renderVetPick() {
   var wrap = $('vetPick');
   if (!wrap) return;
   var items = _vetItems();
-  var suggest = wsMeta.subject || '';
-  wrap.innerHTML = VET_TARGETS.map(function (t) {
+  var whole = !!(_vetPending && _vetPending.idx == null);
+  /* The subject this press is about: one card's own, or nothing on a whole
+     paper, where every question is routed separately. */
+  var suggest = whole ? '' : itemSubject(items[0]);
+  var head = '';
+  if (whole) {
+    /* Filing each question in its OWN app is the headline for a paper, because
+       that is the thing a mixed pile needs and the one thing a single list
+       cannot do. The split is shown BEFORE it is pressed — a batch is where a
+       wrong subject would go unnoticed. */
+    var split = _vetGroupBySubject(items);
+    var counts = split.groups.map(function (g) { return g.items.length + ' ' + g.target.short; });
+    if (split.unknown.length) counts.push(split.unknown.length + ' not filed — subject unclear');
+    head = '<button class="btn vetTarget vetTargetAuto" type="button" onclick="vetChooseAuto()"' +
+      ((!split.groups.length || _vetBusy) ? ' disabled' : '') + '>' +
+      '<span class="vetTargetName">📥 File each in its own app</span>' +
+      '<span class="vetTargetSub">' +
+      escHtml(split.groups.length ? counts.join(' · ')
+                                  : 'no subject could be told on any of them') +
+      '</span></button>' +
+      '<p class="hint" style="margin:4px 0 0">Or put all ' + items.length + ' in one list:</p>';
+  }
+  /* The list this question belongs in is offered FIRST, so the right one is
+     the one under the thumb — and the others are still there, because only a
+     person can overrule a misread. */
+  var order = VET_TARGETS.slice().sort(function (a, b) {
+    return (b.key === suggest ? 1 : 0) - (a.key === suggest ? 1 : 0);
+  });
+  wrap.innerHTML = head + order.map(function (t) {
     /* A question already sitting in that portal's vetting list says so and
        cannot be sent twice by a slip of the thumb — the same paper read again
        is a fresh run and a fresh set of cards, so this only ever means
@@ -3371,7 +3485,9 @@ function renderVetPick() {
       (already || _vetBusy ? ' disabled' : '') + '>' +
       '<span class="vetTargetName">' + escHtml(t.label) + '</span>' +
       '<span class="vetTargetSub">' + escHtml(already ? 'Already in this vetting list' : t.sub) + '</span>' +
-      (t.key === suggest && !already ? '<span class="vetSuggest">the subject you set</span>' : '') +
+      (t.key === suggest && !already
+        ? '<span class="vetSuggest">' + escHtml(wsMeta.subject ? 'the subject you set' : 'what this question reads as') + '</span>'
+        : '') +
       '</button>';
   }).join('');
 }
@@ -3381,10 +3497,15 @@ function vetOpen(idx) {
   _vetPending = { idx: (typeof idx === 'number' ? idx : null) };
   var items = _vetItems();
   if (!items.length) { _vetPending = null; return; }
-  var what = _vetPending.idx == null
-    ? 'All ' + items.length + ' question' + (items.length === 1 ? '' : 's') + ' on this paper'
-    : 'This question';
-  $('vetWhat').textContent = what + ' will be added to the vetting list you choose.';
+  if (_vetPending.idx == null) {
+    $('vetWhat').textContent = 'All ' + items.length + ' question' + (items.length === 1 ? '' : 's') +
+      ' read from this paper. Each one can go to the app for its own subject, or they can all go to one list.';
+  } else {
+    var t = itemTarget(items[0]);
+    $('vetWhat').textContent = t
+      ? 'This question reads as ' + t.short + '. It will be added to that app\u2019s vetting list.'
+      : 'The subject of this question could not be told — choose the list it belongs in.';
+  }
   _vetBusy = false;
   vetStatus('');
   renderVetPick();
@@ -3433,6 +3554,50 @@ function _vetReport(t, r) {
   return '⚠ Nothing could be sent to ' + t.short + ' — ' + r.firstErr;
 }
 
+/* Send a run to the list each question belongs in, one batch per list. It
+   goes through `_vetSend` like everything else, so the admin check, the
+   already-sent guard and the failure count are still written once. */
+async function _vetSendBySubject(items, onProgress) {
+  var split = _vetGroupBySubject(items);
+  var out = { sent: 0, failed: 0, firstErr: '', unfiled: split.unknown.length, byList: [] };
+  for (var i = 0; i < split.groups.length; i++) {
+    var g = split.groups[i];
+    var r = await _vetSend(g.target, g.items, onProgress);
+    out.sent += r.sent;
+    out.failed += r.failed;
+    if (!out.firstErr) out.firstErr = r.firstErr;
+    if (r.sent) out.byList.push(r.sent + ' to ' + g.target.short);
+  }
+  return out;
+}
+/* A split is reported list by list, and the ones that could not be placed are
+   NAMED. A batch that quietly filed fifteen of twenty reads exactly like one
+   that filed all twenty — and the five it dropped are the five most likely to
+   be the ones worth keeping. */
+function _vetSplitReport(r) {
+  var bits = [];
+  if (r.sent) bits.push('✅ ' + r.byList.join(', ') + ' — sent for vetting.');
+  if (r.unfiled) bits.push('⚠ ' + r.unfiled + ' left here: the subject could not be told. Send ' +
+    (r.unfiled === 1 ? 'it' : 'them') + ' by hand with 📥.');
+  if (r.failed) bits.push('⚠ ' + r.failed + ' could not be sent — ' + r.firstErr);
+  return bits.join('  ') || 'Nothing could be filed.';
+}
+async function vetChooseAuto() {
+  if (_vetBusy || !isAdmin(currentUser)) return;
+  var items = _vetItems();
+  if (!items.length) { vetClose(); return; }
+  _vetBusy = true;
+  renderVetPick();
+  vetStatus('Filing ' + items.length + ' question' + (items.length === 1 ? '' : 's') + ' by subject…');
+  var r = await _vetSendBySubject(items, function (done, total) {
+    vetStatus('Sending… ' + done + ' of ' + total);
+  });
+  _vetBusy = false;
+  vetClose();
+  renderAnswers();
+  toast(_vetSplitReport(r), 7500);
+}
+
 async function vetChoose(key) {
   var t = vetTarget(key);
   if (!t || _vetBusy) return;
@@ -3454,28 +3619,32 @@ async function vetChoose(key) {
 }
 
 /* ---- Filing every question automatically ----
-   Set once on the How tab and the whole paper is filed the moment it has been
-   read, which is what a teacher working through a pile of papers actually
-   wants — the button on the card is for the other case, where one question out
-   of twenty is worth keeping. It is OFF unless a portal is chosen, because the
-   subject cannot be guessed: "Any subject" reads a paper perfectly well and
-   says nothing about which of four banks the questions belong in.
+   Set once on the How tab and the whole paper files itself the moment it has
+   been read, which is what a teacher working through a pile actually wants;
+   the button on the card is for the other case, where one question out of
+   twenty is worth keeping.
 
-   It is not silent. The run's own toast is followed by this one, naming the
-   list and the count — questions filed somewhere the teacher was not told
+   EACH QUESTION GOES TO ITS OWN APP. There is no "file everything in the
+   science list" setting, deliberately: routing every question the same way is
+   exactly how a maths question reaches the science bank. A whole paper is
+   forced into one list by naming it in the SUBJECT picker instead — one
+   control, the one that already exists, and `itemSubject` reads it.
+
+   A question whose subject could not be told is NOT filed. It stays on the
+   card with its 📥 and is counted in the toast.
+
+   It is not silent. The run's own toast is followed by this one, naming each
+   list and its count — questions filed somewhere the teacher was not told
    about are questions nobody goes and vets. */
-function vetAutoTarget() {
+function vetAutoOn() {
   var el = $('scanAutoVet');
-  if (!el || !isAdmin(currentUser)) return null;
-  return vetTarget(el.value || '');
+  return !!(el && el.value === 'auto' && isAdmin(currentUser));
 }
 async function _vetAutoFile() {
-  var t = vetAutoTarget();
-  if (!t || !_answers.length) return;
-  var items = _answers.slice();
-  var r = await _vetSend(t, items);
+  if (!vetAutoOn() || !_answers.length) return;
+  var r = await _vetSendBySubject(_answers.slice());
   renderAnswers();
-  toast(_vetReport(t, r), r.failed ? 7000 : 6500);
+  toast(_vetSplitReport(r), 7500);
 }
 
 /* The button on the card, because a question is worth keeping one at a time:
@@ -3492,8 +3661,13 @@ function _vetCardFootHtml(it, i) {
     var t = vetTarget(k);
     return '<span class="sentChip">✓ In ' + escHtml(t ? t.short : k) + ' vetting</span>';
   }).join('');
+  /* The button SAYS where the question is going before it goes, which is the
+     protection that matters: a misread subject is caught by the eye on the
+     card rather than found later in the wrong app's vetting list. */
+  var t = itemTarget(it);
   return '<div class="ansSend noPrint">' +
-    '<button class="btn btnScan" type="button" onclick="vetOpen(' + i + ')">📥 Send to vetting</button>' +
+    '<button class="btn btnScan" type="button" onclick="vetOpen(' + i + ')">📥 Send to ' +
+    escHtml(t ? t.short + ' vetting' : 'vetting') + '</button>' +
     chips + '</div>';
 }
 /* Shown only to the admin, and only once there is something to send. */
@@ -3507,6 +3681,8 @@ function applyVetVisibility() {
   var admin = isAdmin(currentUser);
   var card = $('howVetCard');
   if (card) card.classList.toggle('hidden', !admin);
+  var hint = $('scanAutoVetHint');
+  if (hint) hint.classList.toggle('hidden', !admin);
   var field = $('scanAutoVetField');
   /* Hidden, never CLEARED. This runs once before the sign-in has resolved and
      again after it, so clearing here would wipe the teacher's own saved
@@ -3579,19 +3755,6 @@ auth.onAuthStateChanged(function (user) {
 /* Both subject pickers — the one that says which paper is being scanned and
    the one that says which paper a typed note is about — are filled from
    SUBJECTS, so the four subjects are declared exactly once. */
-/* One row per portal, from VET_TARGETS — the one table — so a portal cannot
-   exist in the send window and not in this picker. */
-(function fillVetTargets() {
-  var sel = $('scanAutoVet');
-  if (!sel) return;
-  VET_TARGETS.forEach(function (t) {
-    var o = document.createElement('option');
-    o.value = t.key;
-    o.textContent = t.label;
-    sel.appendChild(o);
-  });
-})();
-
 (function fillSubjects() {
   ['scanSubject', 'qnSubject', 'aeSubject'].forEach(function (id) {
     var sel = $(id);
@@ -3614,7 +3777,7 @@ var SCAN_PREF_KEY = 'scanPrefs';
     if (p.level && LEVELS.indexOf(p.level) !== -1) $('scanLevel').value = p.level;
     if (p.subject && SUBJECT_OK[p.subject]) $('scanSubject').value = p.subject;
     if (p.detail) $('scanDetail').value = p.detail;
-    if (p.autoVet && vetTarget(p.autoVet)) $('scanAutoVet').value = p.autoVet;
+    if (p.autoVet === 'auto') $('scanAutoVet').value = 'auto';
   } catch (e) {}
   syncMeta();
 })();
@@ -3634,9 +3797,9 @@ function syncMeta() {
 }
 $('scanAutoVet').addEventListener('change', function () {
   syncMeta();
-  var t = vetAutoTarget();
-  toast(t ? 'Every question read will be filed in the ' + t.short + ' vetting list.'
-          : 'Questions will only be sent when you press 📥.', 4000);
+  toast(vetAutoOn()
+    ? 'Every question read will be filed in the app for its own subject.'
+    : 'Questions will only be sent when you press 📥.', 4000);
 });
 $('scanLevel').addEventListener('change', syncMeta);
 $('scanSubject').addEventListener('change', syncMeta);
@@ -3790,6 +3953,7 @@ window.moveShot = moveShot;
 window.removeShot = removeShot;
 window.vetOpen = vetOpen;
 window.vetChoose = vetChoose;
+window.vetChooseAuto = vetChooseAuto;
 
 renderAuth();
 renderShots();
