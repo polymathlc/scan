@@ -160,9 +160,16 @@ step, and ship a change to the shape in both repos together**:
   about 华文 — and the two pickers are right there to widen it back to every subject in one tap.
 - **`topics` is written EMPTY**, like every other note this app writes: it is the Portal's syllabus
   list and this app has never heard of it.
-- **Only the admin is offered the teaching half** (`#aeTeach`), because only the admin ever writes to
-  the notebook. A student's device reads it, and a box that silently fails to save is worse than no
-  box. The card half is everybody's — it changes nothing but this tab.
+- **The ✎ is the TEACHER'S, button and window alike** (v1.5.1). It is the second door into the
+  shared notebook, and the one thing that must never teach a teacher's notes is a student's own
+  non-standard answer — so the button is not drawn for anybody else and `answerEditOpen` refuses as
+  well. **Hiding a button is not a lock**: the handler is on `window` for the rendered card's
+  `onclick`, so it is reachable from a stale card or a console whatever the head was drawn with.
+  `#aeTeach` keeps its own `isAdmin` check behind both of them — three gates, because the cost of
+  the last one failing is a rule in the notebook that the teacher never wrote and cannot place.
+- **`renderAuth` repaints the cards when the account changes**, and `applyNotesVisibility` closes the
+  window. A device handed back to a student mid-edit would otherwise still be wearing the ✎ on every
+  card on screen.
 - **`_ansOptionFrom` moves the tick when an MCQ is corrected by naming another option.** A card whose
   answer says (3) and whose option list still ticks (2) contradicts itself, and the tick is the half
   a student reads.

@@ -632,7 +632,18 @@ ok('an open question never grows an option out of its own answer', open2.option 
 
 /* The window itself. */
 ok('every answer card carries the ✎', /onclick="answerEditOpen\(' \+ i \+ '\)"/.test(html));
-ok('and not while a run is still arriving', /if \(!_scanning\) head\.push\('<button class="ansEditBtn/.test(html));
+/* The ✎ is the TEACHER'S. The window behind it is the second door into the
+   shared notebook, and a student's own answer is the one thing that must never
+   teach the teacher's notes — so it is not offered to anybody else, and the
+   handler refuses as well, because `answerEditOpen` is on `window` for the
+   rendered card's onclick and a hidden button is not a lock. */
+ok('the ✎ is drawn for the teacher alone, and not while a run is still arriving',
+   /if \(!_scanning && isAdmin\(currentUser\)\) \{\s*\n\s*head\.push\('<button class="ansEditBtn/.test(html));
+ok('and the window itself refuses to open for anyone else',
+   /if \(!it \|\| !isAdmin\(currentUser\)\) return;/.test(html));
+ok('an account change closes the window and repaints the cards',
+   /if \(\$\('ansEditModal'\)\) \$\('ansEditModal'\)\.classList\.remove\('open'\);/.test(html) &&
+   /applyNotesVisibility\(\);[\s\S]{0,220}if \(_answers\.length\) renderAnswers\(\);/.test(html));
 ok('the ✎ never prints — a printed key with a button on it is a button nobody can press',
    /class="ansEditBtn noPrint"/.test(html));
 ok('the mark picker is hidden on a question nobody attempted',

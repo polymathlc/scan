@@ -578,7 +578,8 @@
       <p class="sub" style="margin-top:10px">The correct answer is always worked out from scratch first, so what the student
         wrote can never talk the app into the wrong answer.</p>
       <h3 style="margin-top:22px">If an answer is not good enough, fix it — and teach it</h3>
-      <p class="sub" style="margin-top:6px">Every answer card carries a <b>✎ Edit</b>. Rewrite the answer, the
+      <p class="sub" style="margin-top:6px">Every answer card carries a <b>✎ Edit</b> — yours alone, never a
+        student's. Rewrite the answer, the
         explanation, the mark and the feedback, and the card is yours — that is what <b>Copy</b> and <b>Print</b>
         hand over. Underneath there is a box for the rule behind the correction: type it and it is saved as a
         standing instruction in your notebook, obeyed word for word from the very next question — here, in
@@ -821,7 +822,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.5.0';
+var APP_VERSION = 'v1.5.1';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -1638,6 +1639,7 @@ function applyNotesVisibility() {
     $('notesModal').classList.remove('open');
     $('noteEditModal').classList.remove('open');
     $('quickNoteModal').classList.remove('open');
+    if ($('ansEditModal')) $('ansEditModal').classList.remove('open');
   }
 }
 function openNotesModal() {
@@ -2782,9 +2784,16 @@ function answerCardHtml(it, i) {
   // An answer a person has rewritten must not read as one the AI wrote —
   // this is the answer key the class is about to be marked from.
   if (it.edited) head.push('<span class="ansEdited">✎ Edited by you</span>');
-  // Not while a run is in flight: the answers are still arriving, and the
-  // card being edited could be folded into the one before it a second later.
-  if (!_scanning) head.push('<button class="ansEditBtn noPrint" onclick="answerEditOpen(' + i + ')">✎ Edit</button>');
+  // The ✎ is the TEACHER'S, and only theirs. The window behind it is the
+  // second door into the shared notebook, and a student's own answer is not
+  // something the teacher's notes should ever learn from — so the button is
+  // not offered to anybody else rather than being offered and then refusing
+  // half of what it opens. Nor while a run is in flight: the answers are still
+  // arriving, and this card could be folded into the one before it a second
+  // later.
+  if (!_scanning && isAdmin(currentUser)) {
+    head.push('<button class="ansEditBtn noPrint" onclick="answerEditOpen(' + i + ')">✎ Edit</button>');
+  }
   // The answer box is labelled for what it IS. On an unmarked question it is
   // "Answer"; on a marked one the student already has an answer of their own
   // on the paper, and this is the one they should have written.
@@ -2817,7 +2826,10 @@ function ansEditStatus(msg) {
 }
 function answerEditOpen(i) {
   var it = _answers[i];
-  if (!it) return;
+  // Hiding a button is not a lock: `answerEditOpen` is on `window` for the
+  // rendered card's onclick, so it is reachable from a stale card or a console
+  // whatever the head was drawn with.
+  if (!it || !isAdmin(currentUser)) return;
   _ansEditI = i;
   ansEditStatus('');
   $('aeQuestion').textContent = it.question || (it.kind === 'ask' ? 'What you asked' : 'Question ' + (it.number || (i + 1)));
@@ -3058,6 +3070,9 @@ function renderAuth() {
     : '';
   showTab(_tab);
   applyNotesVisibility();
+  // The ✎ belongs to the account, so the cards are repainted when it changes —
+  // otherwise the button the last account was offered stays on every card.
+  if (_answers.length) renderAnswers();
 }
 
 function signIn() {

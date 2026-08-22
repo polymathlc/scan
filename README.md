@@ -82,7 +82,9 @@ this question* and the question and your corrected answer are filed alongside it
 that very question comes back right. The note is offered at the level and subject of the paper you
 are scanning and can be widened to every subject in one tap.
 
-Only the teacher writes; a correction made on a student's device stays on that card.
+**The ✎ is the teacher's alone.** It is not drawn on a student's device and the window will not
+open there, because it is a door into the notebook that grounds all three apps — and a student's own
+non-standard answer is the one thing those notes must never learn from.
 
 ## Four subjects
 
@@ -103,8 +105,8 @@ the plain AI, exactly as it was before any of this existed. Notes can be tagged 
 subjects (and to levels), so a Chinese 词语 rule never turns up in an English comprehension
 answer.
 
-- **✎ Edit** on any answer card (admin only, for the teaching half) — the fastest way in: correct
-  the answer in front of you and say what should have happened, in the same breath.
+- **✎ Edit** on any answer card (admin only) — the fastest way in: correct the answer in front of
+  you and say what should have happened, in the same breath.
 - **✍️ Add a note** (admin only) — house rules in your own words, obeyed word for word on every
   question, when answering and when marking alike. Leave it on *Every subject* or tag it to one of
   the four. Type it and it is live.
