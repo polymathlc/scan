@@ -84,6 +84,8 @@ const api = new Function(prelude + json + grounding + scan + vet + `
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
     _scanSubject, itemSubject, itemTarget, _vetGroupBySubject,
+    _textUsesAlgebra, _itemAsksAlgebra, _itemUsesAlgebra, _applyAlgebraFix,
+    SCAN_ALGEBRA_FIX_CALLS, SCAN_ALGEBRA_FIX_MAX, SCAN_NO_ALGEBRA_RULE,
     set user(v) { currentUser = v; }
   };
 `)();
@@ -794,6 +796,134 @@ ok('a run still being read cannot be sent', /if \(_scanning\) \{ toast\(/.test(h
    before it a second later, and half a question is worse than none. */
 ok('the button is not drawn on a card while the run is still arriving',
    /function _vetCardFootHtml[\s\S]{0,520}if \(_scanning \|\| !isAdmin\(currentUser\)\) return '';/.test(html));
+
+/* ---------- NO ALGEBRA ----------
+   This centre teaches the methods the PSLE is marked on. An answer that
+   reaches the right number by forming an equation is a method the pupil has
+   not been taught and cannot reproduce in the exam — and it is worse than no
+   answer, because it looks right.
+
+   The reader has to be narrow in BOTH directions and every case below is one
+   that would otherwise cost something real: a false negative puts algebra in
+   front of a pupil, and a false positive spends one of the run's two rewrite
+   calls turning a perfectly good unitary answer into another one. */
+const ALGEBRA_YES = [
+  'Let x be the number of apples. x + 15 = 40, so x = 25.',
+  'Let the number of boys be y. 3y + 2 = 20.',
+  '3x + 5 = 20',
+  '2y = 14, y = 7',
+  'Form an equation: 5n - 3 = 12.',
+  'Solve for x.',
+  'We can use algebra here.',
+  'Substitute into the first equation.',
+  'Express the total in terms of n.',
+  'x + 15 = 40',
+  'Using simultaneous equations,'
+];
+/* Every one of these is a method this app is meant to ENCOURAGE, or a unit,
+   or a multiplication sign, or an angle the paper itself lettered. */
+const ALGEBRA_NO = [
+  '5 units = 200, so 1 unit = 40. 8 units = 320.',      // the unitary method itself
+  '1 unit = 4, so 7 units = 28.',
+  'Before: 5 units. After: 3 units. The difference is 2 units = 60.',
+  'Working backwards: 40 - 15 = 25.',
+  'Assume all 20 are chickens: 20 x 2 = 40 legs.',
+  'The ratio is 3 : 5, so 3 units + 5 units = 8 units.',
+  'Total = 3 x 4 = 12 cakes.',                          // x is a multiplication sign
+  '3x4 = 12',
+  'Area = 4 x 4 = 16 cm2',
+  '$2 x 5 = $10',
+  '5 m + 3 m = 8 m',                                    // single-letter units
+  '12 kg - 4 kg = 8 kg',
+  'She read 2 h + 1 h = 3 h.',
+  '50 c + 50 c = $1',
+  'Angle x = 55°, because angles on a straight line add up to 180°.',   // the paper's own letter
+  'Angle x = 55 degrees.',
+  '∠x = 55°',
+  '∠a + ∠b = 180°'
+];
+ALGEBRA_YES.forEach(t => ok('algebra is caught: ' + t.slice(0, 40), api._textUsesAlgebra(t), t));
+ALGEBRA_NO.forEach(t => ok('NOT algebra: ' + t.slice(0, 40), !api._textUsesAlgebra(t), t));
+ok('an empty answer is not algebra',
+   !api._textUsesAlgebra('') && !api._textUsesAlgebra(null) && !api._textUsesAlgebra(undefined));
+
+/* The rule reaches the model, and it names the methods rather than only
+   forbidding the one — "do not use algebra" with nothing to use instead is
+   how a model reaches for it again. */
+ok('the prompt forbids it in as many words', /NEVER USE ALGEBRA/.test(api.SCAN_NO_ALGEBRA_RULE));
+ok('…and names what to use instead',
+   /UNITARY METHOD/.test(api.SCAN_NO_ALGEBRA_RULE) &&
+   /model/i.test(api.SCAN_NO_ALGEBRA_RULE) &&
+   /working backwards/i.test(api.SCAN_NO_ALGEBRA_RULE));
+ok('the maths standard carries it', /NEVER USE ALGEBRA/.test(api.SCAN_SUBJECT_RULE.math));
+ok('and the rewrite call carries the same one fragment',
+   (html.match(/SCAN_NO_ALGEBRA_RULE/g) || []).length >= 3);
+
+/* A question that PRINTS the algebra is the one exception: answering
+   "Simplify 3x + 5x" by the unitary method is answering a different
+   question, and the app's authority order already says the paper wins. */
+const printed = { subject: 'math', question: 'Simplify 3x + 5x.', options: [],
+                  answer: '8x', explanation: '3x + 5x = 8x' };
+ok('a printed algebra question is recognised as one', api._itemAsksAlgebra(printed));
+ok('…and its answer is left alone', !api._itemUsesAlgebra(printed));
+ok('the exception reads the QUESTION, never the answer',
+   !api._itemAsksAlgebra({ question: 'How many apples are left?', options: [],
+                           answer: 'Let x be the apples. x = 4' }));
+ok('an option can carry the printed algebra too',
+   api._itemAsksAlgebra({ question: 'Which is equal to it?',
+                          options: [{ text: '2y + 3' }, { text: 'nine' }] }));
+
+api.meta = { level: 'P5', subject: '' };
+const algQ = { subject: 'math', question: 'Ali had 40 stickers…', options: [],
+               answer: '25', explanation: 'Let x be the number. x + 15 = 40, so x = 25.' };
+const unitQ = { subject: 'math', question: 'Ali had 40 stickers…', options: [],
+                answer: '25', explanation: '40 - 15 = 25.' };
+ok('a maths answer written with algebra is flagged', api._itemUsesAlgebra(algQ));
+ok('a maths answer written with the unitary method is not', !api._itemUsesAlgebra(unitQ));
+/* Only maths is held to it — an English answer is not rewritten for using
+   the word "algebra", and a science one is not either. */
+ok('another subject is never held to the maths rule',
+   !api._itemUsesAlgebra({ subject: 'english', question: 'Define it.', options: [],
+                           answer: 'Let x be the word.' }));
+ok('a question whose subject could not be told IS checked — on a mixed page it is often the maths one',
+   api._itemUsesAlgebra({ subject: '', question: 'Ali had 40…', options: [],
+                          answer: '25', explanation: 'Let x be the number. x + 15 = 40.' }));
+
+/* The budget. Left unbounded this is the loop that quietly spends a term's
+   tokens on one stubborn worksheet. */
+ok('the ration is small, and counted per RUN',
+   api.SCAN_ALGEBRA_FIX_CALLS === 2 && /_algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS;/.test(html));
+ok('…and it is spent BEFORE the call, so a failure cannot buy another try',
+   /_algebraFixLeft--;[\s\S]{0,400}await window\.askGemini\(_algebraPrompt/.test(html));
+ok('a whole batch of slips is ONE call, not one per question',
+   api.SCAN_ALGEBRA_FIX_MAX >= 8 && /bad\.slice\(0, SCAN_ALGEBRA_FIX_MAX\)/.test(html));
+ok('the ration is refilled once per run and never inside the loop',
+   (html.match(/_algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS/g) || []).length === 2);   // the declaration + the reset
+ok('the rewrite is text only — no pictures are sent again',
+   !/_algebraPrompt[\s\S]{0,600}images:/.test(html));
+ok('the rewrite is grounded like every other call',
+   /system: SCAN_ALGEBRA_SYS \+ aiGrounding\('scan'\)/.test(html));
+ok('it runs BEFORE the cards are painted',
+   html.indexOf('await _algebraPass(run, _answers') < html.indexOf('renderAnswers();\n    scanProgress(Math.min'));
+
+/* A rewrite is taken only when it really is free of algebra — a second
+   algebraic answer is not an improvement on the first. */
+const target = { subject: 'math', question: 'Ali had 40…', options: [], answer: '25',
+                 explanation: 'Let x be the number. x + 15 = 40.', feedback: '' };
+api._applyAlgebraFix([target], [{ i: 0, answer: '25', explanation: 'Let y be it. y = 25.' }]);
+ok('a rewrite that is still algebra is refused',
+   /Let x be/.test(target.explanation) && !target.rewritten);
+api._applyAlgebraFix([target], [{ i: 0, answer: '25', explanation: '40 - 15 = 25.' }]);
+ok('a clean rewrite is taken', target.explanation === '40 - 15 = 25.' && target.rewritten === true);
+ok('an entry naming a question that is not there is dropped, never applied to another',
+   api._applyAlgebraFix([target], [{ i: 9, explanation: 'nonsense' }]) === 0 &&
+   target.explanation === '40 - 15 = 25.');
+
+/* Whatever survives the budget is MARKED, not hidden. */
+ok('an answer that is still algebra says so on its own card',
+   /if \(it\.algebra\) \{/.test(html) && /uses algebra/.test(html));
+ok('…and the flag is recomputed every pass, so a fixed answer stops wearing it',
+   /all\.forEach\(function \(it\) \{ it\.algebra = _itemUsesAlgebra\(it\); \}\);/.test(html));
 
 /* ---------- WHICH LIST A QUESTION BELONGS IN ----------
    This is the half the whole feature rests on. A maths question filed in the

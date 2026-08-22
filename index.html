@@ -296,6 +296,11 @@
   .verdict.mWrong { background: #FCEDEB; color: #8C2E1D; border-color: #EFC6BF; }
   .verdict.mBlank { background: var(--bg-soft); color: var(--ink-faint); border-color: var(--line); }
   .ansMarks { font-size: 0.74rem; font-weight: 700; color: var(--ink-soft); }
+  .algChip {
+    font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+    background: #FCEDEB; color: #8C2E1D; border: 1px solid #EFC6BF;
+    border-radius: 999px; padding: 3px 12px;
+  }
   .youBox { margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--line); }
   .youLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
   .youText { font-size: 0.92rem; margin-top: 4px; white-space: pre-wrap; }
@@ -618,6 +623,16 @@
         standing instruction in your notebook, obeyed word for word from the very next question — here, in
         <b>Ans Key</b> and in the <b>Science Learning Portal</b>, because all three read the same notebook.
         Tick <i>Remember my answer to this question</i> and your corrected answer is filed with it as a key fact.</p>
+      <h3 style="margin-top:22px">Maths is answered the way it is taught — never with algebra</h3>
+      <p class="sub" style="margin-top:6px">Every maths answer uses the methods the PSLE is marked on: the
+        <b>unitary method</b> (units and parts), a <b>model</b> described in words, before-and-after, working
+        backwards, the assumption method. No letters standing for unknowns and no equations to solve — an answer
+        that gets the right number by algebra is one a pupil cannot reproduce in the exam.</p>
+      <p class="sub" style="margin-top:10px">Every maths answer is <b>checked</b> afterwards, and one that slipped
+        into algebra is rewritten before it reaches the screen. A question that <i>prints</i> the algebra itself —
+        “simplify 3x + 5x” — is answered as the paper asks. If an answer still uses algebra after that, the card
+        says <b>⚠ uses algebra</b> rather than hiding it, so it can be put right with ✎ Edit.</p>
+
       <h3 style="margin-top:22px">Four subjects</h3>
       <p class="sub" style="margin-top:6px">Science, Mathematics, English and Chinese. A Chinese paper is answered and marked
         in Chinese; an English comprehension gets an answer in full sentences, and a maths question gets the working line by line.</p>
@@ -914,7 +929,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.7.0';
+var APP_VERSION = 'v1.8.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2052,13 +2067,38 @@ var SCAN_ASK_SYS =
    a maths answer without its unit and a Chinese answer written in English are
    both wrong for reasons that have nothing to do with each other. When the
    picker is on "Any subject" all four go in and the paper decides. */
+/* NO ALGEBRA. This centre teaches the methods the PSLE is marked on, and an
+   answer that reaches the right number by forming an equation is a method the
+   pupil has not been taught and cannot reproduce in the exam — it is worse
+   than no answer, because it looks right. The rule is stated in the prompt AND
+   checked in code afterwards (`_itemUsesAlgebra`), because a prompt is asked
+   and a check is enforced.
+
+   THE ONE EXCEPTION IS A QUESTION THAT PRINTS THE ALGEBRA ITSELF. "Simplify
+   3x + 5x" cannot be answered by the unitary method: answering it another way
+   is answering a different question, and the app's own authority order already
+   says what the paper prints wins. `_itemAsksAlgebra` is that exception in
+   code, and it reads the printed question, never the answer. */
+var SCAN_NO_ALGEBRA_RULE =
+  'NEVER USE ALGEBRA. No letter standing for an unknown, no "let x be", no forming or solving an equation, no ' +
+  'simultaneous equations — not in the answer, not in the working, and not as a check afterwards. Use the ' +
+  'methods a Singapore primary pupil is actually taught: the UNITARY METHOD (units and parts — "5 units = 200, ' +
+  'so 1 unit = 40"), a model or bar model described in words, before-and-after comparison, working backwards, ' +
+  'the assumption (guess-and-check) method, grouping, equal-fraction/equal-part reasoning and simple ' +
+  'proportion. Reasoning in plain words and whole numbers is always to be preferred to a formula. ' +
+  'The ONLY exception is a question that PRINTS the algebra itself — one that already uses a letter for an ' +
+  'unknown, or asks you to simplify, expand, factorise, or solve an expression: answer that one exactly as the ' +
+  'paper asks, because answering a printed algebra question by another method is answering a different ' +
+  'question. ';
+
 var SCAN_SUBJECT_RULE = {
   science: 'Science: answer in full sentences and NAME the process or the scientific term rather than describing it ' +
     'loosely ("evaporation", not "it dries up"). A cause-and-effect answer must say what happened AND why. When ' +
     'marking, an answer missing the required term is "partial" at best, however right the idea behind it is.',
   math: 'Mathematics: give the working line by line with the numbers substituted in, and the final answer WITH its ' +
     'unit; a model or bar-model approach is described in words. Check the arithmetic back against the numbers ' +
-    'printed on the page. When marking, follow the student\'s own working and say which line it went wrong on: a ' +
+    'printed on the page. ' + SCAN_NO_ALGEBRA_RULE +
+    'When marking, follow the student\'s own working and say which line it went wrong on: a ' +
     'right method with one slip is "partial", and a right number with no working on a "show your working" ' +
     'question is "partial" too.',
   english: 'English: comprehension answers are full sentences in the student\'s own words, lifting from the passage ' +
@@ -2436,6 +2476,83 @@ function _scanSubject(r) {
   return SUBJECT_OK[v] ? v : '';
 }
 
+/* =====================================================================
+   IS THIS ANSWER ALGEBRA?   (plain code, never an AI call)
+   ---------------------------------------------------------------------
+   The same answer must always get the same verdict, so this is a reader
+   rather than a second opinion — and it costs nothing, which is what lets it
+   run over every maths answer on every paper.
+
+   It flags only what it is SURE about. A false positive spends one of the
+   run's two rewrite calls; a false negative puts algebra in front of a pupil.
+   Neither is free, so the patterns are narrow and the awkward cases are
+   pinned in tools/scan-tests.mjs:
+
+   • "3 x 4" is MULTIPLICATION, and so is "3x4". Only a number written hard
+     against a letter and then an OPERATOR is a term — "3x + 5".
+   • "5 m + 3 m" is metres. The letter set therefore leaves out the
+     single-letter units (m, g, l, s, h, t, c) altogether.
+   • "1 unit = 40" and "5 units = 200" are the unitary method — the very thing
+     this rule exists to encourage — so a letter followed by more letters is
+     never a variable.
+   • "x = 55°" is a PSLE angle, printed on the paper as x. A bare variable is
+     only algebra when it is not an angle.
+   ===================================================================== */
+var ALGEBRA_PHRASE_RE = new RegExp([
+  'algebra',                                  // algebra, algebraic, algebraically
+  'simultaneous\\s+equations?',
+  '\\b(?:form|forming|set\\s+up|setting\\s+up)\\s+(?:an?|the)\\s+equation',
+  '\\bsolve\\s+(?:for\\b|the\\s+equation)',
+  '\\bsubstitut\\w*\\s+(?:it\\s+)?(?:into|for|back)',
+  '\\bin\\s+terms\\s+of\\s+[a-z]\\b',
+  '\\blet\\s+[a-z]\\s*(?:be\\b|=)',            // let x be … / let x = …
+  '\\blet\\b[^.;\\n]{0,48}\\bbe\\s+[a-z]\\b'   // let the number of apples be x
+].join('|'), 'i');
+
+/* The letters a primary paper uses for an unknown, with every single-letter
+   UNIT left out on purpose. */
+var ALGEBRA_TERM_RE = /(^|[^a-z0-9.])\d+\s?([abknpqruvwxyz])(?![a-z0-9°])\s*[+\-−–×÷*\/=]/i;
+/* A bare unknown carrying an operator — "x + 15 = 40".
+   AN ANGLE IS NOT ONE. The paper itself prints "find ∠x", so "x = 55°" is the
+   paper's own letter coming back rather than a method the model chose, and
+   `_algebraStrip` takes those namings out before the test rather than trying
+   to spell them into the pattern. The `\b` after `\d+` is load-bearing for the
+   same case: without it the engine backtracks to "5", finds "5" instead of the
+   degree sign it was told to refuse, and flags every angle answer on the
+   paper. */
+var ALGEBRA_BARE_RE = /(^|[^a-z0-9∠])([abknpqruvwxyz])\s*[+\-−–×÷*\/=]\s*\d+\b(?!\s*(?:°|deg))/i;
+function _algebraStrip(t) {
+  return String(t == null ? '' : t).replace(/(?:∠|\bangles?\s+)[a-z]{1,3}\b/gi, ' ');
+}
+
+function _textUsesAlgebra(t) {
+  var s = String(t == null ? '' : t);
+  if (!s) return false;
+  return ALGEBRA_PHRASE_RE.test(s) || ALGEBRA_TERM_RE.test(s) ||
+         ALGEBRA_BARE_RE.test(_algebraStrip(s));
+}
+/* Did the PAPER print the algebra? Read off the printed question and its
+   options only — never off the answer, or an algebraic answer would excuse
+   itself. */
+function _itemAsksAlgebra(it) {
+  if (!it) return false;
+  if (_textUsesAlgebra(it.question)) return true;
+  return (it.options || []).some(function (o) { return _textUsesAlgebra(o && o.text); });
+}
+/* Only a maths answer is held to this. A question whose subject could not be
+   told is checked too: on a mixed page the unrouted one is very often the
+   maths one, and algebra in an English answer is vanishingly rare. */
+function _itemIsMathish(it) {
+  var subj = itemSubject(it);
+  return subj === 'math' || subj === '';
+}
+function _itemUsesAlgebra(it) {
+  if (!it || !_itemIsMathish(it)) return false;
+  if (_itemAsksAlgebra(it)) return false;      // the paper printed it; the paper wins
+  return _textUsesAlgebra(it.answer) || _textUsesAlgebra(it.explanation) ||
+         _textUsesAlgebra(it.feedback);
+}
+
 /* One part of a reply to an ask that came with no paper. It is filed as an
    ordinary answer card so Copy, Print and the marking all work unchanged —
    `kind` is the only thing that says where it came from, and it is what keeps
@@ -2554,6 +2671,105 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
   return madeOn;
 }
 
+/* =====================================================================
+   REWRITING AN ANSWER THAT USED ALGEBRA — and the budget that bounds it
+   ---------------------------------------------------------------------
+   The check above is free; a rewrite is an AI call, so it is RATIONED and the
+   ration is per RUN rather than per question. A page of fifteen questions
+   that all slipped is ONE call, not fifteen, and a paper that keeps slipping
+   costs two calls and then stops. Left unbounded this is exactly the loop
+   that quietly spends a term's tokens on one stubborn worksheet.
+
+     SCAN_ALGEBRA_FIX_CALLS  how many rewrite calls a whole run may spend  (2)
+     SCAN_ALGEBRA_FIX_MAX    questions carried in one of them             (12)
+
+   So the ceiling is two extra TEXT-only calls per run — no images, which is
+   what makes them cheap — and the ordinary paper spends none at all.
+
+   IT RUNS BEFORE THE CARDS ARE PAINTED. `_runPages` calls it between folding
+   the batch in and rendering, so an algebraic answer is rewritten before a
+   pupil can read it rather than flickering and being replaced.
+
+   WHATEVER SURVIVES THE BUDGET IS MARKED, NOT HIDDEN. An answer nobody can
+   see is worse than one that says what is wrong with it, and the teacher can
+   put it right on the card with ✎ Edit. `it.algebra` is that flag, and it is
+   recomputed on every pass so a fixed answer stops wearing it.
+   ===================================================================== */
+var SCAN_ALGEBRA_FIX_CALLS = 2;
+var SCAN_ALGEBRA_FIX_MAX = 12;
+var _algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS;
+
+var SCAN_ALGEBRA_SYS =
+  'You are an experienced Singapore primary maths teacher rewriting worked answers so that a P3 to P6 pupil can ' +
+  'follow them and reproduce them in an exam. ' + SCAN_NO_ALGEBRA_RULE +
+  'THE FINAL ANSWER MUST NOT CHANGE — only the method used to reach it. If the working already has no algebra in ' +
+  'it, hand it back unchanged. Reply with STRICT JSON only, no markdown, exactly this shape: ' +
+  '{"answers":[{"i":0,"answer":"the same final answer","explanation":"the working, with no algebra in it",' +
+  '"feedback":"the same feedback rewritten the same way, or an empty string"}]}. ' +
+  'One entry per question given to you, "i" being the number printed against it. ' +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+function _algebraPrompt(bad) {
+  return 'Rewrite the working of each of these ' + bad.length + ' answer' + (bad.length === 1 ? '' : 's') +
+    ' without algebra.\n\n' + bad.map(function (it, i) {
+      return '#' + i + '\nQUESTION: ' + _scanStr(it.question, 1400) +
+        '\nFINAL ANSWER (keep this): ' + _scanStr(it.answer, 900) +
+        '\nWORKING: ' + _scanStr(it.explanation, 2400) +
+        (it.feedback ? '\nFEEDBACK: ' + _scanStr(it.feedback, 1200) : '');
+    }).join('\n\n');
+}
+/* A rewrite is taken only when it is really free of algebra. A second
+   algebraic answer is not an improvement on the first, and keeping the
+   original at least keeps it in step with the marking it was written with. */
+function _applyAlgebraFix(bad, rows) {
+  var fixed = 0;
+  (rows || []).forEach(function (r) {
+    var i = parseInt(r && r.i, 10);
+    if (!(i >= 0 && i < bad.length)) return;
+    var it = bad[i];
+    var answer = _scanStr(r.answer, 900);
+    var expl = _scanStr(r.explanation, 2400);
+    var fb = _scanStr(r.feedback, 1200);
+    if (answer && !_textUsesAlgebra(answer)) it.answer = answer;
+    if (expl && !_textUsesAlgebra(expl)) it.explanation = expl;
+    if (it.feedback && fb && !_textUsesAlgebra(fb)) it.feedback = fb;
+    if (!_itemUsesAlgebra(it)) { it.rewritten = true; fixed++; }
+  });
+  return fixed;
+}
+async function _algebraPass(run, all, done, total) {
+  var bad = all.filter(_itemUsesAlgebra);
+  if (bad.length && _algebraFixLeft > 0) {
+    bad = bad.slice(0, SCAN_ALGEBRA_FIX_MAX);
+    _algebraFixLeft--;
+    scanProgress(done, total, '✨ Rewriting ' + bad.length + ' answer' + (bad.length === 1 ? '' : 's') +
+      ' without algebra…');
+    try {
+      var raw = await window.askGemini(_algebraPrompt(bad), {
+        // Grounded like every other call in this app — the rewrite is still
+        // the teacher's answer, in the teacher's own words.
+        system: SCAN_ALGEBRA_SYS + aiGrounding('scan'),
+        maxOutputTokens: 12000,
+        effort: 'high',
+        thinkingLevel: 'high',
+        temperature: 0.2,
+        json: true
+      });
+      if (run !== _scanRun) return;             // a newer run owns the answers now
+      var parsed = _parseAIJson(raw);
+      var rows = Array.isArray(parsed) ? parsed
+        : ((parsed && Array.isArray(parsed.answers)) ? parsed.answers : []);
+      _applyAlgebraFix(bad, rows);
+    } catch (err) {
+      // A failed rewrite must never sink the run: the answer it could not
+      // improve is still an answer, and it is about to be marked as one that
+      // uses algebra.
+      console.warn('algebra rewrite failed', err);
+    }
+  }
+  all.forEach(function (it) { it.algebra = _itemUsesAlgebra(it); });
+}
+
 /* ---- The pages, batch by batch ----
    Unchanged by the ask except that the ask goes in the prompt: it may narrow
    the run to one question, or add nothing but context, and either way the
@@ -2607,6 +2823,10 @@ async function _runPages(run, shots, ask, detail, failedPages) {
     if (run !== _scanRun) return;
 
     var madeOn = _scanFoldRows(rows, start, batch.length, _answers);
+    // Before a word of this batch reaches the screen: anything that reached
+    // its answer by algebra is rewritten, while the run's ration lasts.
+    await _algebraPass(run, _answers, Math.min(start + batch.length, total), total);
+    if (run !== _scanRun) return;
     batch.forEach(function (s, k) {
       var n = madeOn[start + k + 1] || 0;
       s.n = n;
@@ -2644,6 +2864,8 @@ async function _runAskAlone(run, ask, detail) {
       : ((parsed && Array.isArray(parsed.answers)) ? parsed.answers
          : ((parsed && Array.isArray(parsed.questions)) ? parsed.questions : []));
     _askFoldRows(rows, _answers);
+    await _algebraPass(run, _answers, 1, 1);
+    if (run !== _scanRun) return '';
     scanProgress(1, 1, '');
     renderAnswers();
     return '';
@@ -2675,6 +2897,7 @@ async function runScan() {
 
   var run = ++_scanRun;
   _scanning = true;
+  _algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS;   // a fresh ration, once, per run
   _answers = [];
   _askedFor = ask;
   var detail = scanDetail();
@@ -2913,6 +3136,13 @@ function answerCardHtml(it, i) {
   if (!isAsk) head.push('<span class="ansPage">' + escHtml(ansPageLabel(it)) + (it.type === 'mcq' ? ' · multiple choice' : '') + '</span>');
   if (it.marked) head.push('<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>');
   if (it.marked && it.marks) head.push('<span class="ansMarks">' + escHtml(it.marks) + '</span>');
+  // Marked, never hidden: an answer nobody can see is worse than one that says
+  // what is wrong with it, and ✎ Edit is right there.
+  if (it.algebra) {
+    head.push('<span class="algChip" title="This answer still reaches the answer by algebra. ' +
+      'Rewrite it with ✎ Edit before handing it over — the unitary method or a model is what is marked.' +
+      '">⚠ uses algebra</span>');
+  }
   // An answer a person has rewritten must not read as one the AI wrote —
   // this is the answer key the class is about to be marked from.
   if (it.edited) head.push('<span class="ansEdited">✎ Edited by you</span>');
