@@ -70,6 +70,7 @@ const api = new Function(prelude + json + grounding + scan + `
     aiGrounding, groundingSummary, notesKeywordList,
     _parseAIJson, _scanNewItem, _scanFoldRows, _scanStr, _scanPrompt, scanSubjectRule,
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
+    _ansEditApply, _ansEditNote, _ansTrim, _ansNoteTitle, _ansOptionFrom,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE
   };
@@ -551,6 +552,97 @@ ok('nothing but the settings survived on the snap screen',
 /* The trap this app was built around, still pinned. */
 ok('the picker is emptied before the files are queued',
    /input\.value = '';\s*\n\s*if \(files\.length\) addShots\(files\);/.test(html));
+
+/* ---------- ✎ Editing an answer, and teaching it for next time ----------
+   Both halves fail silently. A verdict written onto a blank puts a red cross
+   on a question nobody attempted — by hand this time, which is no better —
+   and a note that comes back with an empty `guidance` is a house rule the
+   teacher believes they typed and that no app will ever read. */
+const blank = { marked: false, studentAnswer: '', verdict: '', marks: '', feedback: '',
+                answer: 'The peaches grow bigger.', explanation: 'Fewer fruits share the food.' };
+api._ansEditApply(blank, { answer: 'The remaining peaches become larger.', explanation: 'Each gets more food.',
+                           verdict: 'wrong', marks: '0/1', feedback: 'You are wrong.' });
+ok('the answer is taken as typed', blank.answer === 'The remaining peaches become larger.');
+ok('the explanation is taken as typed', blank.explanation === 'Each gets more food.');
+ok('A BLANK CAN NEVER BE MARKED WRONG BY HAND EITHER', blank.verdict === '' && !blank.marks && !blank.feedback);
+ok('an answer a person rewrote says so', blank.edited === true);
+
+const marked = { marked: true, studentAnswer: '1.4', verdict: 'correct', marks: '1/1', feedback: 'Good.',
+                 answer: '1.4', explanation: '' };
+api._ansEditApply(marked, { answer: '4.1', explanation: 'Units.', verdict: 'wrong', marks: '0/1', feedback: 'Check the units.' });
+ok('a marked question can be re-marked', marked.verdict === 'wrong' && marked.marks === '0/1');
+ok('and its feedback rewritten', marked.feedback === 'Check the units.');
+api._ansEditApply(marked, { answer: '4.1', explanation: 'Units.', verdict: 'brilliant', marks: '', feedback: '' });
+ok('a verdict the app does not know is dropped, not shown', marked.verdict === '');
+
+const same = { marked: false, answer: 'A', explanation: 'B', verdict: '', marks: '', feedback: '' };
+api._ansEditApply(same, { answer: 'A', explanation: 'B' });
+ok('opening the window and saving nothing does not brand the card edited', !same.edited);
+
+ok('a worked answer keeps its LINES — _scanStr would have folded them into one',
+   api._ansTrim('Step 1\nStep 2', 200) === 'Step 1\nStep 2');
+
+/* The note. This is what makes the fix outlive the tab and reach the other
+   two apps, so every field here is one of the three apps\' own. */
+const ctx = { question: 'How would this affect the size of the remaining peaches?',
+              answer: 'They become larger, because each receives more food.',
+              subject: 'science', level: 'P5' };
+ok('nothing typed and nothing ticked is not a note',
+   api._ansEditNote({ rule: '', remember: false }, ctx) === null);
+ok('a tick with no answer behind it is not a note either',
+   api._ansEditNote({ rule: '', remember: true }, { question: 'Q', answer: '' }) === null);
+
+const ruleOnly = api._ansEditNote({ rule: 'Always name the process.\nNever stop at "it grows".', remember: false }, ctx);
+ok('the rule is the guidance, VERBATIM — the only field that reaches every kind',
+   ruleOnly.guidance === 'Always name the process.\nNever stop at "it grows".');
+ok('a rule alone teaches no key fact', ruleOnly.keyFacts === '');
+ok('the title is the first line of the rule', ruleOnly.title === 'Always name the process.');
+ok('the note is scoped to the paper being scanned',
+   ruleOnly.subjects.join() === 'science' && ruleOnly.levels.join() === 'P5');
+ok('topics is written EMPTY — it is the Portal\'s syllabus list, not this app\'s',
+   Array.isArray(ruleOnly.topics) && !ruleOnly.topics.length);
+ok('the note says which app wrote it', ruleOnly.source === 'scan');
+ok('and what kind of note it is', ruleOnly.noteKind === 'correction');
+ok('the question it was written against is kept for the reader',
+   ruleOnly.sourceQuestion.indexOf('remaining peaches') !== -1);
+ok('the shared fields are still written, empty',
+   ruleOnly.markingStandards === '' && !ruleOnly.keywords.length && !ruleOnly.noteTopics.length);
+
+const remembered = api._ansEditNote({ rule: '', remember: true }, ctx);
+ok('the corrected answer is filed as a KEY FACT — never as guidance',
+   !remembered.guidance && remembered.keyFacts.indexOf('each receives more food') !== -1);
+ok('the key fact carries its question, or it means nothing on its own',
+   remembered.keyFacts.indexOf('remaining peaches') !== -1);
+ok('a note with no rule is still titled after the question',
+   /^Corrected answer/.test(remembered.title));
+
+const unknown = api._ansEditNote({ rule: 'x' }, { question: 'Q', answer: 'A', subject: 'geography', level: 'P9' });
+ok('a subject this app does not teach scopes the note to nothing rather than inventing one',
+   !unknown.subjects.length && !unknown.levels.length);
+
+const mcq = { marked: false, type: 'mcq', option: '2', answer: '(2) It gets bigger.',
+              options: [{ label: '1', text: 'a' }, { label: '2', text: 'b' }, { label: '3', text: 'c' }] };
+api._ansEditApply(mcq, { answer: '(3) It gets smaller.' });
+ok('correcting an MCQ moves the tick as well as the words', mcq.option === '3');
+api._ansEditApply(mcq, { answer: 'It gets smaller.' });
+ok('an answer naming no option leaves the tick where it was', mcq.option === '3');
+const open2 = { marked: false, options: [], option: '', answer: '' };
+api._ansEditApply(open2, { answer: '3 kg' });
+ok('an open question never grows an option out of its own answer', open2.option === '');
+
+/* The window itself. */
+ok('every answer card carries the ✎', /onclick="answerEditOpen\(' \+ i \+ '\)"/.test(html));
+ok('and not while a run is still arriving', /if \(!_scanning\) head\.push\('<button class="ansEditBtn/.test(html));
+ok('the ✎ never prints — a printed key with a button on it is a button nobody can press',
+   /class="ansEditBtn noPrint"/.test(html));
+ok('the mark picker is hidden on a question nobody attempted',
+   /\$\('aeMarkRow'\)\.style\.display = it\.marked \? '' : 'none';/.test(html));
+ok('only the admin is offered the instruction box',
+   /var teach = isAdmin\(currentUser\);\s*\n\s*\$\('aeTeach'\)\.style\.display = teach/.test(html));
+ok('the note goes to the SHARED notebook, the same door every other note uses',
+   /notesCollRef\(currentUser\.uid\)\.doc\(id\)\.set\(note\);/.test(html.slice(html.indexOf('async function answerEditSave'))));
+ok('the card is fixed even when the note cannot be saved',
+   html.indexOf('_ansEditApply(it, {') < html.indexOf('var note = isAdmin(currentUser)'));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

@@ -32,7 +32,10 @@ step, and ship a change to the shape in both repos together**:
   AI when one is saved: it is a note with empty `levels` and empty
   `keywords`/`keyFacts`/`markingStandards`, written straight to Firestore. `subjects` is empty too
   unless the admin picked one in the ✍️ modal — **the picker defaults to "Every subject", so
-  leaving it alone keeps what a typed note has always meant.**
+  leaving it alone keeps what a typed note has always meant.** **The ✎ window on an answer card
+  writes the very same field** (see *✎ Fixing an answer* below) — that is the second door into the
+  notebook, and because it is the same field the rule reaches all three apps exactly as a typed note
+  does.
 - **ONE notebook, three apps.** The notes live at `users/{adminUid}/teachingNotes/{id}` — the same
   collection Ans Key and the Science Learning Portal (`polymathlc/cer`) read and write. Keep the
   fields compatible: `topics` is reserved for the Portal's syllabus list and this app writes it
@@ -128,6 +131,48 @@ step, and ship a change to the shape in both repos together**:
 - **The page SAYS what it was asked** (`renderAskedLine`, and the Copy header). One card where
   twenty were expected is only honest if the instruction that narrowed the run is on screen.
 
+## ✎ Fixing an answer, and teaching it for next time (v1.5.0)
+- **An answer key that cannot be corrected is one the teacher retypes somewhere else, and a
+  correction that dies with the tab is one they make again next week.** So the ✎ window has two
+  halves and they are deliberately separate: `_ansEditApply` fixes the CARD (which lives in this tab
+  and leaves through Copy or Print, like every other answer here), and `_ansEditNote` turns what was
+  typed into a note in the SHARED notebook, so the fix outlives the tab and reaches Ans Key and the
+  Science Learning Portal too.
+- **The card is fixed FIRST, and the note second.** A note that could not be written must never cost
+  the teacher the correction they just typed — `answerEditSave` applies and re-renders before it
+  touches Firestore, and a failed write leaves the window open saying exactly that.
+- **`_ansEditApply` is the one door for the card, and it re-states the blank rule by hand.** The
+  marking fields are only ever touched when `it.marked`; on a blank they are forced empty. A red
+  cross on an untouched worksheet is the one mistake this feature can make, and it is no better for
+  being made through a picker than by the model. The mark picker is not even drawn on a blank.
+- **`guidance` is the RULE and `keyFacts` is the corrected ANSWER, and the split is the whole
+  design.** `guidance` is the only field that reaches every kind of call in all three apps, so a
+  house rule belongs there and nothing else may go in it. The corrected answer is filed as a key
+  fact WITH its question above it (it means nothing on its own) — and key facts never reach a pure
+  marking digest, which is the standing rule: a marker handed the answer stops marking against the
+  paper.
+- **The question is kept for the READER, never for the prompt.** `sourceQuestion` is on the note so
+  a person opening the notebook in any of the three apps can see what the rule was written against;
+  putting the whole question into `guidance` would drown the rule it was written to carry in a
+  paragraph repeated on every question the centre ever answers.
+- **The note is offered at the paper's own subject and level, and it SAYS so.** The run already
+  knows what it is looking at, so a correction on a P5 science paper is not silently made a rule
+  about 华文 — and the two pickers are right there to widen it back to every subject in one tap.
+- **`topics` is written EMPTY**, like every other note this app writes: it is the Portal's syllabus
+  list and this app has never heard of it.
+- **Only the admin is offered the teaching half** (`#aeTeach`), because only the admin ever writes to
+  the notebook. A student's device reads it, and a box that silently fails to save is worse than no
+  box. The card half is everybody's — it changes nothing but this tab.
+- **`_ansOptionFrom` moves the tick when an MCQ is corrected by naming another option.** A card whose
+  answer says (3) and whose option list still ticks (2) contradicts itself, and the tick is the half
+  a student reads.
+- **`_ansTrim` keeps line breaks where `_scanStr` folds them away.** A worked answer and a house rule
+  are both written in lines; flattening them is a change the teacher never asked for.
+- **The ✎ is not drawn while a run is in flight** — the answers are still arriving and a card can
+  still be folded into the one before it — and it is `.noPrint`, because a printed answer key with a
+  button on every question is a button nobody can press.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -194,7 +239,8 @@ step, and ship a change to the shape in both repos together**:
 - After touching **the grounding, the live notebook or the scan run**
   (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
   `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
-  `_notesLiveRepaint`, `_scanNewItem`, `_scanFoldRows`, `_markFields`, `_askNewItem`,
+  `_notesLiveRepaint`, `_ansEditApply`, `_ansEditNote`, `_ansOptionFrom`, `_ansTrim`,
+  `_scanNewItem`, `_scanFoldRows`, `_markFields`, `_askNewItem`,
   `_askFoldRows`, `_askPrompt`, `_scanPrompt`, `SCAN_SYS`, `SCAN_DETAIL_RULE`, `SCAN_MARK_RULE`,
   `SCAN_SUBJECT_RULE`, `SCAN_ASK_SYS`, `SCAN_ASK_WITH_PAGES_RULE`, `SUBJECTS`, `_parseAIJson`),
   run

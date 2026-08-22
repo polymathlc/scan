@@ -66,6 +66,24 @@ A page holding some of each — the ordinary case — comes back with some of ea
 the answers say how it went. The correct answer is always worked out from scratch **first**, from
 the printed question alone, so what the student wrote can never talk the app into agreeing with it.
 
+## ✎ Fix an answer, and teach it for next time
+
+Every answer card carries an **✎ Edit**. The top half fixes the card in front of you — the answer,
+the explanation, and on a question the student attempted, the mark and the feedback. That is what
+**Copy** and **Print** hand over, and a card you have rewritten says *✎ Edited by you* so it never
+reads as one the AI wrote. Correcting a multiple-choice answer by naming another option moves the
+tick with it.
+
+The bottom half is the point. Type the rule behind the correction — *“on ‘explain’ questions, always
+name the process and say who benefits”* — and it is saved as a **standing instruction** in your
+notebook: obeyed word for word on every question from then on, here, in **Ans Key** and in the
+**Science Learning Portal**, because all three read the same notebook. Tick *Remember my answer to
+this question* and the question and your corrected answer are filed alongside it as a key fact, so
+that very question comes back right. The note is offered at the level and subject of the paper you
+are scanning and can be widened to every subject in one tap.
+
+Only the teacher writes; a correction made on a student's device stays on that card.
+
 ## Four subjects
 
 Science, Mathematics, English and Chinese, each held to its own standard: a maths answer needs its
@@ -85,6 +103,8 @@ the plain AI, exactly as it was before any of this existed. Notes can be tagged 
 subjects (and to levels), so a Chinese 词语 rule never turns up in an English comprehension
 answer.
 
+- **✎ Edit** on any answer card (admin only, for the teaching half) — the fastest way in: correct
+  the answer in front of you and say what should have happened, in the same breath.
 - **✍️ Add a note** (admin only) — house rules in your own words, obeyed word for word on every
   question, when answering and when marking alike. Leave it on *Every subject* or tag it to one of
   the four. Type it and it is live.

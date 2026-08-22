@@ -305,6 +305,39 @@
   .fbBox { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: #FFFBF3; border: 1px solid #F0DCB4; }
   .fbLabel { font-size: 0.72rem; font-weight: 700; color: #7A5410; letter-spacing: .03em; text-transform: uppercase; }
   .fbText { font-size: 0.9rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
+  /* ---------- ✎ Editing an answer ----------
+     The pencil sits at the far right of the head, on its own, so it never
+     competes with the number and the verdict for the eye. It is .noPrint: a
+     printed answer key with an Edit button on every question is a button
+     nobody can press. */
+  .ansEditBtn {
+    margin-left: auto; font-size: 0.74rem; font-weight: 600; color: var(--ink-faint);
+    background: var(--bg-soft); border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 12px; cursor: pointer; line-height: 1.4;
+  }
+  .ansEditBtn:hover { color: var(--ink); border-color: var(--ink-faint); }
+  /* An answer a person has rewritten must never read as one the AI wrote. */
+  .ansEdited {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: .03em;
+    border-radius: 999px; padding: 3px 12px; white-space: nowrap;
+    background: #EEF5FF; border: 1px solid #B9D3F2; color: #274B77;
+  }
+  .aeQuote {
+    font-size: 0.86rem; color: var(--ink-soft); line-height: 1.65; white-space: pre-wrap;
+    background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 20px;
+  }
+  .aeTeach {
+    margin-top: 6px; padding-top: 20px; border-top: 1px solid var(--line);
+  }
+  .aeTeach h3 { font-size: 0.98rem; font-weight: 700; margin: 0 0 6px; }
+  .aeCheck { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; }
+  .aeCheck input { margin-top: 3px; flex: none; width: 17px; height: 17px; accent-color: var(--accent-deep); }
+  .aeCheck label { font-size: 0.85rem; font-weight: 600; line-height: 1.55; }
+  .aeCheck .hint { display: block; font-weight: 400; }
+  .aeTwo { display: flex; gap: 12px; flex-wrap: wrap; }
+  .aeTwo .fieldRow { flex: 1; min-width: 150px; }
+
   .tallyRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .tallyRow:empty { display: none; }
   .tally {
@@ -544,6 +577,13 @@
         still blank it is simply answered. A page holding some of each comes back with some of each.</p>
       <p class="sub" style="margin-top:10px">The correct answer is always worked out from scratch first, so what the student
         wrote can never talk the app into the wrong answer.</p>
+      <h3 style="margin-top:22px">If an answer is not good enough, fix it — and teach it</h3>
+      <p class="sub" style="margin-top:6px">Every answer card carries a <b>✎ Edit</b>. Rewrite the answer, the
+        explanation, the mark and the feedback, and the card is yours — that is what <b>Copy</b> and <b>Print</b>
+        hand over. Underneath there is a box for the rule behind the correction: type it and it is saved as a
+        standing instruction in your notebook, obeyed word for word from the very next question — here, in
+        <b>Ans Key</b> and in the <b>Science Learning Portal</b>, because all three read the same notebook.
+        Tick <i>Remember my answer to this question</i> and your corrected answer is filed with it as a key fact.</p>
       <h3 style="margin-top:22px">Four subjects</h3>
       <p class="sub" style="margin-top:6px">Science, Mathematics, English and Chinese. A Chinese paper is answered and marked
         in Chinese; an English comprehension gets an answer in full sentences, and a maths question gets the working line by line.</p>
@@ -656,6 +696,84 @@
   </div>
 </div>
 
+<!-- ---------- ✎ Edit an answer, and teach it for next time ----------
+     Two halves, and the second is the point: the top fixes THIS card, which
+     lives in this tab and leaves through Copy or Print; the bottom writes a
+     standing instruction into the shared notebook, so the fix outlives the
+     tab and reaches Ans Key and the Science Learning Portal too. -->
+<div class="modalBack" id="ansEditModal">
+  <div class="modalCard wide">
+    <div class="modalHead"><h2>✎ Edit this answer</h2></div>
+    <div class="modalBody">
+      <div class="aeQuote" id="aeQuestion"></div>
+      <div class="fieldRow">
+        <label for="aeAnswer">The answer</label>
+        <textarea id="aeAnswer" rows="4" placeholder="What the answer should say"></textarea>
+      </div>
+      <div class="fieldRow">
+        <label for="aeWhy">Why <span class="hint">(the explanation under the answer)</span></label>
+        <textarea id="aeWhy" rows="4"></textarea>
+      </div>
+      <!-- Only a question the student actually attempted has a mark to change.
+           A blank is never marked at all, so there is nothing here to show. -->
+      <div id="aeMarkRow" style="display:none">
+        <div class="aeTwo">
+          <div class="fieldRow">
+            <label for="aeVerdict">The mark</label>
+            <select id="aeVerdict">
+              <option value="">Marked, no verdict</option>
+              <option value="correct">✓ Correct</option>
+              <option value="partial">~ Partly right</option>
+              <option value="wrong">✗ Wrong</option>
+            </select>
+          </div>
+          <div class="fieldRow">
+            <label for="aeMarks">Marks <span class="hint">(optional)</span></label>
+            <input type="text" id="aeMarks" maxlength="12" placeholder="e.g. 1/2">
+          </div>
+        </div>
+        <div class="fieldRow">
+          <label for="aeFeedback">Feedback to the student</label>
+          <textarea id="aeFeedback" rows="3"></textarea>
+        </div>
+      </div>
+
+      <div class="aeTeach" id="aeTeach">
+        <h3>📌 Teach it for next time</h3>
+        <p class="sub" style="margin-bottom:16px">Fixing the card above fixes this paper. Type the rule
+          here and it is saved as a standing instruction in your notebook — obeyed word for word on every
+          question this app answers or marks from now on, and by <b>Ans Key</b> and the <b>Science Learning
+          Portal</b> too, because all three read the same notebook.</p>
+        <div class="fieldRow">
+          <label for="aeRule">What should it do differently?</label>
+          <textarea id="aeRule" rows="4" placeholder="e.g. On “explain” questions, always name the process and say who benefits — never stop at “it grows bigger”."></textarea>
+        </div>
+        <div class="aeCheck">
+          <input type="checkbox" id="aeRemember">
+          <label for="aeRemember">Remember my answer to this question
+            <span class="hint">Files the question and your corrected answer as a key fact, so this very question
+              comes back right. It is never shown to the marker on its own.</span></label>
+        </div>
+        <div class="aeTwo">
+          <div class="fieldRow">
+            <label for="aeSubject">Which subject</label>
+            <select id="aeSubject"><option value="">Every subject</option></select>
+          </div>
+          <div class="fieldRow">
+            <label for="aeLevel">Which level</label>
+            <select id="aeLevel"><option value="">Every level</option></select>
+          </div>
+        </div>
+        <div class="tnStatus" id="aeStatus" style="display:none"></div>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button class="btn" id="ansEditCancelBtn">Cancel</button>
+      <button class="btn btnPrimary" id="ansEditSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- ---------- Edit an uploaded note ---------- -->
 <div class="modalBack" id="noteEditModal">
   <div class="modalCard wide">
@@ -703,7 +821,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.4.0';
+var APP_VERSION = 'v1.5.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -1515,6 +1633,7 @@ function applyNotesVisibility() {
   var show = isAdmin(currentUser);
   if ($('notesBtn')) $('notesBtn').style.display = show ? '' : 'none';
   if ($('quickNoteBtn')) $('quickNoteBtn').style.display = show ? '' : 'none';
+  if ($('aeTeach')) $('aeTeach').style.display = show ? '' : 'none';
   if (!show) {
     $('notesModal').classList.remove('open');
     $('noteEditModal').classList.remove('open');
@@ -2471,6 +2590,137 @@ async function runScan() {
   }
 }
 
+/* ---- ✎ Editing an answer, and teaching it for next time ----
+   An answer key that cannot be corrected is one the teacher has to retype
+   somewhere else, and a correction that dies with the tab is one they will
+   make again next week. So there are two doors here and they are deliberately
+   separate: `_ansEditApply` fixes the card in front of them, and
+   `_ansEditNote` turns what they typed into a note in the SHARED notebook —
+   the same `users/{adminUid}/teachingNotes` collection Ans Key and the
+   Science Learning Portal read, so the rule is obeyed in all three from the
+   very next question.
+
+   Both are pure so the harness can pin them: everything they get wrong is
+   silent. A verdict written onto a blank puts a red cross on a question
+   nobody attempted, and a note that comes back with an empty `guidance` is a
+   house rule the teacher believes they typed and no app will ever read. */
+var ANS_ANSWER_MAX = 2000;
+var ANS_WHY_MAX = 4000;
+var ANS_FB_MAX = 1200;
+var ANS_RULE_MAX = 4000;
+var ANS_QUOTE_MAX = 400;
+
+/* _scanStr flattens newlines, which is right for a line read off a paper and
+   wrong for everything typed here: a worked answer and a house rule are both
+   written in lines, and folding them into one paragraph is a change the
+   teacher never asked for. */
+function _ansTrim(v, cap) {
+  var s = String(v == null ? '' : v).replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
+  return s.length > cap ? s.slice(0, cap) : s;
+}
+
+/* The card, as the teacher has just rewritten it. The marking fields are only
+   ever touched on a question they actually attempted — `it.marked` is
+   `!!studentAnswer` and nothing said in this window may change that, or the
+   one mistake this app can make (a cross on an untouched worksheet) becomes
+   one the teacher can make by hand. */
+/* An MCQ that is corrected by naming another option has to move the tick as
+   well as the words. The list is the loudest thing on the card — a card whose
+   answer says (3) and whose options still tick (2) is a card that contradicts
+   itself, and the tick is the half a student reads. */
+function _ansOptionFrom(it, answer) {
+  var opts = (it && it.options) || [];
+  if (!opts.length) return it && it.option ? it.option : '';
+  var head = String(answer || '').trim().replace(/^[(\[]?\s*([A-Za-z0-9]{1,3})\s*[)\].:]?/, '$1').split(/\s/)[0];
+  head = String(head || '').toLowerCase();
+  var hit = '';
+  opts.forEach(function (o) {
+    if (o.label && String(o.label).toLowerCase() === head) hit = o.label;
+  });
+  return hit || (it.option || '');
+}
+
+function _ansEditApply(it, patch) {
+  if (!it || !patch) return it;
+  var before = JSON.stringify([it.answer, it.explanation, it.verdict, it.marks, it.feedback, it.option || '']);
+  it.answer = _ansTrim(patch.answer, ANS_ANSWER_MAX);
+  it.option = _ansOptionFrom(it, it.answer);
+  it.explanation = _ansTrim(patch.explanation, ANS_WHY_MAX);
+  if (it.marked) {
+    var v = String(patch.verdict == null ? '' : patch.verdict).toLowerCase().trim();
+    it.verdict = SCAN_VERDICTS[v] ? v : '';
+    it.marks = _ansTrim(patch.marks, 12);
+    it.feedback = _ansTrim(patch.feedback, ANS_FB_MAX);
+  } else {
+    it.verdict = '';
+    it.marks = '';
+    it.feedback = '';
+  }
+  if (JSON.stringify([it.answer, it.explanation, it.verdict, it.marks, it.feedback, it.option || '']) !== before) it.edited = true;
+  return it;
+}
+
+function _ansNoteTitle(rule, question) {
+  var first = _ansTrim(rule, 200).split('\n')[0].replace(/\s+/g, ' ').trim();
+  if (!first) {
+    var q = _scanStr(question, 60);
+    return q ? 'Corrected answer — ' + q : 'Corrected answer';
+  }
+  return first.length > 60 ? first.slice(0, 60).trim() + '…' : first;
+}
+
+/* What the teacher typed, as a note in the shared notebook. Two fields carry
+   two different things and the split is the whole design:
+
+   • `guidance` is the RULE, verbatim. It is the only field that reaches every
+     kind of call in all three apps — answering, marking, explaining — so it
+     is where a house rule belongs and nothing else may go there.
+   • `keyFacts` is the corrected answer to THIS question, with the question
+     above it so it means something on its own. Key facts never reach a pure
+     marking digest, which is the standing rule: a marker handed the answer
+     stops marking against the paper.
+
+   `topics` is written EMPTY — it is the Learning Portal\'s syllabus list and
+   this app has never heard of it, so a note written here reads there as a
+   general note rather than one tagged with topics that do not exist. */
+function _ansEditNote(patch, ctx) {
+  patch = patch || {};
+  ctx = ctx || {};
+  var rule = _ansTrim(patch.rule, ANS_RULE_MAX);
+  var question = _scanStr(ctx.question, ANS_QUOTE_MAX);
+  var answer = _ansTrim(ctx.answer, 900);
+  var remember = !!(patch.remember && answer);
+  // Nothing typed and nothing ticked is not a note — it is a teacher who only
+  // wanted to fix the card, and writing an empty note for them would put a
+  // blank row in a notebook two other apps read.
+  if (!rule && !remember) return null;
+  var subj = String(ctx.subject || '').toLowerCase().trim();
+  var lvl = String(ctx.level || '').toUpperCase().trim();
+  var now = new Date().toISOString();
+  return {
+    title: _ansNoteTitle(rule, question),
+    fileName: '',
+    comment: '',
+    guidance: rule,
+    keyFacts: remember ? (question ? 'Question: ' + question + '\nThe answer is: ' + answer : answer) : '',
+    noteKind: 'correction',
+    // Kept for the person reading the notebook in any of the three apps, never
+    // for the prompt: the whole question in every digest would drown the rule
+    // it was written to carry.
+    sourceQuestion: question,
+    sourceApp: 'Scan & Answer',
+    topics: [],
+    noteTopics: [],
+    subjects: SUBJECT_OK[subj] ? [subj] : [],
+    levels: LEVELS.indexOf(lvl) !== -1 ? [lvl] : [],
+    keywords: [],
+    markingStandards: '',
+    source: 'scan',
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
 /* ---- Showing the answers ---- */
 function ansPageLabel(it) {
   if (it.endPage && it.endPage !== it.page) return 'pages ' + it.page + '–' + it.endPage;
@@ -2529,6 +2779,12 @@ function answerCardHtml(it, i) {
   if (!isAsk) head.push('<span class="ansPage">' + escHtml(ansPageLabel(it)) + (it.type === 'mcq' ? ' · multiple choice' : '') + '</span>');
   if (it.marked) head.push('<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>');
   if (it.marked && it.marks) head.push('<span class="ansMarks">' + escHtml(it.marks) + '</span>');
+  // An answer a person has rewritten must not read as one the AI wrote —
+  // this is the answer key the class is about to be marked from.
+  if (it.edited) head.push('<span class="ansEdited">✎ Edited by you</span>');
+  // Not while a run is in flight: the answers are still arriving, and the
+  // card being edited could be folded into the one before it a second later.
+  if (!_scanning) head.push('<button class="ansEditBtn noPrint" onclick="answerEditOpen(' + i + ')">✎ Edit</button>');
   // The answer box is labelled for what it IS. On an unmarked question it is
   // "Answer"; on a marked one the student already has an answer of their own
   // on the paper, and this is the one they should have written.
@@ -2547,6 +2803,95 @@ function answerCardHtml(it, i) {
       : '') +
     (it.explanation ? '<div class="whyBox"><div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
   '</div>';
+}
+
+/* ---- The ✎ window ----
+   Nothing here is saved anywhere except the note: the card lives in this tab
+   and leaves through Copy or Print, exactly as every other answer does. */
+var _ansEditI = -1;
+function ansEditStatus(msg) {
+  var el = $('aeStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? '' : 'none';
+}
+function answerEditOpen(i) {
+  var it = _answers[i];
+  if (!it) return;
+  _ansEditI = i;
+  ansEditStatus('');
+  $('aeQuestion').textContent = it.question || (it.kind === 'ask' ? 'What you asked' : 'Question ' + (it.number || (i + 1)));
+  $('aeAnswer').value = it.answer || (it.option ? '(' + it.option + ')' : '');
+  $('aeWhy').value = it.explanation || '';
+  // A blank was never marked, so there is no mark to change — showing the
+  // picker there is offering to cross out a question nobody attempted.
+  $('aeMarkRow').style.display = it.marked ? '' : 'none';
+  $('aeVerdict').value = it.marked ? (it.verdict || '') : '';
+  $('aeMarks').value = it.marked ? (it.marks || '') : '';
+  $('aeFeedback').value = it.marked ? (it.feedback || '') : '';
+  // Only the admin ever writes to the notebook. A student\'s device reads it
+  // (the scan runs there) and a box that silently fails to save is worse than
+  // no box, so it is simply not there.
+  var teach = isAdmin(currentUser);
+  $('aeTeach').style.display = teach ? '' : 'none';
+  if (teach) {
+    $('aeRule').value = '';
+    $('aeRemember').checked = false;
+    // The run already knows what paper this is, so the note is offered at that
+    // scope rather than as a rule about every subject the centre teaches —
+    // and it SAYS so, and can be widened back in one tap.
+    $('aeSubject').value = wsMeta.subject || '';
+    $('aeLevel').value = wsMeta.level || '';
+  }
+  $('ansEditModal').classList.add('open');
+  setTimeout(function () { $('aeAnswer').focus(); }, 50);
+}
+function answerEditClose() {
+  $('ansEditModal').classList.remove('open');
+  _ansEditI = -1;
+}
+async function answerEditSave() {
+  var it = _answers[_ansEditI];
+  if (!it) { answerEditClose(); return; }
+  _ansEditApply(it, {
+    answer: $('aeAnswer').value,
+    explanation: $('aeWhy').value,
+    verdict: $('aeVerdict').value,
+    marks: $('aeMarks').value,
+    feedback: $('aeFeedback').value
+  });
+  renderAnswers();
+
+  var note = isAdmin(currentUser) ? _ansEditNote(
+    { rule: $('aeRule').value, remember: $('aeRemember').checked },
+    { question: it.question, answer: it.answer, subject: wsMeta.subject, level: wsMeta.level }
+  ) : null;
+  if (!note) { answerEditClose(); toast('Answer updated.'); return; }
+  // The scope is read off the pickers, which the teacher may have widened.
+  var subj = $('aeSubject').value;
+  var lvl = $('aeLevel').value;
+  note.subjects = SUBJECT_OK[subj] ? [subj] : [];
+  note.levels = LEVELS.indexOf(lvl) !== -1 ? [lvl] : [];
+
+  var btn = $('ansEditSaveBtn');
+  if (btn) btn.disabled = true;
+  ansEditStatus('⏳ Saving the instruction…');
+  try {
+    var id = 'note_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    await notesCollRef(currentUser.uid).doc(id).set(note);
+    note.id = id;
+    teachingNotes.unshift(note);
+    ansEditStatus('');
+    answerEditClose();
+    renderNotesBody();
+    renderAnswers();                       // the grounding line counts one more note now
+    toast('✅ Answer updated, and “' + note.title + '” is now a standing instruction here, in Ans Key and in the Learning Portal.', 6000);
+  } catch (e) {
+    console.error('Correction note failed', e);
+    ansEditStatus('The answer above is updated, but the instruction could not be saved: ' + ((e && e.message) || e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* The chips above the answers. Nothing was attempted on the paper — the
@@ -2743,12 +3088,15 @@ auth.onAuthStateChanged(function (user) {
 
 /* ================= Wiring ================= */
 (function fillLevels() {
-  var sel = $('scanLevel');
-  LEVELS.forEach(function (l) {
-    var o = document.createElement('option');
-    o.value = l;
-    o.textContent = levelLabel(l);
-    sel.appendChild(o);
+  ['scanLevel', 'aeLevel'].forEach(function (id) {
+    var sel = $(id);
+    if (!sel) return;
+    LEVELS.forEach(function (l) {
+      var o = document.createElement('option');
+      o.value = l;
+      o.textContent = levelLabel(l);
+      sel.appendChild(o);
+    });
   });
 })();
 
@@ -2756,7 +3104,7 @@ auth.onAuthStateChanged(function (user) {
    the one that says which paper a typed note is about — are filled from
    SUBJECTS, so the four subjects are declared exactly once. */
 (function fillSubjects() {
-  ['scanSubject', 'qnSubject'].forEach(function (id) {
+  ['scanSubject', 'qnSubject', 'aeSubject'].forEach(function (id) {
     var sel = $(id);
     if (!sel) return;
     SUBJECTS.forEach(function (sub) {
@@ -2870,7 +3218,7 @@ pad.addEventListener('drop', function (e) {
 document.addEventListener('paste', function (e) {
   if (!currentUser || _tab !== 'snap') return;
   if ($('notesModal').classList.contains('open') || $('quickNoteModal').classList.contains('open') ||
-      $('noteEditModal').classList.contains('open')) return;
+      $('noteEditModal').classList.contains('open') || $('ansEditModal').classList.contains('open')) return;
   var t = e.target;
   if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
   var items = (e.clipboardData && e.clipboardData.items) || [];
@@ -2908,10 +3256,14 @@ $('quickNoteModal').addEventListener('click', function (e) { if (e.target === $(
 $('noteEditCancelBtn').addEventListener('click', notesEditClose);
 $('noteEditSaveBtn').addEventListener('click', notesEditSave);
 $('noteEditModal').addEventListener('click', function (e) { if (e.target === $('noteEditModal')) notesEditClose(); });
+$('ansEditCancelBtn').addEventListener('click', answerEditClose);
+$('ansEditSaveBtn').addEventListener('click', answerEditSave);
+$('ansEditModal').addEventListener('click', function (e) { if (e.target === $('ansEditModal')) answerEditClose(); });
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
   if (_recOn) { micStop(); return; }
-  if ($('noteEditModal').classList.contains('open')) notesEditClose();
+  if ($('ansEditModal').classList.contains('open')) answerEditClose();
+  else if ($('noteEditModal').classList.contains('open')) notesEditClose();
   else if ($('quickNoteModal').classList.contains('open')) closeQuickNoteModal();
   else if ($('notesModal').classList.contains('open')) closeNotesModal();
 });
@@ -2929,6 +3281,7 @@ window.addEventListener('beforeunload', function (e) {
    markup references by name. */
 window.$ = $;
 window.notesEditOpen = notesEditOpen;
+window.answerEditOpen = answerEditOpen;
 window.notesDelete = notesDelete;
 window.openQuickNoteModal = openQuickNoteModal;
 window.moveShot = moveShot;
