@@ -125,6 +125,25 @@ and the feedback do not — a bank question is the question, not somebody's mark
 **📥 is the teacher's alone**, like the ✎: the buttons are not drawn on a student's device and the
 write refuses as well.
 
+## Maths is never answered with algebra
+
+Every maths answer uses the methods the PSLE is marked on — the **unitary method** (units and parts), a
+**model** described in words, before-and-after, working backwards, the assumption method. No letters
+standing for unknowns and no equations to solve: an answer that reaches the right number by algebra is
+one a pupil cannot reproduce in the exam, and it is worse than no answer because it looks right.
+
+It is not only asked for in the prompt, it is **checked**. Every maths answer is read afterwards by plain
+code — no AI, so the same answer always gets the same verdict — and one that slipped into algebra is
+rewritten *before it reaches the screen*.
+
+The rewrite is **rationed**: at most two extra calls for a whole run, each carrying up to twelve
+questions, and text-only. A page where fifteen answers all slipped is one call, not fifteen; an ordinary
+paper spends none. If an answer still uses algebra after that, the card says **⚠ uses algebra** rather
+than hiding it, so it can be put right with ✎ Edit.
+
+A question that *prints* the algebra itself — "simplify 3x + 5x" — is answered as the paper asks.
+Answering a printed algebra question another way is answering a different question.
+
 ## Four subjects
 
 Science, Mathematics, English and Chinese, each held to its own standard: a maths answer needs its

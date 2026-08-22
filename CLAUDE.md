@@ -275,6 +275,56 @@ step, and ship a change to the shape in both repos together**:
   teacher presses it.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## Maths is never answered with algebra (v1.8.0)
+- **This centre teaches the methods the PSLE is marked on.** An answer that reaches the right number by
+  forming an equation is a method the pupil has not been taught and cannot reproduce in the exam — and
+  it is **worse than no answer, because it looks right**. So `SCAN_NO_ALGEBRA_RULE` is the ONE fragment
+  that says so, and it is carried by the maths standard in `SCAN_SUBJECT_RULE` **and** by the rewrite
+  call's own system prompt. It NAMES what to use instead — the unitary method, a model in words,
+  before-and-after, working backwards, the assumption method: "do not use algebra" with nothing offered
+  in its place is how a model reaches for it again two questions later.
+- **The rule is asked in the prompt AND enforced in code.** A prompt is a request; `_itemUsesAlgebra` is
+  the check. It is **plain code and never an AI call**, so the same answer always gets the same verdict
+  and running it over every maths answer on every paper costs nothing.
+- **The reader is narrow in BOTH directions, and every awkward case is pinned in the harness.** A false
+  negative puts algebra in front of a pupil; a false positive spends one of the run's two rewrite calls
+  turning a perfectly good unitary answer into another one.
+  - **"3 x 4" is MULTIPLICATION**, and so is "3x4". Only a number written hard against a letter and then
+    an OPERATOR is a term — "3x + 5".
+  - **"5 m + 3 m" is metres.** `ALGEBRA_TERM_RE`'s letter set leaves the single-letter units (m, g, l, s,
+    h, t, c) out altogether.
+  - **"1 unit = 40" is the unitary method** — the very thing the rule exists to encourage — so a letter
+    followed by more letters is never a variable.
+  - **"x = 55°" is a PSLE angle** the paper itself lettered. `_algebraStrip` takes "∠x" and "angle x" out
+    before the bare-variable test rather than trying to spell them into the pattern, and **the `\b` after
+    `\d+` in `ALGEBRA_BARE_RE` is load-bearing**: without it the engine backtracks to "5", finds "5"
+    where it was told to refuse a degree sign, and flags every angle answer on the paper.
+- **A question that PRINTS the algebra is the one exception.** "Simplify 3x + 5x" cannot be answered by
+  the unitary method: answering it another way is answering a different question, and the app's own
+  authority order already says what the paper prints wins. `_itemAsksAlgebra` reads the printed QUESTION
+  and its options — **never the answer**, or an algebraic answer would excuse itself.
+- **Only maths is held to it** (`_itemIsMathish`), plus a question whose subject could not be told: on a
+  mixed page the unrouted one is very often the maths one, and algebra in an English answer is
+  vanishingly rare.
+- **THE REWRITE IS RATIONED, AND THE RATION IS PER RUN.** `SCAN_ALGEBRA_FIX_CALLS` (2) and
+  `SCAN_ALGEBRA_FIX_MAX` (12): a page of fifteen questions that all slipped is ONE call, not fifteen, and
+  a paper that keeps slipping costs two calls and then stops. The ration is spent BEFORE the call, so a
+  failed rewrite cannot buy another try, and it is refilled once in `runScan` and nowhere else. The calls
+  are **text only** — no pictures are sent again, which is what makes them cheap. An ordinary paper
+  spends none at all. Left unbounded this is exactly the loop that quietly spends a term's tokens on one
+  stubborn worksheet.
+- **It runs BEFORE the cards are painted.** `_algebraPass` sits between `_scanFoldRows` and
+  `renderAnswers()` in `_runPages` (and after `_askFoldRows` on the ask-alone path), so an algebraic
+  answer is rewritten before a pupil can read it rather than flickering and being replaced.
+- **A rewrite is taken only when it is really free of algebra.** A second algebraic answer is not an
+  improvement on the first, and keeping the original at least keeps it in step with the marking it was
+  written with. An entry naming a question that is not in the batch is dropped, never applied to
+  another one.
+- **Whatever survives the budget is MARKED, not hidden.** `it.algebra` puts a **⚠ uses algebra** chip on
+  the card: an answer nobody can see is worse than one that says what is wrong with it, and ✎ Edit is
+  right there. The flag is recomputed on every pass, so a fixed answer stops wearing it.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -345,6 +395,10 @@ step, and ship a change to the shape in both repos together**:
   `_scanNewItem`, `_scanFoldRows`, `_markFields`, `_askNewItem`,
   `_askFoldRows`, `_askPrompt`, `_scanPrompt`, `SCAN_SYS`, `SCAN_DETAIL_RULE`, `SCAN_MARK_RULE`,
   `SCAN_SUBJECT_RULE`, `SCAN_ASK_SYS`, `SCAN_ASK_WITH_PAGES_RULE`, `SUBJECTS`, `_parseAIJson`,
+  `SCAN_NO_ALGEBRA_RULE`, `SCAN_ALGEBRA_SYS`, `ALGEBRA_PHRASE_RE`, `ALGEBRA_TERM_RE`,
+  `ALGEBRA_BARE_RE`, `_algebraStrip`, `_textUsesAlgebra`, `_itemAsksAlgebra`, `_itemIsMathish`,
+  `_itemUsesAlgebra`, `_algebraPass`, `_algebraPrompt`, `_applyAlgebraFix`,
+  `SCAN_ALGEBRA_FIX_CALLS`, `SCAN_ALGEBRA_FIX_MAX`,
   `VET_TARGETS`, `VET_SOURCE`, `_vetSend`, `_vetSendBySubject`, `_vetPortalDoc`, `_vetMathDoc`,
   `_vetCorrectIndex`, `_vetTitle`, `_vetHtml`, `_vetCardFootHtml`, `vetOpen`, `vetChoose`,
   `vetChooseAuto`, `_vetAutoFile`, `SCAN_SUBJECT_FIELD_RULE`, `_scanSubject`, `itemSubject`,
@@ -367,7 +421,10 @@ step, and ship a change to the shape in both repos together**:
   question under a heading nobody chose, and a `source` that stops saying `'scan'` lands a card
   that is no longer purple and no longer says where it came from. The ROUTING is the worst of them:
   a maths question sent to the science list is approved by a science teacher, sits in a science bank
-  and is served to a science class, and every step after the wrong turn works perfectly.
+  and is served to a science class, and every step after the wrong turn works perfectly. The algebra
+  reader is in there for the mirror of that reason: too eager and it spends the run's whole ration
+  rewriting good unitary answers, too timid and a pupil is handed a method they were never taught and
+  cannot use in the exam — and both look, on the screen, like an app working perfectly.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.
