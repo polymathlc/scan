@@ -11,6 +11,9 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | --- | --- | --- |
 | Science Learning Portal | `polymathlc/cer` | question bank, practice, the games |
 | Ans Key | `polymathlc/anskey` | the PDF worksheet annotator and answer keys |
+| Math Practice | `polymathlc/math` | the maths bank, practice, Nova Protocol |
+| English Learning Portal | `polymathlc/english` | the English bank and practice |
+| Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
 ## What it does
@@ -31,7 +34,8 @@ every question printed on the pages is dealt with — multiple choice, fill in t
 and lettered parts alike.
 
 Then **Copy** or **Print**. Nothing is saved anywhere: a photographed paper is somebody's work, so
-it lives in the tab and leaves through those two buttons.
+it lives in the tab and leaves through those two buttons — the one exception is the teacher's own
+**📥 Send to vetting**, below.
 
 The **How to use** tab holds the instructions and the only settings there are — how much
 explanation you want (answer alone, a short reason, or the full working), and optionally the level
@@ -72,6 +76,32 @@ Science, Mathematics, English and Chinese, each held to its own standard: a math
 working and its unit, a science answer has to name the process, an English comprehension answer is
 full sentences in the student's own words, and a Chinese paper is answered, explained and marked
 **in Chinese**. Leave the subject picker on *Any* and the paper decides for itself.
+
+## 📥 Keeping a question (teacher only)
+
+A question read off a photograph is a question the centre does not have. Every answer card carries
+**📥 Send to vetting**, and the header carries **📥 Send all to vetting** for a whole paper: choose
+the portal it belongs to and the question, its options, its answer and the reason why are written
+straight into that app's vetting list.
+
+| Portal | Repo |
+| --- | --- |
+| 🔬 Science Learning Portal | `polymathlc/cer` |
+| 📐 Math Practice | `polymathlc/math` |
+| 📘 English Learning Portal | `polymathlc/english` |
+| 📕 Chinese Learning Portal | `polymathlc/chinese` |
+
+It lands in **vetting**, never in the bank. The card is highlighted **purple** there and says it
+came from this app, because a scanned question is not like a typed one: it was read by a model from
+a picture of somebody's worksheet, the wording may be half a line short, **the diagram is not there
+at all**, and the topic is left for you to choose — it belongs to that app's syllabus, not this
+one. Nothing reaches a student until you approve it there.
+
+What the student wrote, the mark and the feedback stay here. A bank question is the question, not
+somebody's marked answer to it.
+
+Everything in this section is behind the teacher's account. A student's device runs the very same
+scan, so the buttons are not shown and the write refuses.
 
 ## The answers are the teacher's, not the model's
 
