@@ -9,7 +9,10 @@ Guidance for Claude when working in this repo.
   student has already written is MARKED, what is still blank is ANSWERED**. Four subjects:
   Science, Mathematics, English, Chinese. **A typed or dictated question is the other way in**:
   with pages it governs the run, with no pages it *is* the run. Nothing is saved anywhere: a
-  photographed paper is somebody's work, so it lives in the tab and leaves through Copy or Print.
+  photographed paper is somebody's work, so it lives in the tab and leaves through Copy or Print —
+  **except on the admin's own press**: ✎ Edit teaches a corrected answer into the shared notebook,
+  and **📥 Send to vetting** files one question (never the student's answer to it) in another
+  Polymath app's vetting list. See those two sections below.
 - Version badge (`APP_VERSION`, shown in the header) is hard-coded — bump it on every change.
 
 ## The AI is the Ans Key app's, ported whole
@@ -180,6 +183,75 @@ step, and ship a change to the shape in both repos together**:
   button on every question is a button nobody can press.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 📥 Keeping a question — into the four vetting lists (v1.6.0)
+- **A question read off a photograph is a question the centre does not have.** Until now the only way
+  one reached a bank was to be typed out again in the portal it belongs to, so in practice it never
+  was: the paper was marked, the tab was closed, and the question went with it. Every answer card
+  now carries **📥 Send to vetting** beside its ✎, the header carries **📥 Send all to vetting** for
+  a whole paper, and the How tab carries a setting that files every question the moment a paper has
+  been read.
+- **It is a DIFFERENT DOOR from ✎ Edit, and the two must not be merged.** ✎ fixes the answer on the
+  card and teaches the rule behind it into the shared NOTEBOOK — it is about how this app answers
+  next time. 📥 files the QUESTION in another app's bank. One changes an answer, the other keeps a
+  question; nothing the ✎ writes reaches a vetting list and nothing 📥 writes reaches the notebook.
+- **It is the ADMIN's door and nobody else's**, on exactly the ✎'s reasoning: a student's device runs
+  this very same scan. `_vetCardFootHtml`, `renderVetAllBtn`, `vetOpen`, `vetAutoTarget` and the
+  How-tab card are all behind `isAdmin(currentUser)`, **and `_vetSend` asks again before it writes**.
+  Hiding a button is not the same as shutting a door. The card's button carries the ✎'s SECOND gate
+  too — it is not drawn while a run is in flight, because this card may be folded into the one
+  before it a second later and half a question is worse than none.
+- **`VET_TARGETS` is the ONE table**: a subject, the portal it belongs to, the collection that
+  portal's vetting list really lives in (`vetting` / `mathVetting` / `vettingEn` / `vettingZh`) and
+  the SHAPE that portal's questions take — one row each. A fifth portal is one entry rather than four
+  edits that have to agree, and the How-tab picker is built from it too.
+- **Two shapes, not one.** Science, English and Chinese are one lineage: the answer lives in a BLOCK
+  and an MCQ's correct option is that option's **id**. Maths files its answer on the QUESTION —
+  `expected` / `markingGuide`, the options as plain strings and the correct one as a **position**,
+  with `-1` meaning "not settled", which is that app's own convention. A portal-shaped document
+  written into Maths renders as a question with no answer in it and nothing errors anywhere.
+- **`_vetSend` is the ONE writer**, used by the button and by the automatic filing alike. Two loops
+  would be two places for the admin check, the already-sent guard and the failure count to drift
+  apart — the same rule `_markFields` exists for.
+- **`source: 'scan'` is the ONE field those four apps read**, and it is the whole contract between
+  repositories that cannot see each other. Rename it here and every card still lands, still renders
+  and still approves — it simply stops being purple and stops saying where it came from, with nothing
+  anywhere to say so. `polymathlc/cer`, `polymathlc/math`, `polymathlc/english` and
+  `polymathlc/chinese` each carry the matching `_vetIsScanned` / `vetIsScanned` predicate; **ship a
+  change to the word in all five repos together.**
+- **It lands in VETTING, never in the bank.** What comes back off a photograph was read by a model
+  from a picture of somebody's worksheet: the wording may be half a line short, **the diagram is not
+  there at all**, and the topic is a guess. Vetting is the holding pen all four portals already keep
+  for exactly that, and every one of them draws the card in PURPLE and says it came from here.
+- **No topic is invented.** A topic is read off the destination app's own syllabus list, which this
+  app has never seen and must not carry a copy of — a topic guessed from here files the question
+  under a heading nobody chose while looking perfectly filed. It is left blank and marked
+  `topicConfidence: 'low'`, which is the signal the three portal apps already draw a
+  "⚠ check topic" badge from: the gap is on screen rather than merely absent.
+- **An option the scan could not name is left UNTICKED** (`correctId: null` / `correctOption: -1`).
+  `_vetCorrectIndex` matches the LABEL the model read off the page — "3", "(B)", "b." — against the
+  options rather than trusting it as an index. Guessing an option marks every class that ever sits
+  the question against the wrong one.
+- **The child's work does not travel.** What the student wrote, the verdict, the marks and the
+  feedback stay on the card here. A bank question is the QUESTION, its options, its answer and why —
+  a marked answer belonging to a named child has no business in a bank thirty other children
+  practise from.
+- **Plain text crosses into authored HTML escaped** (`_vetHtml`), with the line breaks kept: a "<" in
+  a maths question is a less-than sign rather than the start of a tag nobody typed.
+- **Filing automatically is OFF unless a portal is chosen**, and it is never silent: the subject
+  cannot be guessed ("Any subject" reads a paper perfectly well and says nothing about which of four
+  banks a question belongs in), so the picker names the portal, and the run's own toast is followed
+  by one naming the list and the count. Questions filed somewhere the teacher was not told about are
+  questions nobody goes and vets. `applyVetVisibility` HIDES that field for a student and never
+  CLEARS it — it runs once before sign-in resolves and again after, so clearing there would wipe the
+  teacher's own setting on every load; what stops a student filing anything is `vetAutoTarget`,
+  which asks who is signed in at the moment the paper is read.
+- **Every question that would not go is reported.** A batch that quietly sent nineteen of twenty
+  reads exactly like one that sent all twenty.
+- **Nothing else about this app changes.** Nothing is saved on a scan, on a Copy or on a Print; this
+  and the ✎'s note are the only two paths that write anything anywhere, and each only when the
+  teacher presses it.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -243,13 +315,15 @@ step, and ship a change to the shape in both repos together**:
   is dropped instead of landing among the new answers.
 
 ## House rules
-- After touching **the grounding, the live notebook or the scan run**
+- After touching **the grounding, the live notebook, the scan run or the vetting door**
   (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
   `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
   `_notesLiveRepaint`, `_ansEditApply`, `_ansEditNote`, `_ansOptionFrom`, `_ansTrim`,
   `_scanNewItem`, `_scanFoldRows`, `_markFields`, `_askNewItem`,
   `_askFoldRows`, `_askPrompt`, `_scanPrompt`, `SCAN_SYS`, `SCAN_DETAIL_RULE`, `SCAN_MARK_RULE`,
-  `SCAN_SUBJECT_RULE`, `SCAN_ASK_SYS`, `SCAN_ASK_WITH_PAGES_RULE`, `SUBJECTS`, `_parseAIJson`),
+  `SCAN_SUBJECT_RULE`, `SCAN_ASK_SYS`, `SCAN_ASK_WITH_PAGES_RULE`, `SUBJECTS`, `_parseAIJson`,
+  `VET_TARGETS`, `VET_SOURCE`, `_vetSend`, `_vetPortalDoc`, `_vetMathDoc`, `_vetCorrectIndex`,
+  `_vetTitle`, `_vetHtml`, `_vetCardFootHtml`, `vetOpen`, `vetChoose`, `_vetAutoFile`),
   run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
   against stubs. Every failure here is silent and the app carries on looking perfectly right: a
@@ -262,6 +336,11 @@ step, and ship a change to the shape in both repos together**:
   "only question 5" back into the whole paper with nothing on screen to say why. The listener is in there for
   the same reason: a one-shot read looks exactly like a live one until the day somebody types a
   note in Ans Key mid-lesson, and then this app is quietly a day behind the one next to it.
+  The vetting door is in there because everything it can get wrong happens in an app this one
+  cannot see: a document written in the wrong SHAPE renders as a question with no answer in it, a
+  guessed option marks a whole class against the wrong word, a topic invented from here files the
+  question under a heading nobody chose, and a `source` that stops saying `'scan'` lands a card
+  that is no longer purple and no longer says where it came from.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.

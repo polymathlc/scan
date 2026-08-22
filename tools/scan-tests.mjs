@@ -26,6 +26,14 @@ const json = section(
 const scan = section(
   '/* =====================================================================\n   THE SCAN',
   '/* ---- Showing the answers ----');
+/* 📥 The admin's door into the four portals' vetting lists. Everything it can
+   get wrong is silent: a document written in the wrong SHAPE renders as a
+   question with no answer in it, and a `source` that stops saying 'scan'
+   lands a card that is no longer purple and no longer says where it came
+   from — in an app this one cannot see. */
+const vet = section(
+  '/* =====================================================================\n   📥 SENDING A SCANNED QUESTION',
+  '/* ================= Sign in ================= */');
 
 const prelude = `
 var currentUser = { uid: 'admin1', email: 'chungzhikai@gmail.com' };
@@ -60,7 +68,7 @@ var db = { collection: () => ({ doc: () => ({
 }) }) };
 `;
 
-const api = new Function(prelude + json + grounding + scan + `
+const api = new Function(prelude + json + grounding + scan + vet + `
   return {
     set notes(v) { teachingNotes = v; },
     set style(v) { aiStyle = v; },
@@ -72,7 +80,10 @@ const api = new Function(prelude + json + grounding + scan + `
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
     _ansEditApply, _ansEditNote, _ansTrim, _ansNoteTitle, _ansOptionFrom,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
-    SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE
+    SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
+    VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
+    _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
+    set user(v) { currentUser = v; }
   };
 `)();
 api.meta = { level: 'P5', subject: 'science' };
@@ -654,6 +665,160 @@ ok('the note goes to the SHARED notebook, the same door every other note uses',
    /notesCollRef\(currentUser\.uid\)\.doc\(id\)\.set\(note\);/.test(html.slice(html.indexOf('async function answerEditSave'))));
 ok('the card is fixed even when the note cannot be saved',
    html.indexOf('_ansEditApply(it, {') < html.indexOf('var note = isAdmin(currentUser)'));
+
+/* ---------- 📥 Sending a scanned question to a vetting list ----------
+   Four portals, two question SHAPES, and one field — `source` — that decides
+   whether the card lands purple and says where it came from. Every failure
+   here happens in an app this one cannot see: the write goes through, the
+   card appears, and it is simply wrong. */
+
+const mcqItem = {
+  kind: 'page', number: '7', page: 1, endPage: 1, type: 'mcq',
+  question: 'Which of these is a good conductor of heat?\nTick one.',
+  options: [
+    { label: '1', text: 'Wood' }, { label: '2', text: 'Plastic' },
+    { label: '3', text: 'Copper' }, { label: '4', text: 'Rubber' }
+  ],
+  option: '(3)', answer: 'Copper', explanation: 'Metals conduct heat well.',
+  marked: true, studentAnswer: 'Wood', verdict: 'wrong',
+  marks: '0/1', feedback: 'Wood is an insulator — look for the metal.'
+};
+const openItem = {
+  kind: 'page', number: '8', page: 2, endPage: 2, type: 'open',
+  question: 'Explain why the water level fell.',
+  options: [], option: '',
+  answer: 'The water evaporated into water vapour.',
+  explanation: 'Evaporation happens at all temperatures.',
+  marked: false, studentAnswer: '', verdict: '', marks: '', feedback: ''
+};
+
+ok('there is one row per portal', api.VET_TARGETS.length === 4);
+ok('every subject the app teaches has a portal to send to',
+   ['science', 'math', 'english', 'chinese'].every(k => !!api.vetTarget(k)));
+ok('each row names the collection that portal really reads',
+   api.vetTarget('science').col === 'vetting' &&
+   api.vetTarget('math').col === 'mathVetting' &&
+   api.vetTarget('english').col === 'vettingEn' &&
+   api.vetTarget('chinese').col === 'vettingZh');
+/* Science, English and Chinese are one lineage and one shape; Maths is not,
+   and a portal-shaped document written there is a question with no answer. */
+ok('the three portal apps share a builder and Maths has its own',
+   api.vetTarget('science').build === api.vetTarget('english').build &&
+   api.vetTarget('english').build === api.vetTarget('chinese').build &&
+   api.vetTarget('math').build !== api.vetTarget('science').build);
+
+const pMcq = api._vetPortalDoc(mcqItem);
+const pOpen = api._vetPortalDoc(openItem);
+const mMcq = api._vetMathDoc(mcqItem);
+const mOpen = api._vetMathDoc(openItem);
+
+ok('a scanned question SAYS it was scanned', pMcq.source === api.VET_SOURCE && mMcq.source === api.VET_SOURCE);
+ok("…and the field is spelled 'scan' — the four portals read that one word",
+   api.VET_SOURCE === 'scan');
+ok('it names the app it came from', /Scan/.test(pMcq.sourceApp) && /Scan/.test(mMcq.sourceApp));
+ok('it lands in VETTING, waiting', pMcq.status === 'pending');
+
+/* The question, the options, the answer and why — and nothing of the child's. */
+const pText = JSON.stringify(pMcq) + JSON.stringify(pOpen) + JSON.stringify(mMcq) + JSON.stringify(mOpen);
+ok("what the student WROTE never travels", !/Wood is an insulator/.test(pText) && !pText.includes('"studentAnswer"'));
+ok('the mark never travels', !/0\/1/.test(pText) && !/"verdict"/.test(pText));
+ok('the question does', /good conductor of heat/.test(pText));
+
+/* The portal shape. */
+const pQ = pMcq.blocks.filter(b => b.type === 'text')[0];
+ok('the wording is a text block', !!pQ && /good conductor/.test(pQ.content));
+ok('the line breaks on the paper survive as line breaks', /<br>/.test(pQ.content));
+ok('a scanned question is escaped on the way into authored HTML',
+   api._vetHtml('5 < 8 & "true"') === '5 &lt; 8 &amp; &quot;true&quot;');
+const pOpts = pMcq.blocks.filter(b => b.type === 'mcq')[0];
+ok('an MCQ keeps its options', !!pOpts && pOpts.options.length === 4);
+ok('the ticked option is the one the paper named',
+   !!pOpts && pOpts.correctId === pOpts.options[2].id);
+ok('an MCQ gets no second answer box',
+   !pMcq.blocks.some(b => b.type === 'plainanswer'));
+ok('a written question gets one',
+   pOpen.blocks.some(b => b.type === 'plainanswer' && /evaporated/.test(b.content)));
+ok('the reason why comes across',
+   pMcq.blocks.some(b => b.type === 'explanation' && /Metals conduct/.test(b.content)));
+ok('an MCQ is filed as one', pMcq.category === 'Multiple Choice Question');
+/* The topic belongs to the destination app's syllabus, which this app has
+   never seen. Guessing one files the question under a heading nobody chose
+   while looking perfectly filed — so it is left blank and FLAGGED. */
+ok('no topic is invented', pMcq.topic === '' && mMcq.topic === '');
+ok('…and the gap is on screen rather than merely absent', pMcq.topicConfidence === 'low');
+
+/* The Maths shape. */
+ok('Maths files its answer on the question, not in a block', mOpen.expected === openItem.answer);
+ok('an MCQ answered on the paper carries the option it named', mMcq.correctOption === 2);
+ok('…and its options as plain strings', Array.isArray(mMcq.options) && mMcq.options[2] === 'Copper');
+ok('the reason why becomes the marking guide', /Metals conduct/.test(mMcq.markingGuide));
+ok('the wording is still a text block', mMcq.blocks.some(b => b.type === 'text' && /conductor/.test(b.content)));
+ok('a written question carries no option list at all', !('options' in mOpen));
+
+/* A label matching nothing must arrive UNTICKED. Guessing an option marks
+   every class that ever sits the question against the wrong one. */
+const noKey = Object.assign({}, mcqItem, { option: '' });
+ok('an option the scan could not name is left unticked (portal)',
+   api._vetPortalDoc(noKey).blocks.filter(b => b.type === 'mcq')[0].correctId === null);
+ok('an option the scan could not name is left unticked (Maths)',
+   api._vetMathDoc(noKey).correctOption === -1);
+ok('the label is matched, never used as an index',
+   api._vetCorrectIndex({ option: 'B', options: [{ label: 'A' }, { label: 'B' }] }) === 1 &&
+   api._vetCorrectIndex({ option: '(3)', options: [{ label: '1' }, { label: '2' }, { label: '3' }] }) === 2);
+
+/* A bank found by title. */
+ok('the card is titled from the question', /good conductor/.test(pMcq.title));
+ok('a very long question is cut, not printed whole',
+   api._vetTitle({ question: 'x'.repeat(400) }).length < 80);
+ok('a question with no wording still gets a name', api._vetTitle({ question: '' }) === 'Scanned question');
+
+/* The door itself. A student's device runs this very same scan. */
+api.user = { uid: 'kid1', email: 'a.student@example.com' };
+ok('a student is offered no way in at all', api._vetCardFootHtml(openItem, 0) === '');
+api.user = { uid: 'admin1', email: 'chungzhikai@gmail.com' };
+ok('the teacher is', /Send to vetting/.test(api._vetCardFootHtml(openItem, 0)));
+ok('and it never prints', /noPrint/.test(api._vetCardFootHtml(openItem, 0)));
+ok('a question already sent says which list it is in',
+   /In Science vetting/.test(api._vetCardFootHtml(Object.assign({ sentTo: ['science'] }, openItem), 0)));
+
+/* Only the teacher's account can write, and it is asked TWICE — once for the
+   button and once at the door. Hiding a button is not shutting a door. */
+ok('the write asks whether this is the admin, not only the button',
+   /async function vetChoose[\s\S]{0,900}if \(!isAdmin\(currentUser\)\)/.test(html));
+ok('the window is the admin’s too', /function vetOpen[\s\S]{0,80}if \(!isAdmin\(currentUser\)\) return;/.test(html));
+ok('every question that would not go is reported',
+   /failed\+\+/.test(html) && /could not be/.test(html));
+ok('a run still being read cannot be sent', /if \(_scanning\) \{ toast\(/.test(html));
+/* The same two gates the ✎ carries. A card can still be folded into the one
+   before it a second later, and half a question is worse than none. */
+ok('the button is not drawn on a card while the run is still arriving',
+   /function _vetCardFootHtml[\s\S]{0,520}if \(_scanning \|\| !isAdmin\(currentUser\)\) return '';/.test(html));
+
+/* ---------- Filing the whole paper automatically ----------
+   Set once on the How tab. Everything about it is admin-only and everything
+   about it has to be SAID: questions filed somewhere the teacher was not told
+   about are questions nobody ever goes and vets. */
+ok('the picker is built from the one table, never written out in the markup',
+   /function fillVetTargets\(\)[\s\S]{0,400}VET_TARGETS\.forEach/.test(html));
+ok('it starts Off, and Off is the empty value',
+   /<option value="">Off/.test(html));
+ok('the setting is remembered with the others',
+   /autoVet: \$\('scanAutoVet'\)/.test(html) && /if \(p\.autoVet && vetTarget\(p\.autoVet\)\)/.test(html));
+ok('a run files the paper only after it has been read',
+   /await _vetAutoFile\(\);/.test(html) &&
+   html.indexOf('await _vetAutoFile();') > html.indexOf('async function runScan'));
+ok('an empty run files nothing', /if \(!t \|\| !_answers\.length\) return;/.test(html));
+ok('it asks who is signed in at the moment the paper is read',
+   /function vetAutoTarget[\s\S]{0,160}!isAdmin\(currentUser\)/.test(html));
+ok('the field is hidden for a student and never cleared — that would wipe the setting',
+   /if \(field\) field\.classList\.toggle\('hidden', !admin\);/.test(html));
+ok('what was filed, and where, is said out loud', /_vetReport\(t, r\)/.test(html));
+/* One writer. Two loops would be two places for the admin check, the
+   already-sent guard and the failure count to drift apart. */
+ok('the button and the automatic filing share ONE writer',
+   (html.match(/await _vetSend\(/g) || []).length === 2 &&
+   (html.match(/async function _vetSend\(/g) || []).length === 1);
+ok('…and the door is inside it', /async function _vetSend[\s\S]{0,320}!isAdmin\(currentUser\)\) return r;/.test(html));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);
