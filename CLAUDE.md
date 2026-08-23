@@ -606,6 +606,51 @@ step, and ship a change to the shape in both repos together**:
   which is exactly what happened.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+### 🌙 Kimi — the THIRD supplier (v1.16.0)
+
+`AI_ENGINES` / `_aiRoutesFor` / `kimiKey` / `kimiModel` / `kimiReady` /
+`askKimiServer` / `askKimiDirect` / `window.kimiListModels` /
+`window.aiSaveKimiKey` / `kimiModelHint` (search `KIMI (Moonshot AI)`), plus
+the third option in **Which to try first**, the Kimi key box and the model box
+with 🔄 **Load models** on the How tab.
+
+Two engines is barely one. Gemini and ChatGPT are two accounts on two bills,
+so the morning the Firebase project is capped **and** the OpenAI balance is at
+zero is the morning every app in the family goes down together. Kimi is a
+third company, a third account and a third cap.
+
+- **An ENGINE is one or two ROUTES, and that is now the whole order.**
+  `AI_ENGINES` names the three; `_aiRoutesFor` turns each into the routes it
+  actually has — the server's key, and behind it a key pasted into this
+  browser. The chosen engine goes first and **the other two stay behind it**.
+  An engine name nobody recognises still yields every route rather than an
+  empty list: a stale word in the centre-wide setting would otherwise take the
+  AI off every device at once.
+- **`window.askGemini` is still the ONE door**, and `_aiRun` still the one
+  dispatcher. Every call site — the scan run, the ask, the algebra rewrite,
+  the report, the notes upload — gained the third supplier without being told.
+- **The card prints the order the CALLS take** (`st.order`, straight from
+  `aiEngineOrder`). It used to assemble its own list and `reverse()` it when
+  ChatGPT was preferred — right with two engines, silently wrong with three,
+  and the symptom is a card confidently describing an order nothing follows.
+- **THE MODEL IS A FIELD, NOT A CONSTANT.** Moonshot renames its flagship with
+  every release (`kimi-k2-…`, `kimi-k3-…`), so an id frozen in this file is a
+  404 on every call a few months from now — and a 404 on every call reads as
+  *Kimi is broken* rather than *the id is a release out of date*. 🔄 **Load
+  models** asks the account itself and `kimiModelHint` says it in words on the
+  card. It is the one thing the server callable takes from the client, because
+  a teacher cannot redeploy a Cloud Function to follow a rename; the function
+  only accepts a Moonshot-shaped id.
+- **An empty key box means "I did not change the key", never "delete it"** —
+  that is what **Remove Kimi key** is for. `window.aiSaveKimiKey` takes
+  `undefined` for leave-alone and `''` for remove, so an admin running on the
+  server route can save a model id without wiping a key they never typed.
+- **The server route** is `askKimi` in `polymathlc/math/functions`
+  (`MOONSHOT_API_KEY`). Until it is deployed the card says the secret has not
+  been set rather than *AI error* — a deploy and a bill are different jobs.
+- The key is the teacher's alone and device-local, exactly as ChatGPT's is:
+  this is a public static site served to every student's browser.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -690,6 +735,9 @@ step, and ship a change to the shape in both repos together**:
   `openAiReady`, `aiEnginePref`, `aiEngineOrder`, `aiEngineIsDown`, `_openAiBody`, `_openAiText`,
   `askOpenAI`, `askOpenAiServer`, `_aiWhy`, `aiAskWith`, `_aiRun`, `renderEngineLine`,
   `applyAiVisibility`, `aiSaveKey`, `aiClearKey`, `aiSetPrefer`,
+  `AI_ENGINES`, `_aiRoutesFor`, `kimiKey`, `kimiModel`, `kimiReady`, `askKimiServer`,
+  `askKimiDirect`, `window.kimiListModels`, `window.aiSaveKimiKey`, `kimiModelHint`,
+  `kimiSave`, `kimiClear`, `kimiLoadModels`,
   `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
   `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`,
   `_mbShotForPage`, `mbIsWrong`, `mbIsRight`, `mbKeyOf`, `mbFindByKey`, `MB_CLEAR_WINS`,

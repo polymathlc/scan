@@ -870,21 +870,43 @@
             placeholder="Only needed if the server backup is not deployed">
         </div>
         <div class="field">
+          <label for="kimiKeyInput">Kimi key <span class="hint">(teacher only — a fallback for this browser)</span></label>
+          <input id="kimiKeyInput" type="password" autocomplete="off" spellcheck="false"
+            placeholder="Only needed if the server backup is not deployed">
+        </div>
+        <div class="field">
+          <label for="kimiModelInput">Kimi model</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="kimiModelInput" type="text" list="kimiModelList" placeholder="kimi-k3" autocomplete="off" spellcheck="false" style="flex:1">
+            <button class="btn" id="kimiLoadBtn" type="button">🔄 Load models</button>
+          </div>
+          <datalist id="kimiModelList"></datalist>
+        </div>
+        <div class="field">
           <label for="openAiPrefer">Which to try first <span class="hint">(everyone's devices)</span></label>
           <select id="openAiPrefer">
-            <option value="gemini">Gemini, with ChatGPT behind it</option>
-            <option value="openai">ChatGPT, with Gemini behind it</option>
+            <option value="gemini">Gemini, with the others behind it</option>
+            <option value="openai">ChatGPT, with the others behind it</option>
+            <option value="kimi">Kimi, with the others behind it</option>
           </select>
         </div>
       </div>
       <div class="rowBtns hidden" id="howEngineBtns">
-        <button class="btn btnPrimary" id="saveKeyBtn" type="button">Save key</button>
-        <button class="btn" id="clearKeyBtn" type="button">Remove key</button>
+        <button class="btn btnPrimary" id="saveKeyBtn" type="button">Save ChatGPT key</button>
+        <button class="btn" id="clearKeyBtn" type="button">Remove ChatGPT key</button>
+        <button class="btn btnPrimary" id="saveKimiBtn" type="button">Save Kimi</button>
+        <button class="btn" id="clearKimiBtn" type="button">Remove Kimi key</button>
       </div>
       <p class="hint hidden" id="howEngineHint" style="margin-top:12px"><b>You should not normally need this.</b>
         The backup's real key lives on the <b>server</b>, as a Firebase secret behind the <code>askOpenAi</code>
         Cloud Function, which is what lets a student's phone use it with nothing set up on it. Set it once with
         <code>firebase functions:secrets:set OPENAI_API_KEY</code> and deploy the functions in the Maths repo.</p>
+      <p class="hint hidden" id="howEngineHint3" style="margin-top:8px"><b>Kimi</b> (Moonshot AI) is a
+        <b>third supplier</b>, on its own account and its own cap — so a day that takes out both of the others does
+        not take out this app. Its server key is <code>MOONSHOT_API_KEY</code> behind the <code>askKimi</code>
+        Cloud Function, set the same way. Moonshot renames its flagship with every release, so the model is a
+        <b>box, not a fixed list</b>: <b>🔄 Load models</b> asks your own account which ids it will answer to, and a
+        stale id is the first thing to check if Kimi starts refusing every call.</p>
       <p class="hint hidden" id="howEngineHint2" style="margin-top:8px">A key typed here is only a <b>fallback for
         this browser</b> — useful before the function is deployed, or if it ever stops answering. It is kept in
         this browser, never uploaded and never written into a paper or the repository, and it is the very same
@@ -1201,7 +1223,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.15.0';
+var APP_VERSION = 'v1.16.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -3859,8 +3881,18 @@ function renderGroundingLine() {
    ===================================================================== */
 function engineName(e) {
   return e === 'gemini' ? 'Gemini'
-    : e === 'openai' ? 'ChatGPT'
-    : e === 'openaiKey' ? 'ChatGPT (a key saved on this device)'
+    : e === 'openai' ? 'ChatGPT on the server'
+    : e === 'openaiKey' ? 'ChatGPT on the key saved in this browser'
+    : e === 'kimi' ? 'Kimi on the server'
+    : e === 'kimiKey' ? 'Kimi on the key saved in this browser'
+    : '';
+}
+/* The commonest way the Kimi route dies is the dullest: the id in the box is
+   a release behind. Unsaid, it reads as "Kimi is broken". */
+function kimiModelHint(why) {
+  var st = aiEngineState();
+  return /model|not_?found|404/i.test(String(why || ''))
+    ? ' The model id "' + (st.kimiModel || '') + '" may simply be out of date — press 🔄 Load models and pick one.'
     : '';
 }
 function aiEngineState() {
@@ -3878,11 +3910,11 @@ function renderEngineLine() {
   var why = st.why || {};
   var bits = [];
 
-  var routes = [];
-  if (st.gemini) routes.push('Gemini');
-  routes.push('ChatGPT on the server');
-  if (st.deviceKey) routes.push('ChatGPT on the key saved in this browser');
-  if (st.prefer === 'openai') routes.reverse();
+  /* THE ORDER IS READ FROM THE ENGINE, never re-assembled here. The old list
+     was built by hand and reversed when ChatGPT was preferred, which is right
+     with two engines and silently wrong with three — the card would print an
+     order the calls do not take. */
+  var routes = (st.order || []).map(engineName).filter(Boolean);
   bits.push(st.shared
     ? 'This order is the centre-wide setting — every signed-in device is using it.'
     : (st.sharedWhy
@@ -3901,6 +3933,14 @@ function renderEngineLine() {
     bits.push(/not-?found|failed-?precondition|not configured|not loaded/i.test(why.server)
       ? 'The server backup is not switched on yet — the OPENAI_API_KEY secret has not been set, or the function has not been deployed. Until it is, only a device with a key of its own has a backup. (' + why.server + ')'
       : 'The server backup refused a moment ago and is being skipped for a few minutes: ' + why.server);
+  }
+  if (st.kimiDown && why.kimi) {
+    bits.push(/not-?found|failed-?precondition|not configured|not loaded/i.test(why.kimi)
+      ? 'Kimi\'s server key is not switched on yet — the MOONSHOT_API_KEY secret has not been set, or the function has not been deployed. Until it is, only a device with a Kimi key of its own can use it. (' + why.kimi + ')'
+      : 'The Kimi server route refused a moment ago and is being skipped for a few minutes: ' + why.kimi + kimiModelHint(why.kimi));
+  }
+  if (st.kimiKeyDown && why.kimiKey) {
+    bits.push('The Kimi key in this browser was refused: ' + why.kimiKey + kimiModelHint(why.kimiKey));
   }
   if (st.gemini && st.geminiDown && why.gemini) {
     bits.push('Gemini refused a moment ago, so it is being skipped for a few minutes rather than paid for again on every page: ' + why.gemini);
@@ -3932,8 +3972,12 @@ function applyAiVisibility() {
     var st = aiEngineState();
     var k = $('openAiKey');
     if (k && !k.value) k.placeholder = st.deviceKey ? 'A key is saved in this browser' : 'Only needed if the server backup is not deployed';
+    var kk = $('kimiKeyInput');
+    if (kk && !kk.value) kk.placeholder = st.kimiDeviceKey ? 'A key is saved in this browser' : 'Only needed if the server backup is not deployed';
+    var km = $('kimiModelInput');
+    if (km && !km.value) km.value = st.kimiModel || '';
     var p = $('openAiPrefer');
-    if (p) p.value = st.prefer === 'openai' ? 'openai' : 'gemini';
+    if (p) p.value = ['gemini', 'openai', 'kimi'].indexOf(st.prefer) >= 0 ? st.prefer : 'gemini';
   }
   renderEngineLine();
 }
@@ -3962,6 +4006,52 @@ function aiClearKey() {
   applyAiVisibility();
   toast('Key removed from this device.');
 }
+/* Kimi's own key, and its model. The model is saved WITHOUT a key as well —
+   an admin running on the server route has no key here and still has to be
+   able to follow Moonshot's renames. */
+function kimiSave() {
+  if (!isAdmin(currentUser)) return;
+  var k = $('kimiKeyInput'), m = $('kimiModelInput');
+  var val = String((k && k.value) || '').trim();
+  var model = String((m && m.value) || '').trim();
+  if (!val && !model) { toast('Paste a Kimi key, or type a model id — or press Remove Kimi key to take the saved one off this device.', 6000); return; }
+  // An empty box is "I did not change the key", never "delete it" — that is
+  // what Remove Kimi key is for.
+  if (!window.aiSaveKimiKey || !window.aiSaveKimiKey(val || undefined, model)) {
+    toast('This browser would not store the key — private browsing usually refuses.', 6000);
+    return;
+  }
+  // Never left in the box: a key on screen is a key over somebody's shoulder.
+  if (k) k.value = '';
+  applyAiVisibility();
+  toast(val ? 'Saved. This browser now has its own Kimi fallback, behind the server one.' : 'Kimi model saved for this browser.', 6000);
+}
+function kimiClear() {
+  if (!isAdmin(currentUser)) return;
+  if (!confirm('Remove the Kimi key from this browser?\n\nThe server backup is unaffected — this only removes the extra fallback.')) return;
+  if (window.aiSaveKimiKey) window.aiSaveKimiKey('');
+  var k = $('kimiKeyInput');
+  if (k) k.value = '';
+  applyAiVisibility();
+  toast('Kimi key removed from this device.');
+}
+/* The account's own list, in one call. A list of ids typed into this file
+   goes stale on Moonshot's schedule rather than ours, and a stale id is a 404
+   on every call with nothing on screen to say why. */
+async function kimiLoadModels() {
+  if (!isAdmin(currentUser)) return;
+  var btn = $('kimiLoadBtn'), dl = $('kimiModelList'), k = $('kimiKeyInput');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'Loading…';
+  try {
+    var ids = await window.kimiListModels(String((k && k.value) || '').trim());
+    if (dl) dl.innerHTML = ids.map(function (id) { return '<option value="' + id.replace(/"/g, '&quot;') + '"></option>'; }).join('');
+    toast(ids.length + ' Kimi models loaded — open the model box and pick one', 5000);
+  } catch (e) {
+    toast("Could not read Kimi's model list: " + ((e && e.message) || e), 6000);
+  } finally { btn.disabled = false; btn.textContent = '🔄 Load models'; }
+}
+
 /* The teacher's toggle. It writes the CENTRE-WIDE setting, because a choice
    that only moved this phone is the bug this replaced: switch to ChatGPT on
    your own device, watch it work, and every student stays on the capped
@@ -3976,15 +4066,14 @@ function aiSetPrefer() {
   if (!isAdmin(currentUser)) return;
   var p = $('openAiPrefer');
   if (!p) return;
-  var v = p.value === 'openai' ? 'openai' : 'gemini';
+  var v = ['gemini', 'openai', 'kimi'].indexOf(p.value) >= 0 ? p.value : 'gemini';
+  var name = v === 'openai' ? 'ChatGPT' : v === 'kimi' ? 'Kimi' : 'Gemini';
   if (window.aiSetEnginePref) window.aiSetEnginePref(v);
   renderEngineLine();
   if (!window.aiEngineSetShared) return;
   window.aiEngineSetShared(v).then(function () {
     renderEngineLine();
-    toast(v === 'openai'
-      ? 'ChatGPT is now the first engine for everyone.'
-      : 'Gemini is now the first engine for everyone.', 5000);
+    toast(name + ' is now the first engine for everyone.', 5000);
   }).catch(function (e) {
     renderEngineLine();
     var msg = String((e && e.message) || e || '');
@@ -5752,6 +5841,9 @@ $('scanSubject').addEventListener('change', syncMeta);
 $('scanDetail').addEventListener('change', syncMeta);
 $('saveKeyBtn').addEventListener('click', aiSaveKey);
 $('clearKeyBtn').addEventListener('click', aiClearKey);
+$('saveKimiBtn').addEventListener('click', kimiSave);
+$('clearKimiBtn').addEventListener('click', kimiClear);
+$('kimiLoadBtn').addEventListener('click', kimiLoadModels);
 $('openAiPrefer').addEventListener('change', aiSetPrefer);
 
 /* Two tabs. The camera bar belongs to the Snap tab alone — a shutter button
@@ -6037,7 +6129,9 @@ const AI_ENGINE_STORE = {
   engine: 'sq_ai_engine',
   key: 'sq_openai_key',
   model: 'sq_openai_model',
-  imageModel: 'sq_openai_image_model'
+  imageModel: 'sq_openai_image_model',
+  kimiKey: 'sq_kimi_key',
+  kimiModel: 'sq_kimi_model'
 };
 const OPENAI_DEFAULT_MODEL = 'gpt-5.6-sol';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
@@ -6052,16 +6146,47 @@ function _aiStore(k) { try { return localStorage.getItem(k) || ''; } catch (e) {
 function openAiKey() { return String(_aiStore(AI_ENGINE_STORE.key) || '').trim(); }
 function openAiModel() { return _aiStore(AI_ENGINE_STORE.model) || OPENAI_DEFAULT_MODEL; }
 function openAiReady() { return !!openAiKey(); }
-function aiEnginePref() { return _aiStore(AI_ENGINE_STORE.engine) === 'openai' ? 'openai' : 'gemini'; }
 
-const _aiDown = { gemini: 0, openai: 0, openaiKey: 0 };
+/* ── 🌙 KIMI (Moonshot AI) — THE THIRD SUPPLIER ───────────────────────
+   Gemini and ChatGPT are two accounts on two bills, so "whichever will
+   answer" has never been more than one deep. The morning the Firebase
+   project is capped AND the OpenAI balance is at zero is a morning that
+   happens, and it left every app in the family dead at once. Kimi is a
+   third company, a third account and a third cap.
+
+   Two routes, ordered like ChatGPT's: the SERVER (`askKimi`, whose key is a
+   Firebase secret, so it reaches a student's phone with nothing set up on
+   it), then a key pasted into THIS browser, which reaches nothing else.
+
+   THE MODEL IS A FIELD, NOT A CONSTANT. Moonshot renames its flagship with
+   every release (kimi-k2-…, kimi-k3-…), so an id hard-coded here is a 404 on
+   every call a few months from now — and a 404 on every call reads as "Kimi
+   is broken" rather than "the id is a release out of date". 🔄 Load models
+   asks the account itself. */
+const KIMI_API_BASE = 'https://api.moonshot.ai/v1';
+const KIMI_DEFAULT_MODEL = 'kimi-k3';
+const KIMI_MAX_OUTPUT = 32000;
+function kimiKey() { return String(_aiStore(AI_ENGINE_STORE.kimiKey) || '').trim(); }
+function kimiModel() { return String(_aiStore(AI_ENGINE_STORE.kimiModel) || '').trim() || KIMI_DEFAULT_MODEL; }
+function kimiReady() { return !!kimiKey(); }
+
+/* THE THREE ENGINES A TEACHER CHOOSES BETWEEN. Each is one or two ROUTES,
+   and choosing one picks which is tried FIRST — the other two stay behind
+   it, which is what makes a capped supplier survivable rather than fatal. */
+const AI_ENGINES = ['gemini', 'openai', 'kimi'];
+function aiEnginePref() {
+  const v = _aiStore(AI_ENGINE_STORE.engine);
+  return AI_ENGINES.indexOf(v) >= 0 ? v : 'gemini';
+}
+
+const _aiDown = { gemini: 0, openai: 0, openaiKey: 0, kimi: 0, kimiKey: 0 };
 /* Why each route last refused. The How tab has to be able to tell "nobody has
    deployed the function yet" from "the key was rejected" from "the account is
    out of credit" — three different problems with three different fixes, and
    an app that reports them all as "AI error" sends the teacher looking in the
    wrong place. */
-const _aiWhy = { gemini: '', openai: '', openaiKey: '', shared: '' };
-const AI_ROUTE_LABEL = { gemini: 'Gemini', openai: 'ChatGPT (server key)', openaiKey: 'ChatGPT (key in this browser)' };
+const _aiWhy = { gemini: '', openai: '', openaiKey: '', kimi: '', kimiKey: '', shared: '' };
+const AI_ROUTE_LABEL = { gemini: 'Gemini', openai: 'ChatGPT (server key)', openaiKey: 'ChatGPT (key in this browser)', kimi: 'Kimi (server key)', kimiKey: 'Kimi (key in this browser)' };
 function _aiNow() { return Date.now(); }
 function aiEngineIsDown(e) { return (_aiDown[e] || 0) > _aiNow(); }
 function aiEngineDownFor(e) { return Math.max(0, (_aiDown[e] || 0) - _aiNow()); }
@@ -6117,7 +6242,7 @@ function aiEngineWatchShared() {
       var d = (snap && snap.exists && snap.data()) || {};
       // An unset field means nobody has chosen, which is Gemini — the default
       // this app already had, so a centre that never touches it is unaffected.
-      _aiSharedEngine = (d.aiEngine === 'gemini' || d.aiEngine === 'openai') ? d.aiEngine : 'gemini';
+      _aiSharedEngine = AI_ENGINES.indexOf(d.aiEngine) >= 0 ? d.aiEngine : 'gemini';
       _aiSharedAt = Date.now();
       _aiWhy.shared = '';
       if (window.renderEngineLine) { try { window.renderEngineLine(); } catch (e) { /* tab not built */ } }
@@ -6139,7 +6264,7 @@ async function aiEngineLoadShared(force) {
   try {
     const snap = await db.collection('config').doc('admin').get();
     const d = (snap && snap.exists && snap.data()) || {};
-    _aiSharedEngine = (d.aiEngine === 'gemini' || d.aiEngine === 'openai') ? d.aiEngine : 'gemini';
+    _aiSharedEngine = AI_ENGINES.indexOf(d.aiEngine) >= 0 ? d.aiEngine : 'gemini';
     _aiSharedAt = Date.now();
     _aiWhy.shared = '';
     return _aiSharedEngine;
@@ -6151,7 +6276,7 @@ async function aiEngineLoadShared(force) {
     if (!_aiFns) _aiFns = firebase.functions();
     const res = await _aiFns.httpsCallable('aiEngineConfig', { timeout: 20000 })({});
     const eng = res && res.data && res.data.engine;
-    if (eng === 'gemini' || eng === 'openai') { _aiSharedEngine = eng; _aiSharedAt = Date.now(); _aiWhy.shared = ''; }
+    if (AI_ENGINES.indexOf(eng) >= 0) { _aiSharedEngine = eng; _aiSharedAt = Date.now(); _aiWhy.shared = ''; }
   } catch (e2) { /* the device preference carries on, and the How tab says so */ }
   return _aiSharedEngine;
 }
@@ -6175,19 +6300,28 @@ async function aiEngineSetShared(engine) {
     if (!_aiFns) _aiFns = firebase.functions();
     const res = await _aiFns.httpsCallable('aiEngineConfig', { timeout: 20000 })({ set: engine });
     const eng = res && res.data && res.data.engine;
-    _aiSharedEngine = (eng === 'gemini' || eng === 'openai') ? eng : engine;
+    _aiSharedEngine = AI_ENGINES.indexOf(eng) >= 0 ? eng : engine;
     _aiSharedAt = Date.now();
     return _aiSharedEngine;
   }
 }
 window.aiEngineSetShared = aiEngineSetShared;
 
+function _aiRoutesFor(engine, haveGemini) {
+  if (engine === 'gemini') return haveGemini ? ['gemini'] : [];
+  if (engine === 'openai') return openAiReady() ? ['openai', 'openaiKey'] : ['openai'];
+  if (engine === 'kimi') return kimiReady() ? ['kimi', 'kimiKey'] : ['kimi'];
+  return [];
+}
 function aiEngineOrder(haveGemini) {
-  const chat = ['openai'];
-  if (openAiReady()) chat.push('openaiKey');
-  const have = aiPreferredEngine() === 'openai'
-    ? chat.concat(haveGemini ? ['gemini'] : [])
-    : (haveGemini ? ['gemini'] : []).concat(chat);
+  const first = aiPreferredEngine();
+  /* An engine name nobody recognises still yields every route rather than an
+     empty list: a stale word in the centre-wide setting would otherwise take
+     the AI off every device at once. */
+  const engines = AI_ENGINES.indexOf(first) >= 0
+    ? [first].concat(AI_ENGINES.filter(function (e) { return e !== first; }))
+    : AI_ENGINES.slice();
+  const have = engines.reduce(function (all, e) { return all.concat(_aiRoutesFor(e, haveGemini)); }, []);
   return have.sort(function (a, b) { return (aiEngineIsDown(a) ? 1 : 0) - (aiEngineIsDown(b) ? 1 : 0); });
 }
 
@@ -6213,6 +6347,86 @@ async function askOpenAiServer(prompt, opts) {
   if (typeof text !== 'string' || !text.trim()) throw new Error('The server backup returned an unexpected response shape.');
   return text.trim();
 }
+
+/* Kimi on the SERVER — the route that reaches a phone nobody has typed a key
+   into. Same compat callable as `askOpenAiServer`, and it is handed the model
+   id (which `askOpenAi` deliberately refuses) because Moonshot renames its
+   flagship every release and a teacher cannot redeploy a Cloud Function to
+   follow it. The function only accepts a Moonshot-shaped id. */
+async function askKimiServer(prompt, opts) {
+  opts = opts || {};
+  if (typeof firebase === 'undefined' || !firebase.functions) throw new Error('The server backup is not loaded on this page');
+  if (!_aiFns) _aiFns = firebase.functions();
+  const call = _aiFns.httpsCallable('askKimi', { timeout: 240000 });
+  const res = await call({
+    prompt: String(prompt == null ? '' : prompt),
+    system: String(opts.system || ''),
+    images: (opts.images || []).filter(function (i) { return i && i.data; })
+      .map(function (i) { return { mimeType: i.mimeType || 'image/jpeg', data: i.data }; }),
+    json: !!opts.json,
+    maxOutputTokens: opts.maxOutputTokens || 512,
+    temperature: opts.temperature,
+    model: kimiModel()
+  });
+  const text = res && res.data && res.data.text;
+  if (typeof text !== 'string' || !text.trim()) throw new Error('The Kimi server route returned an unexpected response shape.');
+  return text.trim();
+}
+
+/* Kimi on a key pasted into THIS browser. It speaks the OpenAI
+   chat-completions dialect, so the request is `_openAiBody`'s shape with a
+   different host, a different key and `max_tokens` rather than
+   `max_completion_tokens`. */
+async function askKimiDirect(prompt, opts) {
+  opts = opts || {};
+  const key = kimiKey();
+  if (!key) throw new Error('No Kimi key is saved in this browser.');
+  const model = kimiModel();
+  const text = String(prompt == null ? '' : prompt);
+  const content = [{ type: 'text', text: text }];
+  (opts.images || []).forEach(function (img) {
+    if (img && img.data) content.push({ type: 'image_url', image_url: { url: 'data:' + (img.mimeType || 'image/jpeg') + ';base64,' + img.data } });
+  });
+  const messages = [];
+  let system = String(opts.system || '');
+  // json_object mode is refused unless the word "json" appears in the prompt.
+  if (opts.json && !/json/i.test(system + ' ' + text)) system += (system ? '\n' : '') + 'Reply with JSON only.';
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push({ role: 'user', content: content });
+  const body = {
+    model: model,
+    messages: messages,
+    max_tokens: Math.min(KIMI_MAX_OUTPUT, Math.max(1024, opts.maxOutputTokens || 512))
+  };
+  if (opts.json) body.response_format = { type: 'json_object' };
+  if (opts.temperature !== undefined) body.temperature = opts.temperature;
+  const res = await fetch(KIMI_API_BASE + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { const ej = await res.json(); detail = ej && ej.error ? (ej.error.message || '') : ''; } catch (e) { /* non-JSON error body */ }
+    // The model id rides in the message on purpose: an id a release out of
+    // date is the commonest way this route dies.
+    throw new Error('Kimi API error ' + res.status + ' (model ' + model + ')' + (detail ? ': ' + detail : ''));
+  }
+  return _openAiText(await res.json());
+}
+
+/* What the account itself says it will answer to. A list of ids typed into
+   this file goes stale on Moonshot's release schedule rather than ours. */
+window.kimiListModels = async function (key) {
+  const k = String(key || kimiKey() || '').trim();
+  if (!k) throw new Error('Paste a Kimi key first — the list is read from the account it belongs to.');
+  const res = await fetch(KIMI_API_BASE + '/models', { headers: { 'Authorization': 'Bearer ' + k } });
+  if (!res.ok) throw new Error('Kimi API error ' + res.status);
+  const data = await res.json();
+  const ids = (((data && data.data) || []).map(function (m) { return m && m.id; }).filter(Boolean)).sort();
+  if (!ids.length) throw new Error('That account listed no models.');
+  return ids;
+};
 
 /* The ChatGPT request. Ported from the Science portal's `askOpenAI` so the
    two ask alike, plus the two things this app needs and that one does not:
@@ -6322,14 +6536,22 @@ window.aiEngines = function () {
     gemini: !!geminiModel,
     server: true,                 // always worth asking; only a refusal says otherwise
     deviceKey: openAiReady(),
+    kimiDeviceKey: kimiReady(),
     prefer: aiPreferredEngine(),
     shared: _aiSharedEngine,
     sharedWhy: _aiWhy.shared,
     model: openAiModel(),
+    kimiModel: kimiModel(),
+    /* The ORDER itself, so the line on the How tab cannot drift from the
+       order the calls actually take. It used to assemble its own list and
+       reverse it, which is right with two engines and wrong with three. */
+    order: aiEngineOrder(!!geminiModel),
     geminiDown: aiEngineIsDown('gemini'),
     serverDown: aiEngineIsDown('openai'),
     deviceKeyDown: aiEngineIsDown('openaiKey'),
-    why: { gemini: _aiWhy.gemini, server: _aiWhy.openai, deviceKey: _aiWhy.openaiKey },
+    kimiDown: aiEngineIsDown('kimi'),
+    kimiKeyDown: aiEngineIsDown('kimiKey'),
+    why: { gemini: _aiWhy.gemini, server: _aiWhy.openai, deviceKey: _aiWhy.openaiKey, kimi: _aiWhy.kimi, kimiKey: _aiWhy.kimiKey },
     last: window.aiLastCall
   };
 };
@@ -6339,7 +6561,29 @@ window.aiEngines = function () {
    blank key that still says ChatGPT is preferred is an app that tries an
    engine it does not have on every single call. */
 window.aiSetEnginePref = function (v) {
-  try { localStorage.setItem(AI_ENGINE_STORE.engine, v === 'openai' ? 'openai' : 'gemini'); } catch (e) { return false; }
+  try { localStorage.setItem(AI_ENGINE_STORE.engine, AI_ENGINES.indexOf(v) >= 0 ? v : 'gemini'); } catch (e) { return false; }
+  return true;
+};
+
+window.aiSaveKimiKey = function (key, model) {
+  try {
+    /* `undefined` means LEAVE THE KEY ALONE and '' means REMOVE it. An admin
+       running on the server route has no key in the box and still has to be
+       able to save a model — and emptying their key because they typed a
+       model id would be the worst possible reading of that. */
+    if (key !== undefined) {
+      const k = String(key == null ? '' : key).trim();
+      if (k) localStorage.setItem(AI_ENGINE_STORE.kimiKey, k);
+      else localStorage.removeItem(AI_ENGINE_STORE.kimiKey);
+    }
+    if (model !== undefined) {
+      const m = String(model == null ? '' : model).trim();
+      if (m) localStorage.setItem(AI_ENGINE_STORE.kimiModel, m);
+      else localStorage.removeItem(AI_ENGINE_STORE.kimiModel);
+    }
+  } catch (e) { return false; }
+  _aiMarkUp('kimi');
+  _aiMarkUp('kimiKey');
   return true;
 };
 
@@ -6368,6 +6612,8 @@ window.askGemini = function askGemini(prompt, opts = {}) {
 function _aiRun(engine, prompt, opts) {
   if (engine === 'openai') return askOpenAiServer(prompt, opts);
   if (engine === 'openaiKey') return askOpenAI(prompt, opts);
+  if (engine === 'kimi') return askKimiServer(prompt, opts);
+  if (engine === 'kimiKey') return askKimiDirect(prompt, opts);
   return askGeminiDirect(prompt, opts);
 }
 
