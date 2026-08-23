@@ -105,7 +105,7 @@
   .fields { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
   .field { display: flex; flex-direction: column; gap: 6px; min-width: 210px; flex: 1; }
   .field label { font-size: 0.76rem; font-weight: 700; color: var(--ink-faint); }
-  select, input[type=text], textarea {
+  select, input[type=text], input[type=password], textarea {
     font-family: var(--font); font-size: 16px; color: var(--ink);
     background: var(--bg); border: 1px solid var(--line);
     border-radius: var(--radius-sm); padding: 11px 13px; width: 100%;
@@ -854,6 +854,40 @@
       <p class="sub" id="howGrounding" style="margin-top:6px"></p>
     </div>
 
+    <!-- ⚙️ The two engines. The LINE is for everybody, because an app quietly
+         running on its backup — or quietly running on one engine with no
+         backup at all — looks exactly like one that is fine, right up to the
+         morning the spending cap is hit. The KEY is the teacher's alone: it
+         is a secret, and a student's device has no business holding one.
+         Shown and hidden by applyAiVisibility, never by this markup alone. -->
+    <div class="card">
+      <h3>Which AI is answering</h3>
+      <p class="sub" id="howEngines" style="margin-top:6px"></p>
+      <div class="fields hidden" id="howEngineFields">
+        <div class="field">
+          <label for="openAiKey">ChatGPT key <span class="hint">(teacher only — this device)</span></label>
+          <input id="openAiKey" type="password" autocomplete="off" spellcheck="false"
+            placeholder="Paste a key to switch the backup on">
+        </div>
+        <div class="field">
+          <label for="openAiPrefer">Which to try first</label>
+          <select id="openAiPrefer">
+            <option value="gemini">Gemini, with ChatGPT behind it</option>
+            <option value="openai">ChatGPT, with Gemini behind it</option>
+          </select>
+        </div>
+      </div>
+      <div class="rowBtns hidden" id="howEngineBtns">
+        <button class="btn btnPrimary" id="saveKeyBtn" type="button">Save key</button>
+        <button class="btn" id="clearKeyBtn" type="button">Remove key</button>
+      </div>
+      <p class="hint hidden" id="howEngineHint" style="margin-top:12px">The key is kept in this browser and is
+        never uploaded, never put in a paper and never written to the repository — so it works on
+        <b>this device</b> and no other. It is the very same key your Maths, English, Chinese and Science
+        portals use, so entering it here switches the backup on in all five at once, and one already saved in
+        any of them is already in use here.</p>
+    </div>
+
     <div class="card">
       <h3>Settings</h3>
       <p class="sub" style="margin-top:6px">Set once and forgotten — the Snap tab stays out of your way.</p>
@@ -1159,7 +1193,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.11.0';
+var APP_VERSION = 'v1.12.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -3786,6 +3820,7 @@ function renderAnswers() {
   renderReport();
   renderVetAllBtn();
   renderGroundingLine();
+  renderEngineLine();
 }
 
 /* Said in full on the How tab, because an ungrounded answer looks exactly
@@ -3802,6 +3837,102 @@ function renderGroundingLine() {
         ? 'No teaching notes are being applied yet, so questions are answered and marked to the ordinary ' +
           'syllabus standard. Press ✍️ Add a note at the top and the very next answer follows it.'
         : 'No teaching notes are being applied, so questions are answered and marked to the ordinary syllabus standard.');
+}
+
+/* =====================================================================
+   ⚙️ WHICH AI IS ANSWERING
+   The engines themselves live in the module at the foot of this file; this
+   is the half that SAYS so. An app running on its backup looks exactly like
+   one running on its first choice, and an app with no backup at all looks
+   exactly like both — until the morning "[429] your billing account has
+   exceeded its monthly spending cap" comes back on every page of a paper,
+   with nothing on any screen having ever mentioned that there was one
+   engine and no other.
+   ===================================================================== */
+function engineName(e) { return e === 'openai' ? 'ChatGPT' : e === 'gemini' ? 'Gemini' : ''; }
+function aiEngineState() {
+  return (window.aiEngines && window.aiEngines()) ||
+    { gemini: false, openai: false, prefer: 'gemini', last: {} };
+}
+function renderEngineLine() {
+  var el = $('howEngines');
+  if (!el) return;
+  var st = aiEngineState();
+  if (!st.gemini && !st.openai) {
+    el.textContent = 'No AI is available at all — check your connection and reload the page.';
+    return;
+  }
+  var first = (st.prefer === 'openai' && st.openai) ? 'openai' : (st.gemini ? 'gemini' : 'openai');
+  var other = first === 'gemini' ? (st.openai ? 'openai' : '') : (st.gemini ? 'gemini' : '');
+  var bits = [other
+    ? engineName(first) + ' answers, and ' + engineName(other) + ' takes over the moment it will not — a ' +
+      'spending cap, a quota, a connection that drops. Nothing you do changes: the page simply keeps working.'
+    : engineName(first) + ' answers, and there is no backup on this device — if it refuses, a paper comes ' +
+      'back with nothing on it.'];
+  var last = st.last || {};
+  if (last.engine) {
+    bits.push(last.fellBack
+      ? 'The last answer came from ' + engineName(last.engine) + ', after the other one refused' +
+        (last.error ? ' (' + last.error + ')' : '') + '.'
+      : 'The last answer came from ' + engineName(last.engine) + '.');
+  } else if (last.error) {
+    bits.push('The last attempt failed on every engine: ' + last.error);
+  }
+  if (st.gemini && st.geminiDown) bits.push('Gemini refused a moment ago, so it is being skipped for a few minutes rather than paid for again on every page.');
+  if (st.openai && st.openaiDown) bits.push('ChatGPT refused a moment ago, so it is being skipped for a few minutes.');
+  el.textContent = bits.join(' ');
+}
+
+/* The key is a secret and the line is not, so only the field is hidden. It is
+   hidden and never CLEARED, exactly as the vetting setting is: this runs once
+   before the sign-in resolves and again after it, and clearing here would
+   empty the teacher's own box on every load. */
+function applyAiVisibility() {
+  var admin = isAdmin(currentUser);
+  ['howEngineFields', 'howEngineBtns', 'howEngineHint'].forEach(function (id) {
+    var el = $(id);
+    if (el) el.classList.toggle('hidden', !admin);
+  });
+  if (admin) {
+    var st = aiEngineState();
+    var k = $('openAiKey');
+    if (k && !k.value) k.placeholder = st.openai ? 'A key is saved on this device' : 'Paste a key to switch the backup on';
+    var p = $('openAiPrefer');
+    if (p) p.value = st.prefer === 'openai' ? 'openai' : 'gemini';
+  }
+  renderEngineLine();
+}
+
+function aiSaveKey() {
+  if (!isAdmin(currentUser)) return;
+  var k = $('openAiKey');
+  if (!k) return;
+  var val = String(k.value || '').trim();
+  if (!val) { toast('Paste a key first — or press Remove key to take the saved one off this device.', 5000); return; }
+  if (!window.aiSaveOpenAiKey || !window.aiSaveOpenAiKey(val)) {
+    toast('This browser would not store the key — private browsing usually refuses.', 6000);
+    return;
+  }
+  // Never left in the box: a key on screen is a key over somebody's shoulder.
+  k.value = '';
+  applyAiVisibility();
+  toast('Backup engine on. ChatGPT answers whenever Gemini cannot — on this device.', 5000);
+}
+function aiClearKey() {
+  if (!isAdmin(currentUser)) return;
+  if (!confirm('Remove the ChatGPT key from this browser?\n\nThe backup engine stops here — and in your Maths, English, Chinese and Science portals on this same device, because all five read the one key.')) return;
+  if (window.aiSaveOpenAiKey) window.aiSaveOpenAiKey('');
+  var k = $('openAiKey');
+  if (k) k.value = '';
+  applyAiVisibility();
+  toast('Key removed from this device.');
+}
+function aiSetPrefer() {
+  if (!isAdmin(currentUser)) return;
+  var p = $('openAiPrefer');
+  if (!p || !window.aiSetEnginePref) return;
+  window.aiSetEnginePref(p.value);
+  renderEngineLine();
 }
 
 function answersAsText() {
@@ -5452,6 +5583,7 @@ function renderAuth() {
   showTab(_tab);
   applyNotesVisibility();
   applyVetVisibility();
+  applyAiVisibility();
   renderMbBadge();
   if (!signedIn) mbClose();
   // The ✎ and the 📥 belong to the account, so the cards are repainted when it
@@ -5558,6 +5690,9 @@ $('scanAutoVet').addEventListener('change', function () {
 $('scanLevel').addEventListener('change', syncMeta);
 $('scanSubject').addEventListener('change', syncMeta);
 $('scanDetail').addEventListener('change', syncMeta);
+$('saveKeyBtn').addEventListener('click', aiSaveKey);
+$('clearKeyBtn').addEventListener('click', aiClearKey);
+$('openAiPrefer').addEventListener('change', aiSetPrefer);
 
 /* Two tabs. The camera bar belongs to the Snap tab alone — a shutter button
    sitting under the instructions is a button that does the wrong thing. */
@@ -5575,7 +5710,7 @@ function showTab(name) {
   // can see — and a camera left running under it is a recording light on
   // somebody's phone for a screen they are not even looking at.
   if (_tab !== 'snap') { micStop(); camClose(); }
-  if (_tab === 'how') renderGroundingLine();
+  if (_tab === 'how') { renderGroundingLine(); renderEngineLine(); }
 }
 $('tabSnap').addEventListener('click', function () { showTab('snap'); });
 $('tabHow').addEventListener('click', function () { showTab('how'); });
@@ -5784,17 +5919,229 @@ try {
   geminiModel = getGenerativeModel(getAI(app, { backend: new GoogleAIBackend() }), { model: AI_MODEL });
 } catch (e) { console.warn("Firebase AI init failed (AI disabled):", e); }
 
-window.aiReady = () => !!geminiModel;
+/* =====================================================================
+   ⚙️ TWO ENGINES, AND WHICHEVER ONE WILL ANSWER
+   ---------------------------------------------------------------------
+   Gemini is the engine and ChatGPT is the BACKUP. It exists because the way
+   this app dies is not a bug in it:
+   "[429] Your billing account has exceeded its monthly spending cap",
+   returned identically to every call, on every device, until the month turns
+   over — and a whole paper then comes back as a column of red cards. One
+   engine is one thing standing between the centre and a dead app.
+
+   • THE KEY IS NEVER IN THIS FILE. This is a public static site served to
+     every student's browser, so a key committed here is a key handed to the
+     whole school. It lives in the admin's own localStorage and nowhere else,
+     which also means: it helps on the DEVICE it was entered on. A student's
+     phone has no key and still meets the cap — there is no backend here to
+     hold one behind, and putting it in Firestore is the same as committing
+     it.
+   • …and it is the SAME localStorage the other portals already write.
+     `polymathlc.github.io/{math,english,chinese,cer,scan}` are sibling
+     folders on ONE origin, so `AI_ENGINE_STORE`'s four slot names are shared
+     with all four of them: a key pasted into the Science portal on this
+     device is already readable here, and one entered here fixes them too.
+     Renaming a slot to something tidier signs this app out of a key it can
+     plainly see, with nothing on screen to say why.
+   • THE FAILOVER GOES BOTH WAYS. The preferred engine is tried first and the
+     other answers when it refuses, so a ChatGPT key that has run out falls
+     back to Gemini exactly as a capped Gemini falls back to ChatGPT. A
+     PREFERENCE IS NOT AN ENGINE: choosing ChatGPT with no key saved leaves
+     Gemini leading, rather than an app that refuses every call.
+   • A REFUSAL IS REMEMBERED FOR `AI_DOWN_MS`, and that is what makes it
+     cheap. A spending cap does not lift between one batch and the next, so a
+     twelve-page paper would otherwise pay the same failed call four times
+     over and fall back four times over. The engine goes to the BACK of the
+     list, NEVER off it — a cap is lifted eventually and a network does come
+     back, and an app that refuses on a stale note is worse than one that
+     spends a call finding out.
+   • The FIRST error is the one that is thrown when both refuse. It is the
+     one that names the real problem; the second is usually "no key saved on
+     this device", which is a true sentence about the wrong thing.
+   • `window.askGemini` keeps its name and its shape. It is the ONE door
+     every call site in this app already goes through, so every one of them —
+     the scan run, the ask, the algebra rewrite, the report, the notes upload
+     — gained the backup at once and none of them had to be told.
+   ===================================================================== */
+
+const AI_ENGINE_STORE = {
+  engine: 'sq_ai_engine',
+  key: 'sq_openai_key',
+  model: 'sq_openai_model',
+  imageModel: 'sq_openai_image_model'
+};
+const OPENAI_DEFAULT_MODEL = 'gpt-5.6-sol';
+const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+// An over-large budget is a 400 rather than a long answer, so it is clamped.
+const OPENAI_MAX_OUTPUT = 32000;
+// How long an engine that refused is skipped over. Long enough that one
+// capped paper does not pay for the discovery on every batch; short enough
+// that a cap lifted, or a tunnel left, is found again inside one sitting.
+const AI_DOWN_MS = 10 * 60 * 1000;
+
+function _aiStore(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function openAiKey() { return String(_aiStore(AI_ENGINE_STORE.key) || '').trim(); }
+function openAiModel() { return _aiStore(AI_ENGINE_STORE.model) || OPENAI_DEFAULT_MODEL; }
+function openAiReady() { return !!openAiKey(); }
+function aiEnginePref() { return _aiStore(AI_ENGINE_STORE.engine) === 'openai' ? 'openai' : 'gemini'; }
+
+const _aiDown = { gemini: 0, openai: 0 };
+function _aiNow() { return Date.now(); }
+function aiEngineIsDown(e) { return (_aiDown[e] || 0) > _aiNow(); }
+function aiEngineDownFor(e) { return Math.max(0, (_aiDown[e] || 0) - _aiNow()); }
+function _aiMarkDown(e) { _aiDown[e] = _aiNow() + AI_DOWN_MS; }
+function _aiMarkUp(e) { _aiDown[e] = 0; }
+
+/* Which engines to try, best first. Only an engine that really EXISTS is
+   listed — a preference with no key behind it is not one — and one that
+   refused a moment ago is moved to the back rather than dropped. `sort` is
+   stable, so the preference order survives underneath. */
+function aiEngineOrder(haveGemini) {
+  const have = [];
+  if (haveGemini) have.push('gemini');
+  if (openAiReady()) have.push('openai');
+  if (aiEnginePref() === 'openai') have.reverse();
+  return have.sort(function (a, b) { return (aiEngineIsDown(a) ? 1 : 0) - (aiEngineIsDown(b) ? 1 : 0); });
+}
+
+/* The ChatGPT request. Ported from the Science portal's `askOpenAI` so the
+   two ask alike, plus the two things this app needs and that one does not:
+   a SYSTEM prompt (every call here carries one — it is where the grounding
+   goes) and IMAGES, which are the whole scan. */
+function _openAiBody(prompt, opts, model) {
+  opts = opts || {};
+  const content = [{ type: 'text', text: String(prompt == null ? '' : prompt) }];
+  (opts.images || []).forEach(function (img) {
+    if (img && img.data) {
+      content.push({
+        type: 'image_url',
+        image_url: { url: 'data:' + (img.mimeType || 'image/jpeg') + ';base64,' + img.data, detail: 'high' }
+      });
+    }
+  });
+  const messages = [];
+  const system = String(opts.system || '');
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push({ role: 'user', content: content });
+  const body = {
+    model: model,
+    messages: messages,
+    max_completion_tokens: Math.max(1024, Math.min(opts.maxOutputTokens || 512, OPENAI_MAX_OUTPUT))
+  };
+  if (opts.json) {
+    body.response_format = { type: 'json_object' };
+    // Strict JSON mode is REFUSED unless the word appears in the messages.
+    // Every prompt here already asks for JSON in as many words, so this is
+    // the belt on a call that would otherwise 400 rather than answer.
+    if (!/json/i.test(prompt + ' ' + system)) messages[messages.length - 1].content.push({ type: 'text', text: 'Reply with JSON only.' });
+  }
+  // A gpt-5 model runs only at its own default temperature; sending one is a
+  // 400. `thinkingLevel` is deliberately not translated either — an argument
+  // a model does not know is a failed call, not a worse answer.
+  if (opts.temperature !== undefined && !/^gpt-5/.test(model)) body.temperature = opts.temperature;
+  return body;
+}
+
+function _openAiText(data) {
+  const text = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (typeof text !== 'string' || !text.trim()) throw new Error('ChatGPT returned an unexpected response shape.');
+  return text.trim();
+}
+
+async function askOpenAI(prompt, opts) {
+  const key = openAiKey();
+  if (!key) throw new Error('No ChatGPT key is saved on this device');
+  const res = await fetch(OPENAI_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify(_openAiBody(prompt, opts, openAiModel()))
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { const ej = await res.json(); detail = ej && ej.error ? ej.error.message : ''; } catch (e) { /* non-JSON error body */ }
+    throw new Error('ChatGPT API error ' + res.status + (detail ? ': ' + detail : ''));
+  }
+  return _openAiText(await res.json());
+}
+
+/* The failover itself. `run` is passed in rather than reached for, so the
+   loop can be run against stubs in the harness — every way it goes wrong is
+   silent in the app: an engine that stops being tried, a "down" note that
+   never clears, or the wrong error reported for a paper that failed twice. */
+async function aiAskWith(prompt, opts, order, run) {
+  if (!order.length) throw new Error('AI is not configured yet');
+  let first = null;
+  for (let i = 0; i < order.length; i++) {
+    const engine = order[i];
+    try {
+      const out = await run(engine, prompt, opts);
+      _aiMarkUp(engine);
+      window.aiLastCall = { engine: engine, fellBack: i > 0, error: first ? String(first.message || first) : '' };
+      return out;
+    } catch (e) {
+      _aiMarkDown(engine);
+      if (!first) first = e;
+      console.warn('AI engine ' + engine + ' refused:', e);
+    }
+  }
+  window.aiLastCall = { engine: '', fellBack: false, error: String((first && first.message) || first || '') };
+  throw first;
+}
+/* ===== end of the two-engine block ===== */
+
+// Ready when EITHER engine can answer — a capped Gemini with a key saved is
+// a working app, and the call sites all ask this one question.
+window.aiReady = () => !!geminiModel || openAiReady();
+
+/* What the How tab prints. An app quietly running on its backup, or quietly
+   running on one engine with no backup at all, looks identical to one that
+   is fine — right up to the morning the cap is hit. */
+window.aiEngines = function () {
+  return {
+    gemini: !!geminiModel,
+    openai: openAiReady(),
+    prefer: aiEnginePref(),
+    model: openAiModel(),
+    geminiDown: aiEngineIsDown('gemini'),
+    openaiDown: aiEngineIsDown('openai'),
+    last: window.aiLastCall
+  };
+};
+
+/* Saving the key writes the SHARED slots, so it is entered once for all five
+   apps on this device. An empty key CLEARS them rather than storing "" — a
+   blank key that still says ChatGPT is preferred is an app that tries an
+   engine it does not have on every single call. */
+window.aiSetEnginePref = function (v) {
+  try { localStorage.setItem(AI_ENGINE_STORE.engine, v === 'openai' ? 'openai' : 'gemini'); } catch (e) { return false; }
+  return true;
+};
+
+window.aiSaveOpenAiKey = function (key, model) {
+  key = String(key == null ? '' : key).trim();
+  try {
+    if (key) {
+      localStorage.setItem(AI_ENGINE_STORE.key, key);
+      if (model) localStorage.setItem(AI_ENGINE_STORE.model, String(model).trim());
+    } else {
+      localStorage.removeItem(AI_ENGINE_STORE.key);
+    }
+  } catch (e) { return false; }
+  _aiMarkUp('openai');
+  return true;
+};
 
 // json: true switches on strict-JSON response mode. system adds a
 // systemInstruction. images is a list of { mimeType, data } inline
 // attachments (base64 WITHOUT the data: prefix), sent after the prompt —
-// the vision path the whole scan runs on.
-window.aiLastCall = { engine: "gemini", fellBack: false, error: "" };
-window.askGemini = async function askGemini(prompt, opts = {}) {
-  window.aiLastCall = { engine: "gemini", fellBack: false, error: "" };
-  return askGeminiDirect(prompt, opts);
+// the vision path the whole scan runs on. Both engines take all four.
+window.aiLastCall = { engine: "", fellBack: false, error: "" };
+window.askGemini = function askGemini(prompt, opts = {}) {
+  return aiAskWith(prompt, opts, aiEngineOrder(!!geminiModel), _aiRun);
 };
+function _aiRun(engine, prompt, opts) {
+  return engine === 'openai' ? askOpenAI(prompt, opts) : askGeminiDirect(prompt, opts);
+}
 
 // An over-large budget is a 400 rather than a long answer, so it is clamped
 // rather than failing the page outright.
@@ -5828,6 +6175,10 @@ async function askGeminiDirect(prompt, { maxOutputTokens = 512, temperature = 0.
     return run(AI_THINK_MIN);
   }
 }
+/* This module is deferred, so the classic script above has already painted
+   the How tab's engine line — before either engine existed, and therefore
+   saying there is none. Repaint it now that they do. */
+try { if (window.applyAiVisibility) window.applyAiVisibility(); } catch (e) { /* the tab is simply not built yet */ }
 </script>
 </body>
 </html>

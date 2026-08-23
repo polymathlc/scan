@@ -500,6 +500,66 @@ step, and ship a change to the shape in both repos together**:
   says so, the email cannot be queued and says so.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## ⚙️ Two engines, and whichever one will answer (v1.12.0)
+- **The way this app dies is not a bug in it.** Every card on every page came back
+  `AI: Error … [429] Your billing account has exceeded its monthly spending cap` — the same
+  answer to every call, on every device, until the month turns over. One engine is one thing
+  standing between the centre and a dead app, so **Gemini is the engine and ChatGPT
+  (`OPENAI_DEFAULT_MODEL`, `gpt-5.6-sol`) is the BACKUP**.
+- **`window.askGemini` keeps its name and its shape, and that is the whole reason this was one
+  change rather than seven.** It is the ONE door every call site already goes through — the scan
+  run, the ask-alone call, the algebra rewrite, the report, the notes upload — so all of them
+  gained the backup at once and not one of them had to be told. `aiAskWith(prompt, opts, order,
+  run)` is the failover loop and `_aiRun` is the dispatcher; a second route past them is a call
+  that still dies on the cap with nothing on screen saying why.
+- **THE KEY IS NEVER IN THIS FILE.** This is a public static site served to every student's
+  browser, so a key committed here is a key handed to the whole school — the harness fails on an
+  `sk-`-shaped string anywhere in `index.html`. It lives in the admin's own `localStorage`, which
+  also means the honest limit: **the backup works on the DEVICE the key was entered on.** A
+  student's phone has no key and still meets the cap. There is no backend here to hold one behind,
+  and putting it in Firestore is the same as committing it.
+- **`AI_ENGINE_STORE` is the SHARED slot table** — `sq_ai_engine` / `sq_openai_key` /
+  `sq_openai_model` / `sq_openai_image_model`, the very names `polymathlc/cer`, `math`, `english`
+  and `chinese` already use. All five apps are sibling folders on ONE GitHub Pages origin, so they
+  share a `localStorage`: a key pasted into the Science portal on this device is **already**
+  readable here, and one entered here switches the backup on in all five. Renaming a slot to
+  something tidier signs this app out of a key it can plainly see, with nothing anywhere to say so.
+- **THE FAILOVER GOES BOTH WAYS.** The preferred engine is tried first and the other answers when
+  it refuses, so a ChatGPT key that has run out falls back to Gemini exactly as a capped Gemini
+  falls back to ChatGPT. **A PREFERENCE IS NOT AN ENGINE**: `aiEngineOrder` lists only an engine
+  that really exists, so choosing ChatGPT with no key saved leaves Gemini answering rather than an
+  app that refuses every call.
+- **A refusal is remembered for `AI_DOWN_MS` (10 min), and that is what makes it cheap.** A
+  spending cap does not lift between one batch and the next, so a twelve-page paper would otherwise
+  pay the same failed call four times over and fall back four times over. The engine goes to the
+  **BACK** of the list and **never off it** — a cap is lifted eventually and a network does come
+  back, and an app that refuses on a stale note is worse than one that spends a call finding out.
+  A success clears the mark.
+- **When both refuse, the FIRST error is the one thrown.** It names the real problem; the second is
+  usually "no key saved on this device", which is a true sentence about the wrong thing.
+- **`_openAiBody` is where the two engines are made to ask the same question**, and it carries the
+  two things the Science portal's own `askOpenAI` does not need: a **system** prompt (every call
+  here has one — it is where `aiGrounding` goes) and **images**, which are the entire scan. A body
+  that quietly dropped the pages would come back fluent and about nothing at all. Three shapes are
+  load-bearing and each is a 400 rather than a worse answer: no `temperature` to a `gpt-5` model,
+  `max_completion_tokens` floored at 1024 and capped, and the word *JSON* somewhere in the messages
+  whenever `response_format` is asked for. **`thinkingLevel` is deliberately NOT translated** — an
+  argument a model does not know is a failed call, and the scan's `'high'` has no honest equivalent
+  to guess at.
+- **`aiReady()` is true when EITHER engine can answer**, or a capped project with a key saved would
+  still show "AI is not available" on every button.
+- **The page SAYS which engine answered** (`renderEngineLine`, on the How tab). An app quietly
+  running on its backup — or quietly running on one engine with no backup at all — looks exactly
+  like one that is fine, right up to the morning the cap is hit. The **line** is for everybody; the
+  **key field** is the teacher's alone (`applyAiVisibility`, plus a second check inside `aiSaveKey`
+  / `aiClearKey`, because hiding a field is not a lock), and it is hidden and never CLEARED — the
+  same rule the vetting setting carries, since this runs once before sign-in resolves and again
+  after it.
+- **The module is deferred, so it repaints the line when it loads.** The classic script paints it
+  before either engine exists, and would otherwise leave "No AI is available at all" on a page
+  where there plainly is.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -580,6 +640,10 @@ step, and ship a change to the shape in both repos together**:
   `itemTarget`, `_vetGroupBySubject`,
   `REPORT_SYS`, `REPORT_CREDIT`, `_reportMarkStr`, `reportScore`, `reportEligible`,
   `_reportPrompt`, `_reportNew`, `_reportRefs`, `reportAsText`, `runReport`,
+  `AI_ENGINE_STORE`, `OPENAI_DEFAULT_MODEL`, `AI_DOWN_MS`, `openAiKey`, `openAiModel`,
+  `openAiReady`, `aiEnginePref`, `aiEngineOrder`, `aiEngineIsDown`, `_openAiBody`, `_openAiText`,
+  `askOpenAI`, `aiAskWith`, `_aiRun`, `renderEngineLine`, `applyAiVisibility`, `aiSaveKey`,
+  `aiClearKey`, `aiSetPrefer`,
   `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
   `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`,
   `_mbShotForPage`, `mbIsWrong`, `mbIsRight`, `mbKeyOf`, `mbFindByKey`, `MB_CLEAR_WINS`,
@@ -624,6 +688,17 @@ step, and ship a change to the shape in both repos together**:
   row" into "twice ever" and empties the book of questions the child still cannot do, and a matcher
   that guesses between two similar questions deletes the wrong one — both on a screen that looks
   exactly like the feature working.
+- After touching **the two engines** (`AI_ENGINE_STORE`, `OPENAI_DEFAULT_MODEL`, `aiEngineOrder`,
+  `aiAskWith`, `_aiRun`, `_openAiBody`, `_openAiText`, `askOpenAI`, `AI_DOWN_MS`, `window.aiReady`,
+  `window.askGemini`), run **`node tools/scan-tests.mjs`**. Every failure here is silent and the
+  app looks exactly as it did the morning the spending cap was hit. A slot name that drifts from
+  the other four portals signs this app out of a key it can plainly see and reports it as "no
+  backup on this device". A preference with no key behind it refuses every call. A "down" note
+  that never clears makes the backup permanent, and one that takes an engine OFF the list instead
+  of to the back leaves the app dead once the cap has been lifted. The second error reported
+  instead of the first tells the teacher "no ChatGPT key is saved" about a paper that actually hit
+  a billing cap. And a body that drops the images, or sends a `temperature` to a gpt-5 model, is a
+  400 — not a worse answer, no answer at all.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.
