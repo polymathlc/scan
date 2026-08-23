@@ -457,6 +457,47 @@ step, and ship a change to the shape in both repos together**:
   running over the page keeps a rectangle of the wrong sheet.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 🧩 Reproducing the question — the Learning Portal's Rapid add, ported (v1.18.0)
+
+`MB_BUILD_SYS` / `_mbCleanBlocks` / `_mbBuildShots` / `_mbBuildBlocks` / `_mbBuildFigures` /
+`_mbBuildFor` / `MB_BUILD_MAX` (search `REPRODUCING THE QUESTION`), and the `blocks` array on the
+mistake and on the `scanPapers` item. The other half is `mistakes.html` in `polymathlc/cer`.
+
+A crop of the photograph is the question as it really was and it is unbeatable for LAYOUT — but it
+is a photograph: grey, skewed, and carrying whatever was on the desk. The Science portal's ⚡ Rapid
+add does something better, and this is a port of it: the printed question is read into **ordered
+blocks** — the wording as text, with an `image` block wherever a figure belongs, each figure cut
+from the page by its own rectangle — so the question comes back **typeset**, with the paper's own
+diagrams still in it.
+
+- **IT IS ITS OWN CALL, and that is deliberate.** The scan run is already doing two hard things at
+  once (marking what is written, answering what is not) on a prompt tuned for both, and bolting a
+  block specification onto `SCAN_SYS` would buy a better worksheet at the price of worse marking.
+  This runs afterwards, on the handful of questions actually being FILED — two or three out of
+  twenty on an ordinary paper.
+- **THREE TIERS, BEST FIRST, and nothing above may cost anything below it**: the blocks, then the
+  whole-question crop, then the flat transcription. `_mbBuildFor` swallows every failure and
+  returns `[]`, so a rebuild that did not work files the entry exactly as it would have been filed
+  before this existed. That is the same shape as the answer key's three sources.
+- **THE RATION IS PER RUN**, like the algebra rewrite's: `MB_BUILD_MAX` (10), spent **before** the
+  call so a failure cannot buy another try, and refilled **once** in `mbFileRun` and nowhere else.
+  A paper where every question is wrong must not quietly spend twenty vision calls.
+- **A build with no WORDING is refused outright** (`_mbCleanBlocks` returns `[]` unless at least one
+  text block survives). A question made of pictures with nothing asking anything is worse than the
+  tiers under it — and validating on ARRIVAL rather than at render is what stops a block that
+  cannot draw being found out on the printed page.
+- **INCLUDE THE SHARED STEM.** Scan files a lettered part as its own item, so a part torn away from
+  the stem it depends on cannot be answered at all: the prompt asks for question 13's wording and
+  figure first, then 13(a)'s own.
+- **LEAVE THE MCQ OPTIONS OUT.** They are already held on the mistake and the worksheet prints them
+  under the blocks; inside the wording as well they would be the choices offered twice.
+- **A figure that will not crop or upload is DROPPED from the blocks**, never left as an empty
+  frame — the wording around it still reads, which is exactly what the whole-question crop cannot
+  fall back on.
+- **`page` says which attached picture a rectangle was drawn on**, so a question stitched over a
+  page break crops from the right sheet — the same rule `boxPage` carries for the crop.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## ✓✓ …and takes itself out again (v1.11.0)
 - **A book that only fills is a list of everything a student has ever got wrong**, which is a list
   nobody opens. What empties it is the thing the whole feature is for: doing the question again and
@@ -763,7 +804,8 @@ third company, a third account and a third cap.
   `kimiSave`, `kimiClear`, `kimiLoadModels`,
   `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
   `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`, `_mbCropFor`,
-  `MB_QCROP_MAX_SIDE`,
+  `MB_QCROP_MAX_SIDE`, `MB_BUILD_MAX`, `MB_BUILD_SYS`, `_mbCleanBlocks`, `_mbBuildShots`,
+  `_mbBuildBlocks`, `_mbBuildFigures`, `_mbBuildFor`,
   `_mbShotForPage`, `mbIsWrong`, `mbIsRight`, `mbKeyOf`, `mbFindByKey`, `MB_CLEAR_WINS`,
   `MB_KEY_PREFIX`, `mbNoteWin`, `mbNoteMiss`, `_mbRunNews`, `mbRunToast`, `mbCardChipHtml`,
   `mbSaveOne`, `mbFileRun`, `_mbPaperDoc`,
@@ -803,7 +845,11 @@ third company, a third account and a third cap.
   that is not really round a question keeps somebody else's question and looks like a working crop,
   a `shot` flag that goes missing prints the question twice or prints a diagram with nothing asking
   anything, and the whole-page test applied to a question box throws away every big open-ended
-  question there is —
+  question there is. The REPRODUCTION is in there for the same reason from the other end: a rebuild
+  that stops swallowing its failures costs the mistake the app was filing, a budget that is spent
+  after the call rather than before it lets one stubborn paper buy call after call, a build kept
+  with no wording in it is a question made of pictures asking nothing, and blocks accepted without
+  the shared stem hand a child a lettered part torn away from the question it depends on —
   and an email announced as sent by a queue that refused the write is a worksheet nobody ever
   receives. The clearing is the other half of that: a streak that stops resetting turns "twice in a
   row" into "twice ever" and empties the book of questions the child still cannot do, and a matcher

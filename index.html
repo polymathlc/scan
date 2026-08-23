@@ -1223,7 +1223,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.17.0';
+var APP_VERSION = 'v1.18.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -4780,6 +4780,163 @@ async function _mbUpload(dataUrl, id) {
   return await ref.getDownloadURL();
 }
 
+/* =====================================================================
+   🧩 REPRODUCING THE QUESTION — the Learning Portal's Rapid add, ported
+   ---------------------------------------------------------------------
+   A crop of the photograph is the question as it really was, and it is
+   unbeatable for layout — but it is a photograph: grey, skewed, and carrying
+   whatever was on the desk. The Science portal's Rapid add does something
+   better and this is a port of it: the question is read into ORDERED BLOCKS
+   — the wording typeset as text, with an "image" block wherever a figure
+   belongs, each figure cut from the page by its own rectangle. What comes out
+   is the question set cleanly, with the paper's own diagrams still in it.
+
+   IT IS ITS OWN CALL, and that is deliberate. The scan run is already doing
+   two hard things at once (marking what is written, answering what is not) on
+   a prompt that has been tuned for both, and bolting a block specification
+   onto it would buy a better worksheet at the price of worse marking. This
+   runs afterwards, on the handful of questions actually being FILED — two or
+   three out of twenty on an ordinary paper — and asks one thing.
+
+   IT CAN NEVER COST THE MISTAKE. Every failure returns an empty list and the
+   entry is filed exactly as it was before this existed: the whole-question
+   crop, and behind that the transcription. Three tiers, best first, the same
+   shape as the answer key's three sources.
+
+   THE RATION IS PER RUN, like the algebra rewrite's. A paper where every
+   question is wrong must not quietly spend twenty vision calls. */
+var MB_BUILD_MAX = 10;          // questions rebuilt per run
+var MB_FIG_MAX = 4;             // figures kept from one question
+var MB_BLOCK_MAX = 16;          // blocks kept from one question
+var MB_BLOCK_CHARS = 900;       // one text block
+var _mbBuildBudget = MB_BUILD_MAX;
+
+var MB_BUILD_SYS =
+  'You are reproducing ONE question from the attached photograph of a school worksheet or exam paper, so that a ' +
+  'student can be given it again to try. You are NOT answering it, NOT marking it and NOT rewording it: your ' +
+  'whole job is to set out what is PRINTED, exactly as printed.\n' +
+  'Reply with STRICT JSON only, no markdown, exactly this shape: {"blocks":[{"type":"text","text":"…"},' +
+  '{"type":"image","page":1,"box_2d":[ymin,xmin,ymax,xmax]}]}\n' +
+  'Rules:\n' +
+  '- List the blocks in the SAME order they appear on the page, so the question reads top to bottom.\n' +
+  '- INCLUDE THE SHARED STEM. If this question is a lettered part — 13(a) — the wording that introduces the whole ' +
+  'of question 13, and any figure belonging to it, comes FIRST, then this part\'s own wording. A part torn away ' +
+  'from the stem it depends on cannot be answered at all.\n' +
+  '- Include ONLY this question and its own stem. Nothing from the question before it or the one after it.\n' +
+  '- "text" is the printed wording as plain text. Do not correct it, do not shorten it, do not explain it, and ' +
+  'never write in an answer. Keep the part marker — "(a)" — at the start of the part\'s own text block, and keep ' +
+  'a printed mark allocation such as "[2]" where it is printed.\n' +
+  '- LEAVE OUT the multiple-choice answer options: they are already held separately and are printed under your ' +
+  'blocks. Leave out the question number printed in the margin, the page header and footer, and anything the ' +
+  'student has written by hand.\n' +
+  '- If a text block lists labelled statements (e.g. "A: …", "B: …"), put EACH on its own line, separated with a ' +
+  'real line break.\n' +
+  '- An "image" block is ONE diagram, picture, graph, figure, experimental set-up, map, number line or printed ' +
+  'data table. Put it exactly where it belongs among the text. Give "box_2d" as [ymin, xmin, ymax, xmax], four ' +
+  'integers from 0 to 1000 measured on the WHOLE attached page: 0,0 is that page\'s top-left corner and ' +
+  '1000,1000 its bottom-right. Draw the rectangle round the figure and its own labels and caption, and leave the ' +
+  'question\'s wording and any neighbouring question OUT of it.\n' +
+  '- "page" is which attached picture the figure is on, 1 for the first attached picture.\n' +
+  '- OMIT the image block entirely for a question that is only words, and for a figure you cannot locate: a ' +
+  'wrong rectangle keeps somebody else\'s picture and looks exactly like a working one.\n' +
+  '- Never invent a block. If the question is one sentence, one text block is the whole correct answer.';
+
+/* Validate on arrival, never at render: a block that would not draw is one
+   the worksheet cannot show, and finding that out on the printed page is too
+   late. A build with no WORDING at all is refused outright — the fallbacks
+   below it are better than a question made of pictures with nothing asking
+   anything. */
+function _mbCleanBlocks(raw) {
+  var arr = (raw && Array.isArray(raw.blocks)) ? raw.blocks : (Array.isArray(raw) ? raw : []);
+  var out = [], figs = 0, words = 0;
+  for (var i = 0; i < arr.length && out.length < MB_BLOCK_MAX; i++) {
+    var b = arr[i];
+    if (!b || typeof b !== 'object') continue;
+    if (b.type === 'image') {
+      if (figs >= MB_FIG_MAX) continue;
+      if (!_mbBoxOk(b.box_2d)) continue;              // a figure box, so the whole-page test applies
+      var pg = parseInt(b.page, 10);
+      out.push({ type: 'image', page: (pg >= 1 ? pg : 1), box: b.box_2d.map(Number), url: '' });
+      figs++;
+    } else {
+      var txt = _ansTrim(b.text, MB_BLOCK_CHARS);     // keeps the line breaks a statement list needs
+      if (!txt) continue;
+      out.push({ type: 'text', text: txt });
+      words++;
+    }
+  }
+  return words ? out : [];
+}
+
+/* The pictures this question is printed on. A question stitched over a page
+   break is measured on the page its rectangle was drawn on, so both go up and
+   the block's own `page` says which it meant. */
+function _mbBuildShots(it) {
+  var pages = [it.page];
+  if (it.endPage && it.endPage !== it.page) pages.push(it.endPage);
+  var out = [];
+  for (var i = 0; i < pages.length; i++) {
+    var s = _mbShotForPage(pages[i]);
+    if (s && s.data) out.push({ shot: s, mimeType: s.mimeType || 'image/jpeg', data: s.data });
+  }
+  return out;
+}
+
+async function _mbBuildBlocks(it) {
+  if (_mbBuildBudget <= 0) return [];
+  if (!window.askGemini || !window.aiReady || !window.aiReady()) return [];
+  var shots = _mbBuildShots(it);
+  if (!shots.length) return [];
+  _mbBuildBudget--;                                   // spent BEFORE the call, so a failure cannot buy another
+  var ask = 'Reproduce question "' + _scanStr(it.number, 16) + '" from the attached ' +
+    (shots.length > 1 ? 'pictures' : 'picture') + '. For reference, the wording read off it was:\n' +
+    _scanStr(it.question, 1200);
+  try {
+    var raw = await window.askGemini(ask, {
+      system: MB_BUILD_SYS,
+      images: shots.map(function (s) { return { mimeType: s.mimeType, data: s.data }; }),
+      json: true,
+      maxOutputTokens: 2600,
+      thinkingLevel: 'low'
+    });
+    return _mbCleanBlocks(_parseAIJson(raw));
+  } catch (e) {
+    console.warn('question rebuild failed', e);
+    return [];
+  }
+}
+
+/* Each figure is cut from ITS OWN page and uploaded beside the question. A
+   figure that will not crop or will not upload is DROPPED from the blocks
+   rather than left as an empty frame — the wording around it still reads. */
+async function _mbBuildFigures(blocks, it, id) {
+  var shots = _mbBuildShots(it);
+  var out = [];
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i];
+    if (b.type !== 'image') { out.push(b); continue; }
+    try {
+      var s = shots[(b.page || 1) - 1] || shots[0];
+      if (!s || !s.shot || !s.shot.url) continue;
+      var crop = await _mbCropBox(s.shot.url, b.box);
+      if (!crop) continue;
+      var url = await _mbUpload(crop, id + '_f' + out.length);
+      if (url) out.push({ type: 'image', url: url });
+    } catch (e) { console.warn('question figure failed', e); }
+  }
+  return out;
+}
+
+/* The whole pass, and it swallows everything: a rebuild that did not work
+   must leave the entry exactly as it would have been filed without it. */
+async function _mbBuildFor(it, id) {
+  try {
+    var blocks = await _mbBuildBlocks(it);
+    if (!blocks.length) return [];
+    return await _mbBuildFigures(blocks, it, id);
+  } catch (e) { console.warn('question rebuild failed', e); return []; }
+}
+
 /* ---- Filing one ----
    The document is written LAST and the picture is only ever an extra on it: a
    Storage bucket that is not there, or rules that refuse the write, must cost
@@ -4790,6 +4947,9 @@ async function mbSaveOne(it) {
   if (!key || mbHasKey(key)) return null;
   var id = 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   var img = '', imgNote = '', shot = '';
+  // The reproduction first, because it is what the worksheet shows when it
+  // works; the crop below stays as the fallback under it.
+  var blocks = await _mbBuildFor(it, id);
   var crop = await _mbCropFor(it);
   if (crop && crop.url) {
     try { img = await _mbUpload(crop.url, id); shot = crop.kind; }
@@ -4819,6 +4979,10 @@ async function mbSaveOne(it) {
     marks: String(it.marks || ''),
     feedback: _scanStr(it.feedback, 1200),
     img: img,
+    // The question set out as it is printed — text with each figure cropped
+    // and placed where it belongs. Empty when the rebuild did not work, and
+    // then the crop below is what the worksheet shows.
+    blocks: blocks,
     // 'question' — the picture IS the question, wording and all — or 'figure',
     // which is a diagram belonging to wording printed beside it. The worksheet
     // lays the two out completely differently, so it can never be guessed.
@@ -4900,6 +5064,7 @@ async function mbNoteMiss(entry) {
 async function mbFileRun(run) {
   if (!mbAvailable()) return 0;
   await mbLoad(false);
+  _mbBuildBudget = MB_BUILD_MAX;      // refilled ONCE per run, and nowhere else
   _mbRunNews = {};
   var added = 0, failed = 0, cleared = 0, closer = 0;
   var seen = {};
@@ -4995,6 +5160,9 @@ async function mbCardChipClick(key) {
   if (e) { await mbRemove(e.id); return; }
   var it = _answers.filter(function (a) { return mbKeyOf(a) === key; })[0];
   if (!it) return;
+  // One question added by hand is ONE question, so it is always worth a
+  // rebuild — a run earlier in the sitting must not have spent its chance.
+  if (_mbBuildBudget < 1) _mbBuildBudget = 1;
   try {
     if (await mbSaveOne(it)) { renderMbBadge(); renderAnswers(); toast('📕 Added.'); }
   } catch (err) { console.warn(err); toast('That could not be saved — try again.', 4000); }
@@ -5193,6 +5361,7 @@ function _mbPaperDoc(items) {
         studentAnswer: m.studentAnswer || '',
         verdict: m.verdict || '',
         feedback: m.feedback || '',
+        blocks: m.blocks || [],  // the question reproduced, best first
         img: m.img || '',        // the crop as photographed
         shot: m.shot || 'figure',// 'question' (the whole thing) or just its figure
         cleanImg: ''             // filled in by the viewer, once, when it cleans it
