@@ -123,6 +123,7 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     mbIsWrong, mbIsRight, mbFindByKey, MB_CLEAR_WINS, MB_KEY_PREFIX,
     mbKeyOf, mbHasKey, _mbBoxOk, _mbShotForPage, _mbPaperUrl, _mbPaperTitle,
     _mbPaperDoc, _mbMailDoc, camAvailable,
+    _mbSubjectsOf, _mbOnly, _mbOrderBySubject, itemSubjectRead,
     set mistakes(v) { _mistakes = v; },
     set shots(v) { _shots = v; },
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
@@ -1003,6 +1004,58 @@ ok('the title names the paper rather than being blank',
    /P5 Science/.test(api._mbPaperTitle(picked)));
 ok('a paper with no subject or level still gets a title',
    api._mbPaperTitle([mk(1, { subject: '', level: '' })].map(m => m)).length > 0);
+
+/* ---------- The sheet may not claim a subject it is not ----------
+   A worksheet headed "P6 Science corrections" over a page of maths is the
+   report this came from, and it is silent: the sheet prints, it looks right,
+   and the child is told they are bad at the wrong subject. */
+const mixed = [mk(1, { subject: 'science' }), mk(2, { subject: 'math' }), mk(3, { subject: 'math' })];
+ok('a mixed paper claims NO subject rather than the first one it saw',
+   !/Science|Mathematics/.test(api._mbPaperTitle(mixed)) && /P5/.test(api._mbPaperTitle(mixed)));
+ok('a paper that really is one subject still says so',
+   /Mathematics/.test(api._mbPaperTitle([mk(1, { subject: 'math' }), mk(2, { subject: 'math' })])));
+ok('a level only two of three questions share is not claimed either',
+   !/P5|P6/.test(api._mbPaperTitle([mk(1, { level: 'P5' }), mk(2, { level: 'P6' })])));
+ok('the subjects the sheet holds are listed in the order SUBJECTS declares them',
+   JSON.stringify(api._mbSubjectsOf(mixed)) === JSON.stringify(['science', 'math']));
+ok('a subject the app does not teach never reaches the heading',
+   api._mbSubjectsOf([mk(1, { subject: 'geography' })]).length === 0);
+
+/* The viewer heads each run of questions, so the runs have to BE runs. */
+const mdoc = api._mbPaperDoc(mixed);
+ok('the paper is written subject by subject',
+   mdoc.items.map(i => i.subject).join(',') === 'science,math,math');
+ok('…and numbered after they are ordered, so 1–2 really are the maths ones',
+   mdoc.items.map(i => i.n).join(',') === '1,2,3');
+ok('a question whose subject was never read keeps its place at the end',
+   api._mbOrderBySubject([mk(1, { subject: '' }), mk(2, { subject: 'math' })])
+     .map(m => m.subject).join(',') === 'math,');
+/* The document carries no summary of its own subjects on purpose: the viewer
+   reads them off the items, which is the only copy that cannot disagree with
+   the questions printed under it — and it must read them that way regardless,
+   for every paper written before any of this existed. */
+ok('the paper keeps ONE account of what it holds, on the items',
+   mdoc.subjects === undefined && mdoc.items.every(i => 'subject' in i));
+
+/* WHAT a question is, and WHERE it goes, are different questions. The picker
+   is remembered in localStorage from whenever it was last touched, so it is
+   not evidence about the paper being scanned today — and a mistake filed
+   under it is mislabelled for as long as it is kept. */
+api.meta = { level: 'P6', subject: 'science' };
+ok('a maths question is LABELLED maths even with the picker left on Science',
+   api.itemSubjectRead({ subject: 'math' }) === 'math');
+ok('…while the teacher’s picker still decides where it is FILED',
+   api.itemSubject({ subject: 'math' }) === 'science');
+ok('the picker is the fallback when the question could not be read',
+   api.itemSubjectRead({ subject: '' }) === 'science');
+api.meta = { level: 'P6', subject: '' };
+ok('with no picker at all, both answer the question’s own reading',
+   api.itemSubjectRead({ subject: 'chinese' }) === 'chinese' &&
+   api.itemSubject({ subject: 'chinese' }) === 'chinese');
+ok('and neither invents one', api.itemSubjectRead({ subject: '' }) === '');
+ok('the mistake book files what the QUESTION is, never the picker alone',
+   /subject: itemSubjectRead\(it\),/.test(html) && !/subject: wsMeta\.subject \|\| '',/.test(html));
+api.meta = { level: 'P5', subject: 'science' };   // as the rest of this file found it
 
 /* The link. It has to be absolute to survive an email, and relative in the
    source or it stops working the day the centre moves to its own domain. */

@@ -1201,7 +1201,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.15.0';
+var APP_VERSION = 'v1.16.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -4654,7 +4654,11 @@ async function mbSaveOne(it) {
   var doc = {
     key: key,
     at: new Date().toISOString(),
-    subject: wsMeta.subject || '',
+    /* The question's OWN subject, never the picker on its own — see
+       `itemSubjectRead`. A maths question filed as Science comes back weeks
+       later on a worksheet headed "P6 Science corrections", which is how this
+       was found. */
+    subject: itemSubjectRead(it),
     level: wsMeta.level || '',
     number: String(it.number || ''),
     question: _scanStr(it.question, 1400),
@@ -5000,12 +5004,49 @@ function _mbPaperUrl(id) {
   try { return new URL(MB_VIEWER_PATH + '?p=' + encodeURIComponent(id), location.href).href; }
   catch (e) { return MB_VIEWER_PATH + '?p=' + encodeURIComponent(id); }
 }
+/* The distinct values a field takes across the paper, in the order SUBJECTS
+   declares them so two papers of the same questions are never headed
+   differently. `_mbOnly` is what stops the sheet CLAIMING something only some
+   of it is: a mixed paper is headed by no subject at all and says which is
+   which question by question, which is honest where "P6 Science corrections"
+   over a maths question is not. */
+function _mbSubjectsOf(items) {
+  var seen = {};
+  (items || []).forEach(function (m) { if (m && SUBJECT_OK[m.subject]) seen[m.subject] = 1; });
+  return SUBJECTS.map(function (x) { return x.value; }).filter(function (v) { return seen[v]; });
+}
+function _mbOnly(items, field) {
+  var v = '', many = false;
+  (items || []).forEach(function (m) {
+    var x = (m && m[field]) || '';
+    if (!x) return;
+    if (!v) v = x; else if (v !== x) many = true;
+  });
+  return many ? '' : v;
+}
+/* It used to take the FIRST question that named a subject and head the whole
+   paper with it — so one question's subject (and, when the mistake was filed
+   from the picker, one stale setting) named a sheet full of another's. */
 function _mbPaperTitle(items) {
-  var subj = '';
-  items.some(function (m) { if (m.subject) { subj = subjectLabel(m.subject) || ''; return true; } return false; });
-  var lvl = '';
-  items.some(function (m) { if (m.level) { lvl = levelLabel(m.level) || ''; return true; } return false; });
+  var subs = _mbSubjectsOf(items);
+  var subj = subs.length === 1 ? (subjectLabel(subs[0]) || '') : '';
+  var lvl = levelLabel(_mbOnly(items, 'level')) || '';
   return [lvl, subj, 'corrections'].filter(Boolean).join(' ') || 'Questions to try again';
+}
+/* The paper is written SUBJECT BY SUBJECT, in the order `SUBJECTS` declares,
+   and numbered afterwards — so 1 to 5 really are the maths ones and the
+   worksheet can head each run without renumbering anything or printing 1, 4,
+   7 down a page. A question whose subject was never read keeps its place at
+   the end rather than being dropped. */
+function _mbOrderBySubject(items) {
+  var order = SUBJECTS.map(function (x) { return x.value; });
+  var rank = function (m) {
+    var i = order.indexOf((m && m.subject) || '');
+    return i === -1 ? order.length : i;
+  };
+  return (items || []).map(function (m, i) { return { m: m, i: i }; })
+    .sort(function (a, b) { return (rank(a.m) - rank(b.m)) || (a.i - b.i); })
+    .map(function (x) { return x.m; });
 }
 /* What the paper carries. The student's own answer, the verdict and the
    feedback travel WITH it — unlike a question sent to a vetting list, where
@@ -5025,7 +5066,7 @@ function _mbPaperDoc(items) {
     mode: 'clean',                      // the cleaned-up version is what opens first
     createdAt: now.toISOString(),
     expiresAt: ends.toISOString(),
-    items: items.map(function (m, i) {
+    items: _mbOrderBySubject(items).map(function (m, i) {
       return {
         n: i + 1,
         number: m.number || '',
@@ -5330,9 +5371,22 @@ function _vetMathDoc(it) {
    Neither available → '' , and NOTHING is filed on a blank. A question whose
    subject could not be told waits for a hand and is reported; guessing it is
    precisely the mistake this routing exists to prevent. */
+/* WHAT THE QUESTION IS, which is a DIFFERENT question from where it goes, and
+   the two are answered here side by side rather than in two places that can
+   drift. Routing asks "which list has the teacher chosen for this pile", so
+   the picker wins. LABELLING asks "what subject is this question", and there
+   the question's own reading wins — because the picker is remembered in
+   `localStorage` from whenever it was last touched, so on a paper scanned
+   today it is not evidence about today's paper at all. A mistake filed under
+   it is mislabelled for good: it is read back weeks later, on a worksheet
+   that has to describe itself, long after the picker moved on. */
+function itemSubjectRead(it) {
+  if (it && SUBJECT_OK[it.subject]) return it.subject;
+  return (wsMeta.subject && SUBJECT_OK[wsMeta.subject]) ? wsMeta.subject : '';
+}
 function itemSubject(it) {
   if (wsMeta.subject && SUBJECT_OK[wsMeta.subject]) return wsMeta.subject;
-  return (it && SUBJECT_OK[it.subject]) ? it.subject : '';
+  return itemSubjectRead(it);
 }
 function itemTarget(it) { return vetTarget(itemSubject(it)); }
 

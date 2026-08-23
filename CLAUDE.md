@@ -420,6 +420,15 @@ step, and ship a change to the shape in both repos together**:
 - **`mbIsWrong` is the ONE test**, and it re-states the blank rule: a blank was never attempted, so
   it is not a mistake; a correct answer is not; an answer to a typed question was never on a paper.
 - **`mbKeyOf` folds the wording**, so a paper photographed twice is one mistake rather than two.
+- **A mistake is filed under WHAT THE QUESTION IS, never the Subject picker on its own**
+  (`itemSubjectRead`, v1.16.0). It used to store `wsMeta.subject`, and that picker is **remembered
+  in `localStorage`** from whenever it was last touched — so a maths paper scanned with the picker
+  still on Science filed every question as Science, and weeks later they came back on a worksheet
+  headed *"P6 Science corrections"* over a page of maths. The question's own reading wins here and
+  the picker is only the fallback. **That is deliberately the opposite order from `itemSubject`**,
+  which routes a question to a vetting list: routing asks *which list has the teacher chosen for
+  this pile*, labelling asks *what subject is this question*, and the two live side by side in one
+  block so they cannot drift into two hidden rules.
 - **THE PICTURE IS CROPPED AT THE MOMENT IT IS FILED**, because that is the only moment the
   photograph is still in the tab. `SCAN_BOX_RULE` asks the model for `diagramBox` —
   `[ymin,xmin,ymax,xmax]` as integers 0–1000, the same convention the Learning Portal's rapid
@@ -486,6 +495,19 @@ step, and ship a change to the shape in both repos together**:
   queue that failed is REPORTED. The link is always on screen with a Copy button, and the window
   says plainly whether the email could even be queued: telling a student an email is on its way when
   nothing can send it is the outcome worth engineering against.
+- **THE SHEET MAY NOT CLAIM A SUBJECT IT IS NOT** (v1.16.0). `_mbPaperTitle` took the FIRST
+  question that named one and headed the whole paper with it, so one question's subject named a
+  sheet full of another's. `_mbOnly` / `_mbSubjectsOf` now name a subject or a level **only where
+  every question agrees**; a mixed paper is headed by neither and says which is which question by
+  question instead. A worksheet that mislabels itself prints perfectly and tells a child they are
+  bad at the wrong subject.
+- **The paper is written SUBJECT BY SUBJECT and numbered afterwards** (`_mbOrderBySubject`, in the
+  order `SUBJECTS` declares). That is what lets the viewer head each run without renumbering
+  anything or printing 1, 4, 7 down a page — and a question whose subject was never read keeps its
+  place at the end rather than being dropped. The document carries **no summary of its own
+  subjects**: the viewer reads them off the items, which is the one copy that cannot disagree with
+  the questions printed under it — and it has to read them that way for every paper written before
+  any of this existed anyway.
 - **The student's own answer TRAVELS with their own paper** — unlike a question sent to a vetting
   list, where it must never go. The difference is who it is for: a bank question is for thirty other
   children, and this is the child's own paper coming back to them.
@@ -683,7 +705,7 @@ step, and ship a change to the shape in both repos together**:
   `VET_TARGETS`, `VET_SOURCE`, `_vetSend`, `_vetSendBySubject`, `_vetPortalDoc`, `_vetMathDoc`,
   `_vetCorrectIndex`, `_vetTitle`, `_vetHtml`, `_vetCardFootHtml`, `vetOpen`, `vetChoose`,
   `vetChooseAuto`, `_vetAutoFile`, `SCAN_SUBJECT_FIELD_RULE`, `_scanSubject`, `itemSubject`,
-  `itemTarget`, `_vetGroupBySubject`,
+  `itemTarget`, `itemSubjectRead`, `_vetGroupBySubject`,
   `REPORT_SYS`, `REPORT_CREDIT`, `_reportMarkStr`, `reportScore`, `reportEligible`,
   `_reportPrompt`, `_reportNew`, `_reportRefs`, `reportAsText`, `runReport`,
   `AI_ENGINE_STORE`, `OPENAI_DEFAULT_MODEL`, `AI_DOWN_MS`, `openAiKey`, `openAiModel`,
@@ -693,6 +715,7 @@ step, and ship a change to the shape in both repos together**:
   `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
   `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`,
   `_mbShotForPage`, `mbIsWrong`, `mbIsRight`, `mbKeyOf`, `mbFindByKey`, `MB_CLEAR_WINS`,
+  `_mbPaperTitle`, `_mbSubjectsOf`, `_mbOnly`, `_mbOrderBySubject`,
   `MB_KEY_PREFIX`, `mbNoteWin`, `mbNoteMiss`, `_mbRunNews`, `mbRunToast`, `mbCardChipHtml`,
   `mbSaveOne`, `mbFileRun`, `_mbPaperDoc`,
   `_mbMailDoc`, `_mbPaperUrl`, `MB_VIEWER_PATH`),
@@ -733,7 +756,11 @@ step, and ship a change to the shape in both repos together**:
   receives. The clearing is the other half of that: a streak that stops resetting turns "twice in a
   row" into "twice ever" and empties the book of questions the child still cannot do, and a matcher
   that guesses between two similar questions deletes the wrong one — both on a screen that looks
-  exactly like the feature working.
+  exactly like the feature working. **The subject a mistake is FILED under is in there for the same
+  reason and it has already gone wrong**: a book filled from the Subject picker — remembered in
+  `localStorage` from whenever it was last touched — labelled a maths paper Science, and the sheet
+  that came back weeks later was headed "P6 Science corrections" over a page of maths. Nothing
+  threw, nothing looked broken, and a child was told they were bad at the wrong subject.
 - After touching **the engines** (`AI_ENGINE_STORE`, `OPENAI_DEFAULT_MODEL`, `aiEngineOrder`,
   `aiAskWith`, `_aiRun`, `_openAiBody`, `_openAiText`, `askOpenAI`, `askOpenAiServer`, `_aiWhy`,
   `AI_DOWN_MS`, `window.aiReady`, `window.askGemini`) — **or the `askOpenAi` function in
