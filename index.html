@@ -1223,7 +1223,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.18.0';
+var APP_VERSION = 'v1.19.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -4702,17 +4702,365 @@ function _mbBoxOk(box, whole) {
   if (!whole && (n[2] - n[0]) / 1000 > 0.94 && (n[3] - n[1]) / 1000 > 0.94) return false;
   return true;
 }
-async function _mbCropBox(dataUrl, box, whole) {
+
+/* =====================================================================
+   ✂️ THE FIGURE, AND NOT THE SENTENCE ABOVE IT
+   ---------------------------------------------------------------------
+   A model's rectangle is a guess made by eye, and the way it is wrong is
+   always the same: it overshoots up or down and takes a line of the
+   question's own WORDING with it. The worksheet then prints the figure with
+   half a sentence stuck to its top edge and the tail of the next sentence
+   under it — which is what a photograph of the printed page looked like
+   before this existed.
+
+   THE OLD PAD MADE IT WORSE, and it is worth writing down why. The margin
+   was measured on the PAGE (3% of its width, 2.5% of its height), so on an
+   ordinary phone photograph it grew the rectangle by fifty or sixty pixels
+   in every direction — a whole line of 9pt print — every single time,
+   whether or not the model's rectangle needed any help at all. A pad that
+   large cannot be tuned: it is either too small to rescue a clipped label or
+   big enough to swallow a sentence. So the pad is measured on the BOX now
+   and is deliberately tiny, and the two jobs it was doing badly are done
+   properly instead by the two passes below.
+
+   BOTH PASSES ARE PIXEL WORK, NOT ANOTHER AI CALL. The Science portal asks a
+   second vision call to tidy each crop (`_aiRefineCrop`), which works and
+   costs a call per figure on a run that is already reading a whole paper.
+   These are free, instant and deterministic — the same picture always comes
+   out the same way — and the portal keeps its refine pass on top of them.
+
+   ① GROW OUT OF WHAT IT CUT THROUGH. An edge sitting on ink is an edge
+   halfway through a label, so it moves outward until it sits in clear paper.
+   Generous sideways, because a label and its leader line stick far out to
+   the left and right of the drawing they name; mean vertically, because what
+   sits above and below a figure is nearly always the question's wording.
+
+   ② CUT OFF WHAT IS PLAINLY PROSE. A band of ink is a line of body text when
+   it is short (one line tall), spans most of the width, is not solid like a
+   rule, and clear paper separates it from everything else. A caption, an
+   axis title and a label are all narrow and survive; a table's border is
+   thin and solid and survives; a line of the question does not.
+
+   THE THRESHOLD IS MEASURED, NOT ASSUMED, and that is the one thing that
+   could not be ported as it stood. The portal's passes read a SCREENSHOT,
+   which is white at 255, so a fixed "darker than 190 is ink" works there.
+   This app reads a PHOTOGRAPH: the paper is grey, the lighting slopes across
+   the sheet, and a fixed line reads the whole page as ink — so the trimmer
+   would find one band covering everything and do nothing at all, on every
+   photograph, with nothing to show it had stopped working. So the paper's
+   own white is measured off the picture (the 98th percentile of the luma,
+   the same statistic the portal's paper-clean pass uses) and ink is what
+   falls well under it.
+
+   IT FAILS SAFE, ALWAYS. Every pass returns the rectangle it was given the
+   moment it is not confident: too small to analyse, a canvas that will not
+   read back, a trim that would take a fifth of the crop or leave less than
+   half of it. A slightly loose crop is a figure with a stray line over it; a
+   confident wrong one is a figure with its own labels cut off, and only one
+   of those can be seen for what it is on the printed page.
+   ===================================================================== */
+
+var MB_INK_RATIO = 0.74;        // ink is this fraction of the paper's own white, or darker
+var MB_INK_FLOOR = 48;          // …but never call almost-black-only "ink"
+var MB_INK_CEIL = 205;          // …and never call the paper itself ink
+var MB_ANALYSE_MAX_SIDE = 1100; // the probe is downscaled: this is measurement, not the crop
+var MB_PAD_FRAC = 0.015;        // breathing space, measured on the BOX and never on the page
+var MB_PAD_MIN = 6;
+var MB_GROW_X = 0.16;           // how far an edge may move out of ink, as a fraction of the box
+var MB_GROW_Y = 0.05;
+var MB_TRIM_BANDS = 3;          // lines of prose taken off one side at most
+var MB_TRIM_MAX = 0.22;         // …and never more than this much of the crop
+var MB_TRIM_KEEP = 0.5;         // …and never leaving less than this much of it
+var MB_MAXRUN_FRAC = 0.30;      // a run of ink longer than this much of the band is a STROKE
+var MB_RUNS_MIN = 6;            // …and a line of print breaks into at least this many pieces
+var MB_RULE_FRAC = 0.55;        // a row carrying a run this wide is a printed RULE
+/* FOUR, not three, and the difference matters. A perfectly ordinary boxed
+   diagram is a rule at the top, a rule at the bottom and a divider across the
+   middle — three, and at three the pass would stand down on half the figures
+   it was written to clean. A ruled table with a header and three rows of data
+   carries five. The per-band stroke test above is the real defence here
+   anyway: every row of a ruled table has a rule in it, so it is refused as
+   prose on its own account; this is the belt to that pair of braces. */
+var MB_RULE_GROUPS = 4;
+
+/* The paper's own white, as the 98th percentile of the luma. The top 2% is
+   given away deliberately: a specular highlight off a glossy sheet is 255 and
+   is not what the page is made of, so the maximum would put the line too
+   high on exactly the photographs that need it lowest. */
+function _mbInkLevel(hist, total) {
+  if (!hist || !total) return MB_INK_CEIL;
+  var want = total * 0.98, seen = 0, white = 255;
+  for (var v = 0; v < 256; v++) {
+    seen += hist[v] || 0;
+    if (seen >= want) { white = v; break; }
+  }
+  var thr = Math.round(white * MB_INK_RATIO);
+  return Math.max(MB_INK_FLOOR, Math.min(MB_INK_CEIL, thr));
+}
+function _mbLumaHist(data) {
+  var hist = new Array(256), total = 0, i;
+  for (i = 0; i < 256; i++) hist[i] = 0;
+  for (i = 0; i + 3 < data.length; i += 4) {
+    if (data[i + 3] < 60) continue;                 // a hole is not paper and is not ink
+    var l = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    hist[l < 0 ? 0 : (l > 255 ? 255 : Math.round(l))]++;
+    total++;
+  }
+  return { hist: hist, total: total };
+}
+/* Ink per row and per column, in ONE pass over ONE readback. The portal grows
+   its rectangle by calling getImageData up to forty times as it walks each
+   edge outward; reading the region once and walking the numbers is the same
+   answer for a fraction of the work, and it is what lets both passes below
+   be plain arithmetic on plain arrays — which is what makes them testable. */
+function _mbInkProfile(data, w, h, thr) {
+  var rows = new Array(h), cols = new Array(w), x, y;
+  for (x = 0; x < w; x++) cols[x] = 0;
+  for (y = 0; y < h; y++) {
+    var n = 0, minX = -1, maxX = -1, runs = 0, run = 0, maxRun = 0, prev = 0;
+    var base = y * w * 4;
+    for (x = 0; x < w; x++) {
+      var i = base + x * 4;
+      var on = (data[i + 3] > 60 &&
+                data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114 < thr) ? 1 : 0;
+      if (on) {
+        n++; cols[x]++;
+        if (minX < 0) minX = x;
+        maxX = x;
+        if (!prev) { runs++; run = 1; } else run++;
+        if (run > maxRun) maxRun = run;
+      } else run = 0;
+      prev = on;
+    }
+    rows[y] = { n: n, minX: minX, maxX: maxX, runs: runs, maxRun: maxRun };
+  }
+  return { rows: rows, cols: cols };
+}
+
+/* ① Walk one edge outward until it stands in clear paper. `from` is the
+   current edge, `dir` which way is out, `limit` one past the furthest it may
+   go. An edge already clear does not move, and an edge that never finds clear
+   paper within its allowance stays exactly where it was — moving it to the
+   allowance's end would be growing blindly, which is the pad this replaces. */
+function _mbClearEdge(counts, from, dir, limit, inkMin) {
+  if (!counts || !counts.length) return from;
+  for (var i = from; dir > 0 ? i < limit : i > limit; i += dir) {
+    if (i < 0 || i >= counts.length) break;
+    if ((counts[i] || 0) <= inkMin) return i;
+  }
+  return from;
+}
+
+/* ② The rows of prose above and below. Returns the first and last row worth
+   keeping, in the profile's own coordinates.
+
+   A BAND IS PROSE ON FIVE COUNTS, and the last two are what stop a table or
+   a graph being eaten a row at a time:
+     · it is ONE LINE TALL — taller is the figure, thinner is a rule;
+     · its ink spans most of the width — a caption, an axis title and a label
+       are narrow, and they survive;
+     · it is not solid, so a filled bar is not mistaken for a sentence;
+     · IT HAS NO LONG STROKE in it. Every scanline through a line of print
+       crosses letters, so the longest unbroken run of ink is a few pixels.
+       An axis, a table border, a leader line, the top of a rectangle, a
+       number line — every one of them lays a run of ink right across the
+       band. Density alone cannot see that: a hairline rule across a wide
+       crop is a fraction of a percent of the pixels in its row, so the
+       "not solid" test passes it happily and the trimmer takes the top off
+       the table it was pointed at.
+     · IT IS MADE OF MANY SHORT PIECES. A line of print breaks into dozens of
+       separate runs; a stroke or a blob is one or two.
+
+   AND A FRAMED TABLE IS NOT TRIMMED AT ALL. Three or more full-width rules
+   inside one crop is a ruled table, whose every row is short, wide and
+   full of letters — prose on every count that reads a row on its own. The
+   whole pass stands down rather than handing back the bottom two thirds of
+   it, which is the one wrong crop that looks completely convincing.
+
+   ONE MORE THING IS NEW, and it is the case the Science portal's version
+   cannot reach: a run of CONSECUTIVE lines. Two lines of a question sit a
+   few pixels apart, which is far less than the clear band that separates the
+   wording from the figure — so a trimmer that insists on clear paper after
+   the FIRST line finds none, stops, and leaves both lines on the picture. A
+   run is taken instead, and it only counts once it has reached real
+   whitespace: the cut is remembered at the end of a run that ended in a gap
+   and nowhere else, so a band with nothing but figure after it is still
+   never touched. */
+function _mbRuleGroups(rows, w, h, from, to) {
+  var groups = 0, run = 0;
+  for (var y = from; y <= to; y++) {
+    var r = rows[y];
+    var isRule = !!r && r.maxRun >= w * MB_RULE_FRAC;
+    if (isRule && !run) groups++;
+    run = isRule ? 1 : 0;
+  }
+  return groups;
+}
+function _mbTrimTextRows(rows, w, h, pageH) {
+  var out = { top: 0, bot: h - 1 };
+  if (!rows || w < 40 || h < 60) return out;
+  /* A framed table is the figure, and every one of its rows reads as prose. */
+  if (_mbRuleGroups(rows, w, h, 0, h - 1) >= MB_RULE_GROUPS) return out;
+
+  var inkMin = Math.max(2, w * 0.004);
+  var joinGap = Math.max(2, Math.round(pageH * 0.003));   // an i-dot is not a new line
+  var gapMin = Math.max(5, Math.round(pageH * 0.007));    // paper that really separates two things
+  var minBandH = Math.max(4, Math.round(pageH * 0.005));  // thinner is a rule or a border — keep it
+  var maxBandH = Math.max(minBandH + 1, Math.round(pageH * 0.030)); // taller is the figure — keep it
+  var maxTrim = h * MB_TRIM_MAX, minKeep = h * MB_TRIM_KEEP;
+
+  function inked(ry) { return ry >= 0 && ry < h && rows[ry].n > inkMin; }
+  function band(from, dir, limit) {
+    var s = from;
+    while (s !== limit && !inked(s)) s += dir;
+    if (s === limit || s < 0 || s >= h) return null;
+    var e = s, gap = 0, minX = w, maxX = 0, maxFrac = 0, maxRun = 0, runs = [], ry;
+    for (ry = s; ry !== limit; ry += dir) {
+      if (inked(ry)) {
+        e = ry; gap = 0;
+        if (rows[ry].minX >= 0 && rows[ry].minX < minX) minX = rows[ry].minX;
+        if (rows[ry].maxX > maxX) maxX = rows[ry].maxX;
+        if (rows[ry].n / w > maxFrac) maxFrac = rows[ry].n / w;
+        if ((rows[ry].maxRun || 0) > maxRun) maxRun = rows[ry].maxRun || 0;
+        runs.push(rows[ry].runs || 0);
+      } else if (++gap > joinGap) break;
+    }
+    var after = 0;
+    for (ry = e + dir; ry !== limit && !inked(ry); ry += dir) after++;
+    runs.sort(function (a, b) { return a - b; });
+    return {
+      start: s, end: e, size: Math.abs(e - s) + 1,
+      inkW: maxX - minX + 1, maxFrac: maxFrac, maxRun: maxRun,
+      medRuns: runs.length ? runs[runs.length >> 1] : 0,
+      after: after
+    };
+  }
+  function isProse(b) {
+    if (!b) return false;
+    if (b.size < minBandH || b.size > maxBandH) return false;   // one line of type, no more
+    if (b.inkW < w * 0.55) return false;                        // a caption is narrow — keep it
+    if (b.maxFrac > 0.6) return false;                          // a solid bar is not a sentence
+    if (b.maxRun > b.inkW * MB_MAXRUN_FRAC) return false;       // an axis, a rule, a border
+    if (b.medRuns < MB_RUNS_MIN) return false;                  // letters, not one long stroke
+    return true;
+  }
+  /* A run of prose lines, and the cut is only ever taken where the run met
+     clear paper. `null` back means nothing here was safe to remove. */
+  function eat(from, dir, limit) {
+    var at = from, cut = null;
+    for (var k = 0; k < MB_TRIM_BANDS; k++) {
+      var b = band(at, dir, limit);
+      if (!isProse(b)) break;
+      if (b.after >= gapMin) cut = b.end + dir * (1 + Math.min(b.after, gapMin));
+      at = b.end + dir;
+      if (dir > 0 ? at >= limit : at <= limit) break;
+    }
+    return cut;
+  }
+  var t = eat(0, 1, h);
+  if (t !== null && t <= maxTrim && (out.bot - t + 1) >= minKeep) out.top = t;
+  var b2 = eat(h - 1, -1, out.top - 1);
+  if (b2 !== null && (h - 1 - b2) <= maxTrim && (b2 - out.top + 1) >= minKeep) out.bot = b2;
+
+  /* ③ AND THEN THE BLANK PAPER ITSELF. Whatever survives, the edges are
+     pulled in to the first and last row that has any ink in it at all. This
+     is the one move here that cannot be wrong — it removes measured empty
+     paper and nothing else — and it is what the old pad was reaching for
+     and getting backwards: a rectangle the model drew loose comes back
+     tight, without a single decision being made about what the ink IS. */
+  var f = out.top, l = out.bot;
+  while (f < l && !inked(f)) f++;
+  while (l > f && !inked(l)) l--;
+  if (l - f + 1 >= 8) { out.top = f; out.bot = l; }
+  return out;
+}
+
+/* Both passes, over one readback of the page. Takes the rectangle in IMAGE
+   pixels and hands back a rectangle in image pixels — the same one it was
+   given whenever anything at all is not right. */
+function _mbTightenRect(img, W, H, r, opts) {
+  try {
+    var grow = (opts && opts.grow !== false);
+    var trim = (opts && opts.trim !== false);
+    if (!grow && !trim) return r;
+    // The probe covers the box PLUS everywhere an edge is allowed to move to,
+    // so growing is a walk over numbers already in hand rather than a fresh
+    // read of the page for every step.
+    var gx = grow ? Math.round(r.w * MB_GROW_X) : 0;
+    var gy = grow ? Math.round(r.h * MB_GROW_Y) : 0;
+    var px = Math.max(0, Math.floor(r.x - gx)), py = Math.max(0, Math.floor(r.y - gy));
+    var pw = Math.min(W - px, Math.ceil(r.w + gx * 2 + (r.x - px)));
+    var ph = Math.min(H - py, Math.ceil(r.h + gy * 2 + (r.y - py)));
+    if (pw < 40 || ph < 40) return r;
+    var s = Math.min(1, MB_ANALYSE_MAX_SIDE / Math.max(pw, ph));
+    var aw = Math.max(8, Math.round(pw * s)), ah = Math.max(8, Math.round(ph * s));
+    var c = document.createElement('canvas');
+    c.width = aw; c.height = ah;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return r;
+    ctx.drawImage(img, px, py, pw, ph, 0, 0, aw, ah);
+    var data = ctx.getImageData(0, 0, aw, ah).data;   // throws on a tainted canvas — caught below
+    var lv = _mbLumaHist(data);
+    var thr = _mbInkLevel(lv.hist, lv.total);
+    var prof = _mbInkProfile(data, aw, ah, thr);
+
+    // The box itself, in the probe's coordinates.
+    var kx = aw / pw, ky = ah / ph;
+    var bx = Math.max(0, Math.min(aw - 1, Math.round((r.x - px) * kx)));
+    var by = Math.max(0, Math.min(ah - 1, Math.round((r.y - py) * ky)));
+    var bw = Math.max(1, Math.min(aw - bx, Math.round(r.w * kx)));
+    var bh = Math.max(1, Math.min(ah - by, Math.round(r.h * ky)));
+
+    if (grow) {
+      var colMin = Math.max(1, bh * 0.004), rowMin = Math.max(1, bw * 0.004);
+      var nx = _mbClearEdge(prof.cols, bx, -1, -1, colMin);
+      var nr = _mbClearEdge(prof.cols, bx + bw - 1, 1, aw, colMin);
+      var ny = _mbClearEdge(prof.rows.map(function (o) { return o.n; }), by, -1, -1, rowMin);
+      var nb = _mbClearEdge(prof.rows.map(function (o) { return o.n; }), by + bh - 1, 1, ah, rowMin);
+      bw = (nr - nx) + 1; bx = nx;
+      bh = (nb - ny) + 1; by = ny;
+    }
+    if (trim && bh > 1) {
+      // The trim reads only the rows inside the box, measured across it.
+      var sub = prof.rows.slice(by, by + bh).map(function (o) {
+        var lo = Math.max(o.minX, bx), hi = Math.min(o.maxX, bx + bw - 1);
+        return { n: o.n, minX: o.minX < 0 ? -1 : lo, maxX: o.maxX < 0 ? -1 : hi };
+      });
+      var cut = _mbTrimTextRows(sub, bw, bh, ah);
+      by += cut.top; bh = cut.bot - cut.top + 1;
+    }
+    if (bw < 8 || bh < 8) return r;
+    return {
+      x: px + bx / kx, y: py + by / ky,
+      w: Math.min(W - (px + bx / kx), bw / kx),
+      h: Math.min(H - (py + by / ky), bh / ky)
+    };
+  } catch (e) { console.warn('crop tighten skipped', e); return r; }
+}
+
+/* `opts.whole` is the WHOLE-QUESTION crop: it is meant to hold the wording,
+   so neither pass runs on it. `opts.trim === false` is the picture-options
+   band, whose content is (1) (2) (3) (4) — text by definition, and a trimmer
+   pointed at it would take the choices off the picture one line at a time. */
+async function _mbCropBox(dataUrl, box, whole, opts) {
   if (!_mbBoxOk(box, whole)) return '';
   var n = box.map(Number);
   var img = await _loadImageEl(dataUrl);
   var W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
   if (!W || !H) return '';
-  var mx = W * 0.03, my = H * 0.025;                 // a little air, so a label is not shaved off
-  var x = Math.max(0, n[1] / 1000 * W - mx);
-  var y = Math.max(0, n[0] / 1000 * H - my);
-  var w = Math.min(W - x, (n[3] - n[1]) / 1000 * W + mx * 2);
-  var h = Math.min(H - y, (n[2] - n[0]) / 1000 * H + my * 2);
+  var r = {
+    x: n[1] / 1000 * W,
+    y: n[0] / 1000 * H,
+    w: (n[3] - n[1]) / 1000 * W,
+    h: (n[2] - n[0]) / 1000 * H
+  };
+  if (!whole) r = _mbTightenRect(img, W, H, r, opts);
+  // Breathing space, measured on the BOX. A pad taken off the page is the
+  // same fifty pixels round a postage-stamp figure as round half a sheet.
+  var pad = Math.max(MB_PAD_MIN, Math.round(Math.min(r.w, r.h) * MB_PAD_FRAC));
+  var x = Math.max(0, r.x - pad), y = Math.max(0, r.y - pad);
+  var w = Math.min(W - x, r.w + (r.x - x) + pad);
+  var h = Math.min(H - y, r.h + (r.y - y) + pad);
   if (w < 24 || h < 24) return '';
   var s = Math.min(1, (whole ? MB_QCROP_MAX_SIDE : MB_CROP_MAX_SIDE) / Math.max(w, h));
   var c = document.createElement('canvas');
@@ -4816,7 +5164,8 @@ var MB_BUILD_SYS =
   'student can be given it again to try. You are NOT answering it, NOT marking it and NOT rewording it: your ' +
   'whole job is to set out what is PRINTED, exactly as printed.\n' +
   'Reply with STRICT JSON only, no markdown, exactly this shape: {"blocks":[{"type":"text","text":"…"},' +
-  '{"type":"image","page":1,"box_2d":[ymin,xmin,ymax,xmax]}]}\n' +
+  '{"type":"image","page":1,"box_2d":[ymin,xmin,ymax,xmax]},' +
+  '{"type":"options","page":1,"box_2d":[ymin,xmin,ymax,xmax]}]}\n' +
   'Rules:\n' +
   '- List the blocks in the SAME order they appear on the page, so the question reads top to bottom.\n' +
   '- INCLUDE THE SHARED STEM. If this question is a lettered part — 13(a) — the wording that introduces the whole ' +
@@ -4826,9 +5175,15 @@ var MB_BUILD_SYS =
   '- "text" is the printed wording as plain text. Do not correct it, do not shorten it, do not explain it, and ' +
   'never write in an answer. Keep the part marker — "(a)" — at the start of the part\'s own text block, and keep ' +
   'a printed mark allocation such as "[2]" where it is printed.\n' +
-  '- LEAVE OUT the multiple-choice answer options: they are already held separately and are printed under your ' +
-  'blocks. Leave out the question number printed in the margin, the page header and footer, and anything the ' +
-  'student has written by hand.\n' +
+  '- LEAVE OUT the multiple-choice answer options WHEN THEY ARE WORDS OR NUMBERS: they are already held ' +
+  'separately and are printed under your blocks. Leave out the question number printed in the margin, the ' +
+  'page header and footer, and anything the student has written by hand.\n' +
+  '- WHEN THE OPTIONS ARE PICTURES — four little diagrams, four graphs, four shapes, one per choice — they ' +
+  'cannot be written out, so give ONE block {"type":"options","page":1,"box_2d":[ymin,xmin,ymax,xmax]} as ' +
+  'the LAST block. ONE rectangle round ALL of the option pictures together, including the (1) (2) (3) (4) ' +
+  'labels printed with them and nothing else. NEVER one rectangle per option: four separate pictures lose ' +
+  'the row they were printed in and stop reading as a set of choices at all. Give this block ONLY when the ' +
+  'choices really are pictures; a question whose options are words gets no options block.\n' +
   '- If a text block lists labelled statements (e.g. "A: …", "B: …"), put EACH on its own line, separated with a ' +
   'real line break.\n' +
   '- An "image" block is ONE diagram, picture, graph, figure, experimental set-up, map, number line or printed ' +
@@ -4841,6 +5196,67 @@ var MB_BUILD_SYS =
   'wrong rectangle keeps somebody else\'s picture and looks exactly like a working one.\n' +
   '- Never invent a block. If the question is one sentence, one text block is the whole correct answer.';
 
+/* =====================================================================
+   🔢 FOUR PICTURE OPTIONS ARE ONE PICTURE
+   ---------------------------------------------------------------------
+   A multiple-choice question whose four choices are little DRAWINGS — four
+   shapes, four graphs, four circuits — has options that cannot be written
+   out. Until now the reproduction was told to leave every option out, on the
+   grounds that the app already holds them as words; for a picture question it
+   holds four empty strings, so what came back was a question with a diagram
+   and four blank choices, printed and handed to a child with nothing to
+   choose between.
+
+   THEY TRAVEL AS ONE RECTANGLE, and that is the part worth stating plainly.
+   Cut out separately, four options become four pictures stacked down the
+   page: the row they were printed in is gone, they are each a different size,
+   and they stop reading as a set of choices at all — a student answering
+   "(3)" cannot see which one (3) was. One rectangle round the lot keeps the
+   paper's own layout, keeps the (1) (2) (3) (4) labels attached to the
+   pictures they name, and is one crop instead of four.
+
+   AND IT IS NEVER TRIMMED. The prose trimmer above exists to take lines of
+   text off a figure; an options band is a row of pictures with a number
+   printed under each of them, so pointed at this it would work perfectly and
+   take the choices off one line at a time. `role: 'options'` is what says so,
+   and it is the one flag the crop reads.
+
+   THE BLOCK IS AN ORDINARY `image` ON THE WIRE. It is `role` that marks it,
+   so a viewer that has never heard of picture options draws it as a figure
+   and prints the (empty) word options under it — untidy, and the question is
+   still answerable. A block of a type nobody knows would have been dropped
+   on the floor instead. That is the whole contract with the viewer, and it
+   is why the role is a field on a known type rather than a type of its own.
+   ===================================================================== */
+
+var MB_OPT_MAX = 1;             // one options picture per question — see above
+var MB_UNION_SLACK = 2.6;       // how much emptier than its parts a union may be
+var MB_UNION_MAX_AREA = 0.55;   // …and it may never be most of the page either
+
+/* One rectangle round several. A model that ignores "one rectangle" and sends
+   four is answered by covering all four rather than by keeping the first —
+   but only when they really do sit together: boxes in opposite corners of the
+   page union to most of the sheet, which is not a set of options, it is a
+   failed reading, and the caller is better off with nothing. */
+function _mbUnionBox(boxes) {
+  var use = (boxes || []).filter(function (b) { return _mbBoxOk(b, true); }).map(function (b) { return b.map(Number); });
+  if (!use.length) return null;
+  if (use.length === 1) return use[0];
+  var y0 = 1000, x0 = 1000, y1 = 0, x1 = 0, area = 0;
+  use.forEach(function (b) {
+    if (b[0] < y0) y0 = b[0];
+    if (b[1] < x0) x0 = b[1];
+    if (b[2] > y1) y1 = b[2];
+    if (b[3] > x1) x1 = b[3];
+    area += (b[2] - b[0]) * (b[3] - b[1]);
+  });
+  var u = [y0, x0, y1, x1];
+  var uArea = (y1 - y0) * (x1 - x0);
+  if (!area || uArea > area * MB_UNION_SLACK) return null;   // scattered — not one band of options
+  if (uArea / 1000000 > MB_UNION_MAX_AREA) return null;      // most of the page is not an options row
+  return _mbBoxOk(u, true) ? u : null;
+}
+
 /* Validate on arrival, never at render: a block that would not draw is one
    the worksheet cannot show, and finding that out on the printed page is too
    late. A build with no WORDING at all is refused outright — the fallbacks
@@ -4848,10 +5264,23 @@ var MB_BUILD_SYS =
    anything. */
 function _mbCleanBlocks(raw) {
   var arr = (raw && Array.isArray(raw.blocks)) ? raw.blocks : (Array.isArray(raw) ? raw : []);
-  var out = [], figs = 0, words = 0;
+  var out = [], figs = 0, words = 0, optBoxes = [], optPage = 1;
   for (var i = 0; i < arr.length && out.length < MB_BLOCK_MAX; i++) {
     var b = arr[i];
     if (!b || typeof b !== 'object') continue;
+    if (b.type === 'options') {
+      /* Held back and merged at the end, because "one rectangle round all of
+         them" is a rule the model can only be asked to follow — it cannot be
+         made to. The whole-page test is skipped (`true`): a row of options
+         across the foot of a page is a legitimate band and a tall one is
+         still four pictures, so it is the union's own guard that decides. */
+      if (Array.isArray(b.box_2d)) {
+        optBoxes.push(b.box_2d);
+        var op = parseInt(b.page, 10);
+        if (optBoxes.length === 1 && op >= 1) optPage = op;
+      }
+      continue;
+    }
     if (b.type === 'image') {
       if (figs >= MB_FIG_MAX) continue;
       if (!_mbBoxOk(b.box_2d)) continue;              // a figure box, so the whole-page test applies
@@ -4865,7 +5294,14 @@ function _mbCleanBlocks(raw) {
       words++;
     }
   }
-  return words ? out : [];
+  if (!words) return [];
+  // The options go LAST whatever order they arrived in — that is where they
+  // are printed, and a block asking the question has to come before them.
+  if (optBoxes.length && out.length < MB_BLOCK_MAX) {
+    var u = _mbUnionBox(optBoxes.slice(0, 8));
+    if (u) out.push({ type: 'image', role: 'options', page: optPage, box: u, url: '' });
+  }
+  return out;
 }
 
 /* The pictures this question is printed on. A question stitched over a page
@@ -4918,10 +5354,17 @@ async function _mbBuildFigures(blocks, it, id) {
     try {
       var s = shots[(b.page || 1) - 1] || shots[0];
       if (!s || !s.shot || !s.shot.url) continue;
-      var crop = await _mbCropBox(s.shot.url, b.box);
+      /* The options band is a row of pictures with a number printed under
+         each of them, so the prose trimmer must not touch it — see 🔢 above.
+         Growing out of clipped ink is still welcome there. */
+      var isOpts = b.role === 'options';
+      var crop = await _mbCropBox(s.shot.url, b.box, false, isOpts ? { trim: false } : null);
       if (!crop) continue;
       var url = await _mbUpload(crop, id + '_f' + out.length);
-      if (url) out.push({ type: 'image', url: url });
+      if (!url) continue;
+      var made = { type: 'image', url: url };
+      if (isOpts) made.role = 'options';
+      out.push(made);
     } catch (e) { console.warn('question figure failed', e); }
   }
   return out;
