@@ -26,6 +26,13 @@ const json = section(
 const scan = section(
   '/* =====================================================================\n   THE SCAN',
   '/* ---- Showing the answers ----');
+/* 📋 The report on the whole script. Every number on that card is counted
+   HERE, in plain code, from the verdicts already on the answer cards — so a
+   score that drifts is the app contradicting itself in front of a parent,
+   with nothing on screen to say which half is lying. */
+const report = section(
+  '/* =====================================================================\n   📋 THE REPORT',
+  '/* =====================================================================\n   📥 SENDING A SCANNED QUESTION');
 /* 📥 The admin's door into the four portals' vetting lists. Everything it can
    get wrong is silent: a document written in the wrong SHAPE renders as a
    question with no answer in it, and a `source` that stops saying 'scan'
@@ -68,7 +75,7 @@ var db = { collection: () => ({ doc: () => ({
 }) }) };
 `;
 
-const api = new Function(prelude + json + grounding + scan + vet + `
+const api = new Function(prelude + json + grounding + scan + report + vet + `
   return {
     set notes(v) { teachingNotes = v; },
     set style(v) { aiStyle = v; },
@@ -81,6 +88,12 @@ const api = new Function(prelude + json + grounding + scan + vet + `
     _ansEditApply, _ansEditNote, _ansTrim, _ansNoteTitle, _ansOptionFrom,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
+    _reportMarkStr, reportScore, reportEligible, _reportPrompt, _reportNew, _reportRefs,
+    reportScoreText, reportCountsText, reportBasisText, reportAsText, reportCardHtml,
+    REPORT_SYS, REPORT_MIN_MARKED, REPORT_MAX_GAPS, REPORT_MAX_LIST,
+    set answers(v) { _answers = v; },
+    set report(v) { _report = v; },
+    get report() { return _report; },
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
     _scanSubject, itemSubject, itemTarget, _vetGroupBySubject,
@@ -668,6 +681,155 @@ ok('the note goes to the SHARED notebook, the same door every other note uses',
    /notesCollRef\(currentUser\.uid\)\.doc\(id\)\.set\(note\);/.test(html.slice(html.indexOf('async function answerEditSave'))));
 ok('the card is fixed even when the note cannot be saved',
    html.indexOf('_ansEditApply(it, {') < html.indexOf('var note = isAdmin(currentUser)'));
+
+/* ---------- 📋 The report on the whole script ----------
+   Everything here fails silently and the card still renders beautifully. A
+   score counted the wrong way is a number on a page a parent reads, with the
+   chips directly above it saying something else; a blank folded into the
+   denominator marks a child down for the questions they never reached; and a
+   question reference the model invented points them at nothing. */
+function pageQ(number, verdict, marks, studentAnswer) {
+  return {
+    kind: 'page', number, question: 'Question ' + number, answer: '42', option: '',
+    options: [], explanation: '',
+    marked: !!studentAnswer, studentAnswer: studentAnswer || '',
+    verdict: studentAnswer ? (verdict || '') : '',
+    marks: studentAnswer ? (marks || '') : '',
+    feedback: studentAnswer ? 'a line of feedback' : ''
+  };
+}
+const blankQ = n => pageQ(n, '', '', '');
+
+/* The paper's own marks, read out of a free-text field the model wrote. */
+ok('"2/3" is read as two numbers', (() => {
+  const m = api._reportMarkStr('2/3');
+  return m && m.awarded === 2 && m.total === 3;
+})());
+ok('a decimal mark is read', (() => { const m = api._reportMarkStr(' 2.5 / 4 '); return m && m.awarded === 2.5; })());
+ok('"3 marks" is not a mark allocation this can add up', api._reportMarkStr('3 marks') === null);
+ok('an empty allocation reads as none', api._reportMarkStr('') === null);
+ok('more awarded than the question is worth is refused', api._reportMarkStr('4/3') === null);
+ok('out of nothing is refused', api._reportMarkStr('0/0') === null);
+
+/* The score. Counted here, from the verdicts already on the cards. */
+const paper = [
+  pageQ('1', 'correct', '', '12'),
+  pageQ('2', 'wrong', '', '9'),
+  pageQ('3', 'partial', '', 'half of it'),
+  blankQ('4'), blankQ('5')
+];
+let rsc = api.reportScore(paper);
+ok('a blank is never counted as wrong', rsc.wrong === 1 && rsc.blank === 2);
+ok('a blank is out of the percentage altogether', rsc.judged === 3);
+ok('a partly right answer is worth half', rsc.credit === 1.5 && rsc.pct === 50);
+ok('the questions attempted are counted', rsc.attempted === 3 && rsc.total === 5);
+
+/* The paper's own marks are only used when EVERY judged question printed one:
+   half a paper's marks totalled as if they were all of it is simply a wrong
+   score, and it reads exactly like a right one. */
+rsc = api.reportScore([pageQ('1', 'correct', '3/3', 'x'), pageQ('2', 'partial', '1/4', 'y')]);
+ok('the paper\'s own marks are used when every question prints one', rsc.marksUsable === true);
+ok('…and they are what the percentage comes from', rsc.awarded === 4 && rsc.outOf === 7 && rsc.pct === 57);
+rsc = api.reportScore([pageQ('1', 'correct', '3/3', 'x'), pageQ('2', 'wrong', '', 'y')]);
+ok('marks printed on only SOME questions are not totalled as the score', rsc.marksUsable === false);
+ok('…and it falls back to counting questions', rsc.pct === 50);
+
+/* A written answer the model would not judge. Counting it wrong marks the
+   student down for the model's indecision; counting it right is a mark they
+   did not earn. */
+rsc = api.reportScore([pageQ('1', 'correct', '', 'x'), pageQ('2', '', '', 'y')]);
+ok('an answer with no verdict still counts as attempted', rsc.attempted === 2 && rsc.unjudged === 1);
+ok('…and is left out of the percentage rather than counted wrong', rsc.judged === 1 && rsc.pct === 100);
+ok('…and the card says so', /left out of it rather than counted against you/.test(api.reportBasisText(rsc)));
+ok('a paper with nothing judged has no percentage', api.reportScore([blankQ('1')]).pct === null);
+ok('nothing attempted says nothing at all', api.reportCountsText(api.reportScore([blankQ('1')])) === '');
+ok('the blanks are named as answered, never as mistakes',
+   /were blank and have been answered for you/.test(api.reportCountsText(api.reportScore(paper))));
+ok('the basis of the percentage is said out loud',
+   /counted a question at a time/.test(api.reportBasisText(api.reportScore(paper))) &&
+   /marks the paper itself prints/.test(api.reportBasisText(api.reportScore(
+     [pageQ('1', 'correct', '3/3', 'x')]))));
+
+/* Who gets one. A report is written about a marked SCRIPT. */
+ok('a fresh worksheet gets no report', api.reportEligible([blankQ('1'), blankQ('2')]) === false);
+ok('one marked question is the feedback card again, not a report',
+   api.reportEligible([pageQ('1', 'correct', '', 'x'), blankQ('2')]) === false);
+ok('two marked questions is a script', api.reportEligible(paper) === true);
+ok('an answer to a typed question is not a script',
+   api.reportEligible([{ kind: 'ask', marked: true, studentAnswer: '16' },
+                       { kind: 'ask', marked: true, studentAnswer: '9' }]) === false);
+ok('the minimum is a named constant', api.REPORT_MIN_MARKED === 2);
+
+/* The prompt. The verdicts are final, the blanks stay out of it, and the
+   model is forbidden the one thing that could contradict the card above it. */
+const rp = api._reportPrompt(paper, api.reportScore(paper));
+ok('the prompt carries what the student wrote', rp.includes('half of it'));
+ok('the prompt carries the verdict already given', rp.includes('marked: partial'));
+ok('the prompt carries the correct answer', rp.includes('the correct answer: 42'));
+ok('a blank question is never listed', !rp.includes('Question 4'));
+ok('…but the blanks are named as not-mistakes', /left BLANK/.test(rp) && /not mistakes/.test(rp));
+ok('the paper is described', rp.includes('P5 Science'));
+ok('the model is told never to give a score',
+   /NEVER GIVE A SCORE, A TOTAL, A MARK OR A PERCENTAGE/.test(api.REPORT_SYS));
+ok('the model is told never to re-mark', /NEVER RE-MARK ANYTHING/.test(api.REPORT_SYS));
+ok('the model is told to group by theme, not walk the questions',
+   /never question by question/.test(api.REPORT_SYS));
+ok('a blank is never a mistake in the report either',
+   /is not\s+a mistake/.test(api.REPORT_SYS.replace(/\s+/g, ' ')));
+/* The report is written ABOUT marking, so it is held to the marking standard
+   and deliberately not handed the exemplar answers — the one-door rule. */
+ok('the report call is grounded', /system: REPORT_SYS \+ aiGrounding\('mark'\)/.test(html));
+ok('the pictures are not sent again', !/images:/.test(report));
+
+/* The reply. */
+const words = api._reportNew({
+  headline: 'A solid paper.',
+  strengths: ['You set the working out clearly.', '', '  '],
+  gaps: [{ title: 'Units', detail: 'You are adding before converting.', questions: 'Q2, 3 and 99' },
+         { title: '', detail: '' }],
+  next: ['Ten conversion drills.']
+}, paper);
+ok('the headline comes back', words.headline === 'A solid paper.');
+ok('an empty strength is dropped', words.strengths.length === 1);
+ok('a gap with nothing in it is dropped', words.gaps.length === 1);
+ok('a question the model invented is dropped', words.gaps[0].questions.join(',') === '2,3');
+ok('the report knows when nothing came back', api._reportNew({}, paper).empty === true);
+ok('…and a report with only a headline is not empty',
+   api._reportNew({ headline: 'Well done.' }, paper).empty === false);
+ok('the lists are capped', api._reportNew(
+  { next: ['a', 'b', 'c', 'd', 'e', 'f'] }, paper).next.length === api.REPORT_MAX_LIST);
+ok('the themes are capped', api._reportNew(
+  { gaps: [1, 2, 3, 4, 5, 6].map(n => ({ title: 't' + n, detail: 'd' })) },
+  paper).gaps.length === api.REPORT_MAX_GAPS);
+/* "7(a)", "7a" and "(7a)" are one question written three ways. */
+ok('a question reference is matched however it is written',
+   api._reportRefs('question 7a, (3)', [pageQ('7(a)', 'wrong', '', 'x'), pageQ('3', 'wrong', '', 'y')])
+     .join(',') === '7(a),3');
+
+/* It leaves with the paper. */
+api.answers = paper;
+api.report = { run: 1, status: 'done', score: api.reportScore(paper), words, err: '' };
+const rtxt = api.reportAsText();
+ok('the copied report carries the score', rtxt.includes('50%'));
+ok('the copied report carries the words', rtxt.includes('A solid paper.') && rtxt.includes('Units'));
+ok('the report is copied out with the answers', /var rep = reportAsText\(\);/.test(html));
+ok('the report card is not in the noPrint header', html.indexOf('id="reportWrap"') > html.indexOf('</div>\n      <!-- 📋'));
+ok('the report card prints', /\.reportCard \{ break-inside: avoid/.test(html));
+/* A failed call still leaves a real report: the score was never the model's. */
+api.report = { run: 1, status: 'failed', score: api.reportScore(paper), words: null, err: 'no network' };
+ok('a failed report still shows the score', api.reportAsText().includes('50%'));
+ok('…and says the words are the part that failed',
+   /could not be written/.test(api.reportCardHtml()) && api.reportCardHtml().includes('50%'));
+api.report = null;
+ok('no report is no text', api.reportAsText() === '' && api.reportCardHtml() === '');
+
+/* It runs itself, once the whole paper has been read, and a reply that
+   arrives after the teacher has started again is dropped. */
+ok('the report is written after the run, not during it',
+   /await runReport\(run\);/.test(html) &&
+   html.indexOf('await runReport(run);') > html.indexOf('async function runScan'));
+ok('last paper\'s report never outlives its paper', /_report = null; +\/\/ last paper/.test(html));
+ok('a stale report is dropped', (report.match(/if \(run !== _scanRun\) return;/g) || []).length >= 2);
 
 /* ---------- 📥 Sending a scanned question to a vetting list ----------
    Four portals, two question SHAPES, and one field — `source` — that decides

@@ -353,6 +353,43 @@
   .tally.mPartial { background: #FDF4E3; color: #7A5410; border-color: #E7BD72; }
   .tally.mWrong { background: #FCEDEB; color: #8C2E1D; border-color: #EFC6BF; }
 
+  /* ---------- 📋 The report ----------
+     The one card on this screen that is about the WHOLE paper rather than one
+     question, so it is set apart from the column of answer cards above it and
+     it PRINTS — the chips in the header card do not, and a printed script with
+     no score on it is the half a parent actually reads. */
+  .reportCard {
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 24px 26px; margin-bottom: 22px;
+    border-top: 4px solid var(--accent-deep);
+  }
+  .repHead { display: flex; align-items: flex-start; gap: 18px; }
+  .repHeadText { flex: 1; min-width: 0; }
+  .repTitle { font-size: 1.05rem; font-weight: 700; }
+  .repScore { font-size: 0.95rem; font-weight: 600; color: var(--ink-soft); margin-top: 6px; }
+  .repCounts { font-size: 0.84rem; color: var(--ink-faint); margin-top: 6px; line-height: 1.6; }
+  .repPct {
+    flex: none; font-size: 2rem; font-weight: 700; line-height: 1;
+    color: var(--ink); background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 12px 16px;
+  }
+  .repLead { font-size: 0.95rem; color: var(--ink); line-height: 1.75; margin-top: 20px; }
+  .repSec { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .repSecTitle {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .repList { list-style: none; margin: 10px 0 0; display: flex; flex-direction: column; gap: 9px; }
+  .repList li { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.7; padding-left: 20px; position: relative; }
+  .repList li::before { content: '·'; position: absolute; left: 6px; font-weight: 700; color: var(--accent-deep); }
+  .repGap { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: #FFFBF3; border: 1px solid #F0DCB4; }
+  .repGapTitle { font-size: 0.9rem; font-weight: 700; color: #7A5410; }
+  .repGapQs { font-size: 0.74rem; color: var(--ink-faint); margin-top: 3px; }
+  .repGapText { font-size: 0.88rem; color: var(--ink-soft); margin-top: 6px; line-height: 1.7; }
+  .repNote { font-size: 0.8rem; color: var(--ink-faint); margin-top: 14px; line-height: 1.6; }
+  .repPending { font-size: 0.9rem; color: var(--ink-soft); margin-top: 20px; }
+  .repFail { font-size: 0.88rem; color: #8C2E1D; margin-top: 20px; line-height: 1.7; }
+
   .empty {
     color: var(--ink-faint); text-align: center; padding: 40px 18px;
     border: 1px dashed var(--line); border-radius: var(--radius); font-size: 0.9rem;
@@ -505,6 +542,7 @@
     body { background: #fff; }
     main { max-width: none; padding: 0; }
     .ansCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
+    .reportCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
   }
 </style>
 </head>
@@ -539,7 +577,8 @@
     <p class="sub">Take a photo of a worksheet or an exam paper — or pick pictures out of your gallery —
       and every question on them is read and answered, in your teacher's own words.
       Science, Maths, English and Chinese alike. Anything already written on the page is
-      <b>marked</b> and given feedback; anything still blank is answered.
+      <b>marked</b> and given feedback; anything still blank is answered. Then the whole paper comes back with a
+      <b>report</b> — the score, what went well, what the mistakes have in common and what to practise next.
       A question that runs over onto the next page is fine: add both pictures and they are read as one paper.</p>
     <div class="rowBtns"><button class="btn btnPrimary btnBig" id="signInBtn2">Sign in with Google</button></div>
   </section>
@@ -573,6 +612,7 @@
           <div class="spacer"></div>
           <div style="display:flex;gap:10px;flex:none;">
             <button class="btn btnScan hidden" id="vetAllBtn" title="Add every question on this paper to a vetting list">📥 Send all to vetting</button>
+            <button class="btn hidden" id="reportBtn" title="Write the report on this paper again">📋 Report</button>
             <button class="btn" id="copyAnswersBtn">📋 Copy</button>
             <button class="btn" id="printAnswersBtn">🖨 Print</button>
           </div>
@@ -582,6 +622,9 @@
         <p class="sub" id="markSummary" style="margin-top:10px"></p>
         <p class="sub" id="answersNote" style="margin-top:10px"></p>
       </div>
+      <!-- 📋 The report on the whole paper. Outside the noPrint header card on
+           purpose: it is the one thing on this screen that has to reach paper. -->
+      <div id="reportWrap"></div>
       <div id="answersList"></div>
     </div>
 
@@ -615,6 +658,18 @@
         still blank it is simply answered. A page holding some of each comes back with some of each.</p>
       <p class="sub" style="margin-top:10px">The correct answer is always worked out from scratch first, so what the student
         wrote can never talk the app into the wrong answer.</p>
+      <h3 style="margin-top:22px">📋 And then the report on the whole paper</h3>
+      <p class="sub" style="margin-top:6px">Once every page has been read, the marked script is looked at <b>as a whole</b> and
+        the report appears above the answers: the score, then what the student can already do, what their mistakes have
+        in common — the same slip in questions 3, 7 and 12 is <i>one</i> misunderstanding, not three — and what to go and
+        practise. It writes itself; there is nothing to switch on.</p>
+      <p class="sub" style="margin-top:10px"><b>The score is counted here, not by the AI</b>, from the marks already on the
+        cards: out of the paper's own marks where every question prints one, and otherwise a question at a time with a
+        partly right answer worth half. A question you left blank is never counted against you, and an answer the AI
+        would not commit to a verdict on is left out rather than marked wrong.</p>
+      <p class="sub" style="margin-top:10px">A paper with nothing written on it gets no report — there is nothing to report
+        on, only answers. The report goes out with <b>Copy</b> and <b>Print</b>; press <b>📋 Report</b> to have it written
+        again.</p>
       <h3 style="margin-top:22px">If an answer is not good enough, fix it — and teach it</h3>
       <p class="sub" style="margin-top:6px">Every answer card carries a <b>✎ Edit</b> — yours alone, never a
         student's. Rewrite the answer, the
@@ -929,7 +984,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.8.0';
+var APP_VERSION = 'v1.9.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2899,6 +2954,7 @@ async function runScan() {
   _scanning = true;
   _algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS;   // a fresh ration, once, per run
   _answers = [];
+  _report = null;                 // last paper's report must never outlive its paper
   _askedFor = ask;
   var detail = scanDetail();
   var failedPages = [];
@@ -2941,6 +2997,12 @@ async function runScan() {
       (t.marked ? ' — ' + t.marked + ' marked, ' + t.blank + ' answered' : ' — all answered') +
       (failedPages.length ? '. Page ' + failedPages.join(', ') + ' could not be read' : '') + '.', 6000);
   }
+
+  // 📋 The report on the whole script, once every page has been read and
+  // marked. Automatic, like the marking, and only where something was
+  // actually attempted — see `runReport`.
+  await runReport(run);
+  if (run !== _scanRun) return;
 
   // 📥 File the whole paper, where the teacher has asked for that on the How
   // tab. Admin only, and it says so when it has — see `_vetAutoFile`.
@@ -3343,6 +3405,7 @@ function renderAnswers() {
     : 'No teaching notes are being applied — this is the ordinary syllabus standard.';
   $('copyAnswersBtn').disabled = !_answers.length;
   $('printAnswersBtn').disabled = !_answers.length;
+  renderReport();
   renderVetAllBtn();
   renderGroundingLine();
 }
@@ -3383,7 +3446,11 @@ function answersAsText() {
     ].filter(Boolean).join(', ') + ')');
     if (t.blank) head.push(t.blank + (allAsk ? ' answered' : ' blank, answered'));
   }
-  return head.join(' · ') + '\n\n' + _answers.map(function (it, i) {
+  // The report goes out with the paper. A copy that lost it would be a bare
+  // answer key again — the half a parent reads is the one at the top.
+  var rep = reportAsText();
+  return head.join(' · ') + '\n\n' + (rep ? rep + '\n\n———\n\n' : '') +
+    _answers.map(function (it, i) {
     var lines = [it.kind === 'ask'
       ? (it.question || 'Answer')
       : (it.number || (i + 1)) + '. ' + (it.question || '')];
@@ -3420,6 +3487,392 @@ function _copyFallback(text) {
   try { document.execCommand('copy'); toast('Copied.'); }
   catch (e) { toast('Could not copy — select the text and copy it by hand.', 5000); }
   document.body.removeChild(ta);
+}
+
+/* =====================================================================
+   📋 THE REPORT — the whole script, once every page has been read
+   ---------------------------------------------------------------------
+   Twenty marked cards are twenty separate verdicts. What a teacher writes at
+   the bottom of a paper they have just marked is the thing none of those
+   cards can say: the SAME mistake in questions 3, 7 and 12 is one
+   misunderstanding, not three, and knowing that is the difference between a
+   student who corrects three answers and one who learns the topic. So when
+   the run finishes, the marked script goes up ONCE more and comes back as a
+   report — how it went, what is already solid, what the mistakes have in
+   common, and what to go and practise.
+
+   IT IS AUTOMATIC, LIKE THE MARKING, AND HAS NO SETTING. A picker asking
+   "report or no report?" is a decision demanded before the app has seen the
+   paper, and the honest answer is always yes when something was attempted.
+
+   THE SCORE IS NEVER THE MODEL'S. Every number on this card is counted here,
+   in plain code, from the verdicts already on the cards (`reportScore`), and
+   the prompt forbids the model to give a score, a total or a percentage at
+   all. A model asked to add up its own marking gets it wrong often enough,
+   and a total that disagrees with the chips printed directly above it is
+   worse than no report — it is the app contradicting itself in front of a
+   parent. The model writes the WORDS; the arithmetic is not its job.
+
+   IT IS NOT A SECOND MARKER. Every verdict was settled question by question
+   against the picture of the page; this call never sees the pictures, only
+   the transcription the run already produced — reading and marking are
+   separate passes, exactly as the Learning Portal's Mark Paper keeps them —
+   and it is told in as many words that the verdicts are final. A report that
+   quietly re-marked question 4 would leave a card saying "correct" above a
+   report saying it was not.
+
+   A BLANK IS NEVER IN IT. The one rule the whole marking side rests on holds
+   here too: only questions the student ATTEMPTED are sent, and the prompt
+   says a blank is not a mistake. A report that told a child off for the
+   twelve questions they had not reached yet would be this feature's worst
+   possible failure.
+
+   NOTHING IS SAVED. The report lives in the tab with the answers and leaves
+   through Copy and Print, like everything else here.
+   ===================================================================== */
+
+var REPORT_MIN_MARKED = 2;   // one attempted question is the feedback card again
+var REPORT_MAX_Q = 60;       // how many marked questions reach the prompt
+var REPORT_MAX_LIST = 4;     // strengths / next steps
+var REPORT_MAX_GAPS = 4;     // a report naming eight themes has grouped nothing
+
+/* What a verdict is worth when the paper prints no mark allocation of its
+   own. "partial" is half a mark rather than nothing, because an answer that
+   is right as far as it goes and one that is simply wrong are not the same
+   paper, and a score that treats them alike is the one a student argues with. */
+var REPORT_CREDIT = { correct: 1, partial: 0.5, wrong: 0 };
+
+var _report = null;   // { run, status: 'writing'|'done'|'failed', score, words, err }
+
+/* The ONE place "2/3" becomes two numbers. It is deliberately strict: the
+   field is free text the model wrote, so "2 out of 3", "3 marks" and "½" are
+   not a mark allocation this can add up, and half a paper's marks totalled as
+   if they were all of it is a score that is simply wrong. Anything it cannot
+   read returns null and the question is counted the other way instead. */
+function _reportMarkStr(s) {
+  var m = /^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*$/.exec(String(s == null ? '' : s));
+  if (!m) return null;
+  var awarded = parseFloat(m[1]);
+  var total = parseFloat(m[2]);
+  if (!(total > 0) || !(awarded >= 0) || awarded > total) return null;
+  return { awarded: awarded, total: total };
+}
+function _reportNum(n) {
+  return String(Math.round(n * 100) / 100);
+}
+
+/* The whole arithmetic of the report, in one pass over the same items the
+   cards were drawn from — so the score, the sentence under it and the chips
+   at the top of the page can never disagree about the same paper.
+
+   Two things it must keep doing. THE PAPER'S OWN MARKS ARE ONLY USED WHEN
+   EVERY judged question printed one: a paper where three questions in ten
+   print an allocation would otherwise come back "5/6", which reads as the
+   score for the whole script. And AN ANSWER THE MODEL WOULD NOT JUDGE is out
+   of the percentage altogether — counting it wrong marks the student down for
+   the model's indecision, and counting it right is a mark they did not earn. */
+function reportScore(items) {
+  var s = {
+    total: 0, attempted: 0, blank: 0,
+    correct: 0, partial: 0, wrong: 0, unjudged: 0,
+    judged: 0, credit: 0,
+    awarded: 0, outOf: 0, printed: 0, marksUsable: false,
+    pct: null
+  };
+  (items || []).forEach(function (it) {
+    s.total++;
+    if (!it || !it.marked) { s.blank++; return; }
+    s.attempted++;
+    var v = it.verdict;
+    if (REPORT_CREDIT[v] == null) { s.unjudged++; return; }
+    s[v]++;
+    s.judged++;
+    s.credit += REPORT_CREDIT[v];
+    var m = _reportMarkStr(it.marks);
+    if (m) { s.printed++; s.awarded += m.awarded; s.outOf += m.total; }
+  });
+  s.marksUsable = s.judged > 0 && s.printed === s.judged && s.outOf > 0;
+  if (s.marksUsable) s.pct = Math.round((s.awarded / s.outOf) * 100);
+  else if (s.judged) s.pct = Math.round((s.credit / s.judged) * 100);
+  return s;
+}
+
+function reportScoreText(s) {
+  if (!s || !s.judged) return '';
+  if (s.marksUsable) return _reportNum(s.awarded) + ' / ' + _reportNum(s.outOf) + ' marks';
+  return _reportNum(s.credit) + ' / ' + s.judged + ' of the questions attempted';
+}
+function reportCountsText(s) {
+  if (!s || !s.attempted) return '';
+  var bits = [];
+  if (s.correct) bits.push(s.correct + ' right');
+  if (s.partial) bits.push(s.partial + ' partly right');
+  if (s.wrong) bits.push(s.wrong + ' wrong');
+  if (s.unjudged) bits.push(s.unjudged + ' marked without a verdict');
+  var out = s.attempted + ' of ' + s.total + ' question' + (s.total === 1 ? '' : 's') + ' had been answered on ' +
+    'the paper' + (bits.length ? ' — ' + bits.join(', ') : '');
+  if (s.blank) {
+    out += '. The other ' + s.blank +
+      (s.blank === 1 ? ' was blank and has' : ' were blank and have') + ' been answered for you';
+  }
+  return out + '.';
+}
+/* Said out loud, because a percentage worked out two different ways on two
+   different papers with nothing to say which is which is a number nobody can
+   check. */
+function reportBasisText(s) {
+  if (!s || !s.judged) return '';
+  if (s.marksUsable) return 'Counted from the marks the paper itself prints.';
+  return 'This paper does not print a mark for every question, so it is counted a question at a time — ' +
+    'a partly right answer as half.' +
+    (s.unjudged ? ' The ' + s.unjudged + ' answered but not judged ' + (s.unjudged === 1 ? 'is' : 'are') +
+                  ' left out of it rather than counted against you.' : '');
+}
+
+/* A report is written about a marked SCRIPT. An answer to a typed question was
+   never on a paper, and one marked question is the feedback card again in
+   longer words — neither is a script, so neither gets one. */
+function reportEligible(items) {
+  var n = 0;
+  (items || []).forEach(function (it) { if (it && it.kind === 'page' && it.marked) n++; });
+  return n >= REPORT_MIN_MARKED;
+}
+
+var REPORT_SYS =
+  'You are an experienced Singapore tuition teacher (P3 to Secondary 1) writing the short report that goes back ' +
+  'to a student with their marked paper. Every question has ALREADY been marked, one by one, against the ' +
+  'photographs — your job is to read the whole script at once and say what it shows. Reply with STRICT JSON ' +
+  'only, no markdown, exactly this shape: {"headline":"one or two sentences to the student about how this paper ' +
+  'went","strengths":["something they can already do, named"],"gaps":[{"title":"the misunderstanding, named in ' +
+  'a few words","detail":"1 to 3 sentences on what went wrong and what to do instead","questions":"3, 7(a)"}],' +
+  '"next":["one thing to go and practise"]}. ' +
+  'Rules: WRITE ACROSS THE WHOLE PAPER, never question by question. The student already has a card of feedback ' +
+  'on every question, so a report that walks through them again is worth nothing: group what went wrong into ' +
+  'THEMES — the same mistake in three questions is ONE gap — and name in "questions" the questions each theme ' +
+  'shows up in. At most 4 gaps, 4 strengths and 4 next steps, and fewer is better than padded. ' +
+  'NEVER GIVE A SCORE, A TOTAL, A MARK OR A PERCENTAGE, and never say how many were right or wrong. The marks ' +
+  'are counted for you and printed above your words: a second count that disagrees with them is worse than no ' +
+  'report at all. ' +
+  'NEVER RE-MARK ANYTHING. An answer marked correct is correct and one marked wrong is wrong, whatever you would ' +
+  'have said; if a verdict looks wrong to you, leave it alone and do not mention it. ' +
+  'Only the questions the student ATTEMPTED are listed below. A question left blank was not attempted and is not ' +
+  'a mistake — never count one against them and never tell them off for one. ' +
+  'Speak TO the student, warmly and plainly, at their own level. Be specific about the cause: "you are adding ' +
+  'before you convert the units" rather than "check your working". Never be unkind, and never be vague. ' +
+  'A paper that went well still gets a report: say what made it good and what would stretch them next. ' +
+  'Never name a question number that is not in the list below. ' +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+/* The marked script, as text. The pictures are deliberately NOT sent again:
+   the reading has already happened and been checked question by question, and
+   a second look at the photographs is a second chance to read them
+   differently. */
+function _reportPrompt(items, s) {
+  var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
+  var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
+  var who = (lvl || subj) ? 'It is a ' + [lvl, subj].filter(Boolean).join(' ') + ' paper.\n' : '';
+  var lines = [];
+  var skipped = 0;
+  (items || []).forEach(function (it, i) {
+    if (!it || !it.marked) return;
+    if (lines.length >= REPORT_MAX_Q) { skipped++; return; }
+    lines.push('Q' + (it.number || (i + 1)) +
+      ' | asked: ' + (_scanStr(it.question, 320) || '(not transcribed)') +
+      ' | the student wrote: ' + (it.studentAnswer || '(could not be read)') +
+      ' | the correct answer: ' + (_scanStr(it.answer, 240) || (it.option ? '(' + it.option + ')' : '—')) +
+      ' | marked: ' + (it.verdict || 'answered but not judged') +
+      (it.marks ? ' (' + it.marks + ')' : ''));
+  });
+  return 'THE MARKED SCRIPT — every question the student actually attempted, with what they wrote, the correct ' +
+    'answer, and the verdict already given:\n' + lines.join('\n') + '\n' +
+    (skipped ? 'And ' + skipped + ' further attempted questions not listed here.\n' : '') +
+    who +
+    (s && s.blank ? s.blank + ' further question' + (s.blank === 1 ? ' was' : 's were') + ' left BLANK. They were ' +
+      'not attempted, so they are not mistakes and are not listed: the answers to them have simply been supplied. ' +
+      'Do not mention them as errors.\n' : '') +
+    (_askedFor ? 'The student also asked, word for word: "' + _scanStr(_askedFor, ASK_MAX_CHARS) + '"\n' : '') +
+    'Write the report on this script.';
+}
+
+/* A question number the model reached for that is not on this paper points
+   the student at nothing, so a reference is kept only when it matches a
+   question that really came back. Matched the way the option labels are —
+   with the brackets and the dots taken off — because "7(a)", "7a" and "(7a)"
+   are one question written three ways. */
+function _reportRefs(v, items) {
+  var known = {};
+  (items || []).forEach(function (it, i) {
+    var n = String((it && it.number) || (i + 1));
+    known[n.replace(/[()\s.]/g, '').toLowerCase()] = n;
+  });
+  var out = [];
+  String(v == null ? '' : v).split(/[,;]+|\band\b/i).forEach(function (part) {
+    var key = String(part).replace(/^\s*q(?:uestion)?s?\.?\s*/i, '').replace(/[()\s.]/g, '').toLowerCase();
+    if (!key) return;
+    var hit = known[key];
+    if (hit && out.indexOf(hit) < 0) out.push(hit);
+  });
+  return out;
+}
+function _reportList(v, cap, len) {
+  var out = [];
+  (Array.isArray(v) ? v : []).forEach(function (x) {
+    var t = _scanStr(typeof x === 'string' ? x : (x && (x.text || x.title)), len);
+    if (t && out.length < cap) out.push(t);
+  });
+  return out;
+}
+function _reportNew(parsed, items) {
+  var p = (parsed && typeof parsed === 'object') ? parsed : {};
+  var gaps = [];
+  (Array.isArray(p.gaps) ? p.gaps : []).forEach(function (g) {
+    if (gaps.length >= REPORT_MAX_GAPS) return;
+    var title = _scanStr(g && g.title, 140);
+    var detail = _scanStr(g && g.detail, 700);
+    if (!title && !detail) return;
+    gaps.push({
+      title: title || 'Worth another look',
+      detail: detail,
+      questions: _reportRefs(g && g.questions, items)
+    });
+  });
+  var r = {
+    headline: _scanStr(p.headline, 700),
+    strengths: _reportList(p.strengths, REPORT_MAX_LIST, 320),
+    gaps: gaps,
+    next: _reportList(p.next, REPORT_MAX_LIST, 320)
+  };
+  r.empty = !r.headline && !r.strengths.length && !r.gaps.length && !r.next.length;
+  return r;
+}
+
+/* ---- Writing it ----
+   The score is worked out and on screen the moment the run ends; only the
+   WORDS are waited for. A call that fails therefore still leaves a real
+   report rather than an empty space where one was promised. */
+async function runReport(run) {
+  var items = _answers.slice();
+  if (!reportEligible(items)) { _report = null; renderReport(); return; }
+  if (!window.askGemini || !window.aiReady || !window.aiReady()) return;
+  _report = { run: run, status: 'writing', score: reportScore(items), words: null, err: '' };
+  renderReport();
+  try {
+    var raw = await window.askGemini(_reportPrompt(items, _report.score), {
+      // 'mark' is the honest kind: this is written ABOUT marking, so it is
+      // held to the teacher's own marking standard — and deliberately not
+      // handed the key facts and the exemplar answers, which would tempt it
+      // into answering the paper again instead of reporting on it.
+      system: REPORT_SYS + aiGrounding('mark'),
+      maxOutputTokens: 4000,
+      effort: 'high',
+      thinkingLevel: 'high',
+      temperature: 0.3,
+      json: true
+    });
+    if (run !== _scanRun) return;                 // a newer run owns the screen now
+    var words = _reportNew(_parseAIJson(raw), items);
+    if (words.empty) throw new Error('nothing came back');
+    _report.words = words;
+    _report.status = 'done';
+  } catch (err) {
+    if (run !== _scanRun) return;
+    console.warn('report: failed', err);
+    _report.status = 'failed';
+    _report.err = (err && err.message) || 'it could not be written';
+  }
+  renderReport();
+}
+function reportRewrite() {
+  if (_scanning) { toast('The pages are still being read.'); return; }
+  if (!reportEligible(_answers)) return;
+  runReport(_scanRun);
+}
+
+/* ---- Showing it ---- */
+function reportCardHtml() {
+  if (!_report || !_report.score) return '';
+  var s = _report.score;
+  var w = _report.words;
+  var score = reportScoreText(s);
+  var basis = reportBasisText(s);
+
+  var head = '<div class="repHead"><div class="repHeadText">' +
+      '<div class="repTitle">📋 Report</div>' +
+      (score ? '<div class="repScore">' + escHtml(score) + '</div>' : '') +
+      '<div class="repCounts">' + escHtml(reportCountsText(s)) + '</div>' +
+    '</div>' +
+    (s.pct == null ? '' : '<div class="repPct">' + s.pct + '%</div>') +
+    '</div>';
+
+  var body = '';
+  if (_report.status === 'writing') {
+    body = '<div class="repPending">✨ Writing the report on the whole paper…</div>';
+  } else if (_report.status === 'failed') {
+    body = '<div class="repFail">The written half of the report could not be written — ' + escHtml(_report.err) +
+      '. The marks above are counted here and are not affected. Press 📋 Report to try again.</div>';
+  } else if (w) {
+    if (w.headline) body += '<p class="repLead">' + escHtml(w.headline) + '</p>';
+    if (w.strengths.length) {
+      body += '<div class="repSec"><div class="repSecTitle">✓ What went well</div><ul class="repList">' +
+        w.strengths.map(function (x) { return '<li>' + escHtml(x) + '</li>'; }).join('') + '</ul></div>';
+    }
+    if (w.gaps.length) {
+      body += '<div class="repSec"><div class="repSecTitle">✗ What to work on</div>' +
+        w.gaps.map(function (g) {
+          return '<div class="repGap"><div class="repGapTitle">' + escHtml(g.title) + '</div>' +
+            (g.questions.length
+              ? '<div class="repGapQs">' + (g.questions.length > 1 ? 'Questions ' : 'Question ') +
+                escHtml(g.questions.join(', ')) + '</div>' : '') +
+            (g.detail ? '<div class="repGapText">' + escHtml(g.detail) + '</div>' : '') + '</div>';
+        }).join('') + '</div>';
+    }
+    if (w.next.length) {
+      body += '<div class="repSec"><div class="repSecTitle">→ Practise next</div><ul class="repList">' +
+        w.next.map(function (x) { return '<li>' + escHtml(x) + '</li>'; }).join('') + '</ul></div>';
+    }
+  }
+  return '<div class="reportCard">' + head + body +
+    (basis ? '<div class="repNote">' + escHtml(basis) + '</div>' : '') + '</div>';
+}
+
+function renderReport() {
+  var wrap = $('reportWrap');
+  if (wrap) wrap.innerHTML = reportCardHtml();
+  var b = $('reportBtn');
+  if (!b) return;
+  b.classList.toggle('hidden', !reportEligible(_answers));
+  b.disabled = _scanning || !!(_report && _report.status === 'writing');
+  b.textContent = (_report && _report.status === 'done') ? '📋 Rewrite report' : '📋 Report';
+}
+
+function reportAsText() {
+  if (!_report || !_report.score) return '';
+  var s = _report.score;
+  var w = _report.words;
+  var out = ['REPORT'];
+  var score = reportScoreText(s);
+  out.push((score ? score + (s.pct == null ? '' : '  ·  ' + s.pct + '%') + '\n' : '') + reportCountsText(s));
+  if (_report.status === 'writing') out.push('(the written report had not come back yet)');
+  if (_report.status === 'failed') out.push('(the written report could not be written: ' + _report.err + ')');
+  if (w) {
+    if (w.headline) out.push(w.headline);
+    if (w.strengths.length) {
+      out.push('What went well:\n' + w.strengths.map(function (x) { return '  • ' + x; }).join('\n'));
+    }
+    if (w.gaps.length) {
+      out.push('What to work on:\n' + w.gaps.map(function (g) {
+        return '  • ' + g.title +
+          (g.questions.length ? '  (question' + (g.questions.length > 1 ? 's ' : ' ') + g.questions.join(', ') + ')' : '') +
+          (g.detail ? '\n    ' + g.detail : '');
+      }).join('\n'));
+    }
+    if (w.next.length) {
+      out.push('Practise next:\n' + w.next.map(function (x) { return '  • ' + x; }).join('\n'));
+    }
+  }
+  var basis = reportBasisText(s);
+  if (basis) out.push(basis);
+  return out.join('\n\n');
 }
 
 /* =====================================================================
@@ -4090,6 +4543,7 @@ $('askText').addEventListener('keydown', function (e) {
   if (!$('readBtn').disabled) runScan();
 });
 $('vetAllBtn').addEventListener('click', function () { vetOpen(null); });
+$('reportBtn').addEventListener('click', reportRewrite);
 $('copyAnswersBtn').addEventListener('click', copyAnswers);
 $('printAnswersBtn').addEventListener('click', function () { window.print(); });
 
