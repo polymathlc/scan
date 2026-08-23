@@ -32,7 +32,11 @@ const scan = section(
    with nothing on screen to say which half is lying. */
 const report = section(
   '/* =====================================================================\n   📋 THE REPORT',
-  '/* =====================================================================\n   📥 SENDING A SCANNED QUESTION');
+  /* It ENDS at the mistake book, not at the vetting door beyond it: the book
+     sits between the two, so the old boundary swept the book's code into the
+     report's section and every "the report does not do X" check was quietly
+     being asked of the book as well. */
+  '/* =====================================================================\n   📕 THE MISTAKE BOOK');
 /* 📕 The mistake book, and the worksheet it makes. The one place this app
    keeps a child's work, so every guard on it matters — and the collection
    NAME most of all: `mistakes` under this same uid is the Science portal's
@@ -122,6 +126,7 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     MB_COL, MB_PAPER_COL, MB_IMG_PATH, MB_PAPER_MAX, MB_PAPER_DAYS, MB_VIEWER_PATH, MB_MAIL_COL,
     mbIsWrong, mbIsRight, mbFindByKey, MB_CLEAR_WINS, MB_KEY_PREFIX,
     mbKeyOf, mbHasKey, _mbBoxOk, _mbShotForPage, _mbPaperUrl, _mbPaperTitle,
+    _mbCleanBlocks, _mbBuildShots, MB_BUILD_SYS, MB_FIG_MAX, MB_BLOCK_MAX, MB_BLOCK_CHARS,
     _mbPaperDoc, _mbMailDoc, camAvailable,
     set mistakes(v) { _mistakes = v; },
     set shots(v) { _shots = v; },
@@ -992,6 +997,109 @@ ok('the prompt asks for the rectangle only where there IS a figure',
    /OMIT "diagramBox" entirely for a question that is only words/.test(html));
 ok('the rectangle uses the same 0–1000 convention the portal’s readers use',
    /\[ymin, xmin, ymax, xmax\], four integers from 0 to 1000/.test(html));
+
+/* ---- Reproducing the question as ORDERED BLOCKS ----
+   The Science portal's Rapid add sets a question out as typeset wording with
+   each figure cropped and placed where it belongs, and this is that ability
+   ported. Every way it goes wrong is silent on a printed sheet: a block that
+   is only pictures asks nothing, a figure box that is really the whole page
+   keeps the neighbouring question, and a rebuild that could cost the filing
+   would lose the mistake itself rather than just its layout. */
+ok('a good build is kept in order, text and figure alike', (() => {
+  const out = api._mbCleanBlocks({ blocks: [
+    { type: 'text', text: 'Farmer Tan removed the outer ring.' },
+    { type: 'image', page: 1, box_2d: [100, 100, 500, 600] },
+    { type: 'text', text: '(a) State the function of the tubes. [1]' }
+  ] });
+  return out.length === 3 && out[0].type === 'text' && out[1].type === 'image' && out[2].type === 'text';
+})());
+ok('…and a figure carries its own page and rectangle, ready to crop', (() => {
+  const b = api._mbCleanBlocks({ blocks: [{ type: 'text', text: 'x' }, { type: 'image', page: 2, box_2d: [10, 20, 300, 400] }] })[1];
+  return b.page === 2 && b.box.join() === '10,20,300,400' && b.url === '';
+})());
+ok('a page the model did not name falls back to the first, never to nothing',
+   api._mbCleanBlocks({ blocks: [{ type: 'text', text: 'x' }, { type: 'image', box_2d: [10, 20, 300, 400] }] })[1].page === 1);
+
+/* A BUILD WITH NO WORDING IS REFUSED. A worksheet made of pictures with
+   nothing asking anything is worse than the crop it would have replaced, and
+   the fallbacks underneath it are both better than that. */
+ok('a build with no wording at all is refused outright',
+   api._mbCleanBlocks({ blocks: [{ type: 'image', box_2d: [100, 100, 500, 600] }] }).length === 0);
+ok('nothing usable is an empty list, not a throw',
+   api._mbCleanBlocks(null).length === 0 && api._mbCleanBlocks({}).length === 0
+   && api._mbCleanBlocks({ blocks: 'nonsense' }).length === 0);
+ok('an empty text block is dropped rather than printed as a blank paragraph',
+   api._mbCleanBlocks({ blocks: [{ type: 'text', text: '   ' }, { type: 'text', text: 'real' }] }).length === 1);
+
+/* The rectangle is a FIGURE's, so the whole-page test still applies here —
+   a box round the entire sheet keeps the question above and below it too. */
+ok('a figure box that is really the whole page is refused',
+   api._mbCleanBlocks({ blocks: [{ type: 'text', text: 'x' }, { type: 'image', box_2d: [10, 10, 990, 990] }] }).length === 1);
+ok('a malformed rectangle costs the figure and never the wording',
+   api._mbCleanBlocks({ blocks: [{ type: 'text', text: 'x' }, { type: 'image', box_2d: [1, 2] }] }).length === 1);
+
+/* Caps, because a model that will not stop is a document that will not save
+   and a mistake that was therefore never filed at all. */
+ok('the figures are capped', (() => {
+  const many = [{ type: 'text', text: 'x' }];
+  for (let i = 0; i < api.MB_FIG_MAX + 6; i++) many.push({ type: 'image', box_2d: [100, 100, 400, 400] });
+  return api._mbCleanBlocks({ blocks: many }).filter(b => b.type === 'image').length === api.MB_FIG_MAX;
+})());
+ok('the blocks are capped', (() => {
+  const many = [];
+  for (let i = 0; i < api.MB_BLOCK_MAX + 10; i++) many.push({ type: 'text', text: 'line ' + i });
+  return api._mbCleanBlocks({ blocks: many }).length === api.MB_BLOCK_MAX;
+})());
+ok('a runaway text block is clipped', (() => {
+  const b = api._mbCleanBlocks({ blocks: [{ type: 'text', text: 'z'.repeat(5000) }] })[0];
+  return b.text.length === api.MB_BLOCK_CHARS;
+})());
+/* A statement list has to keep its line breaks, or "A: … B: … C: …" prints as
+   one run-on paragraph — which is the layout this feature exists to preserve. */
+ok('line breaks inside a block survive',
+   api._mbCleanBlocks({ blocks: [{ type: 'text', text: 'A: one\nB: two' }] })[0].text === 'A: one\nB: two');
+
+/* The pages a question is printed on: a stitched question is measured on the
+   page its rectangle was drawn on, so BOTH go up and the block says which. */
+api.shots = [{ data: 'a', url: 'a' }, { data: 'b', url: 'b' }, { data: 'c', url: 'c' }];
+ok('one page for an ordinary question', api._mbBuildShots({ page: 2, endPage: 2 }).length === 1);
+ok('both pages for a question that ran over the break',
+   api._mbBuildShots({ page: 1, endPage: 2 }).length === 2);
+api.shots = [];
+
+/* The prompt reproduces; it does not answer, mark or reword. Each of these is
+   a way the worksheet quietly stops being the question the child sat. */
+ok('the rebuild is told to reproduce, never to answer or reword',
+   /NOT answering it, NOT marking it and NOT rewording it/.test(api.MB_BUILD_SYS));
+ok('…to bring the SHARED STEM with a lettered part',
+   /INCLUDE THE SHARED STEM/.test(api.MB_BUILD_SYS)
+   && /A part torn away from the stem it depends on cannot be answered at all/.test(api.MB_BUILD_SYS));
+ok('…to take nothing from the neighbouring questions',
+   /Nothing from the question before it or the one after it/.test(api.MB_BUILD_SYS));
+ok('…to leave the options out, because they are printed from the item itself',
+   /LEAVE OUT the multiple-choice answer options/.test(api.MB_BUILD_SYS));
+ok('…and to leave the handwriting out', /anything the student has written by hand/.test(api.MB_BUILD_SYS));
+ok('the rectangle rule is the same 0–1000 convention as everywhere else',
+   /four \n?\s*integers from 0 to 1000 measured on the WHOLE attached page/.test(api.MB_BUILD_SYS.replace(/\s+/g, ' '))
+   || /integers from 0 to 1000 measured on the WHOLE attached page/.test(api.MB_BUILD_SYS));
+ok('an omitted figure is an acceptable answer', /OMIT the image block entirely/.test(api.MB_BUILD_SYS));
+
+/* The ration, and the guarantee that it can never cost the mistake. */
+ok('the budget is spent BEFORE the call, so a failure cannot buy another',
+   /_mbBuildBudget--;\s*\/\/ spent BEFORE the call/.test(html));
+ok('…refilled once per run and nowhere else',
+   /\n  _mbBuildBudget = MB_BUILD_MAX;\s+\/\/ refilled ONCE per run/.test(html)
+   && (html.match(/^\s+_mbBuildBudget = MB_BUILD_MAX;/gm) || []).length === 1);
+ok('…and a question added by hand always gets one',
+   /if \(_mbBuildBudget < 1\) _mbBuildBudget = 1;/.test(html));
+ok('every failure returns an empty list rather than throwing the filing away',
+   /catch \(e\) \{ console\.warn\('question rebuild failed', e\); return \[\]; \}/.test(html));
+ok('the reproduction reaches the mistake…', /blocks: blocks,/.test(html));
+ok('…and the worksheet', /blocks: m\.blocks \|\| \[\]/.test(html));
+/* It is its OWN call. Bolting a block specification onto the scan prompt buys
+   a better worksheet at the price of worse marking. */
+ok('it is a separate call, not more work for the marking prompt',
+   !/MB_BUILD_SYS/.test(api.SCAN_SYS) && /system: MB_BUILD_SYS/.test(html));
 
 /* The page a crop is cut from. The page numbers count only the pictures that
    were SENT, so a picture that could not be opened must not shift them. */
