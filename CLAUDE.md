@@ -8,7 +8,9 @@ Guidance for Claude when working in this repo.
   or pick pictures out of the gallery — and **every question printed on them is read: what the
   student has already written is MARKED, what is still blank is ANSWERED**. Four subjects:
   Science, Mathematics, English, Chinese. **A typed or dictated question is the other way in**:
-  with pages it governs the run, with no pages it *is* the run. Nothing is saved anywhere: a
+  with pages it governs the run, with no pages it *is* the run. **When the last page has been read,
+  the marked script comes back as a REPORT** — the score, what went well, what the mistakes have in
+  common, what to practise next. See that section below. Nothing is saved anywhere: a
   photographed paper is somebody's work, so it lives in the tab and leaves through Copy or Print —
   **except on the admin's own press**: ✎ Edit teaches a corrected answer into the shared notebook,
   and **📥 Send to vetting** files one question (never the student's answer to it) in another
@@ -325,6 +327,49 @@ step, and ship a change to the shape in both repos together**:
   right there. The flag is recomputed on every pass, so a fixed answer stops wearing it.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 📋 The report on the whole script (v1.9.0)
+- **Twenty marked cards are twenty separate verdicts.** What a teacher writes at the bottom of a
+  paper they have just marked is the thing none of those cards can say: the same mistake in
+  questions 3, 7 and 12 is ONE misunderstanding, not three. So when the run finishes, the marked
+  script goes up once more and comes back as a report — the score, what is already solid, what the
+  mistakes have in common, and what to practise next.
+- **It is automatic and has no setting**, exactly like the marking. A picker asking "report or no
+  report?" is a decision demanded before the app has seen the paper.
+- **THE SCORE IS NEVER THE MODEL'S.** Every number on the card is counted in plain code by
+  `reportScore`, from the verdicts already on the answer cards, and `REPORT_SYS` forbids the model
+  a score, a total, a mark or a percentage at all. A model asked to add up its own marking gets it
+  wrong often enough, and a total that disagrees with the chips printed directly above it is the
+  app contradicting itself in front of a parent — worse than no report.
+- **`_reportMarkStr` is the ONE place "2/3" becomes two numbers**, and it is deliberately strict:
+  "3 marks", "2 out of 3" and "½" are not allocations this can add up. **The paper's own marks are
+  used only when EVERY judged question printed one** (`marksUsable`) — a paper where three
+  questions in ten print an allocation would otherwise come back "5/6", which reads as the score
+  for the whole script. Otherwise it is counted a question at a time, a `partial` worth half
+  (`REPORT_CREDIT`), and the card SAYS which of the two it did (`reportBasisText`).
+- **A blank is never in it**, on either side: `reportScore` counts it as blank rather than wrong,
+  only attempted questions reach `_reportPrompt`, and the prompt says in as many words that a blank
+  is not a mistake. **An answer the model would not give a verdict on is out of the percentage
+  altogether** — counting it wrong marks the student down for the model's indecision.
+- **It is NOT a second marker.** The pictures are not sent again: the call sees only the
+  transcription the run already produced (reading and marking are separate passes, as the Learning
+  Portal's Mark Paper keeps them), and it is told the verdicts are final. A report that quietly
+  re-marked question 4 would leave a card saying "correct" above a report saying it was not.
+- **It is grounded as `aiGrounding('mark')`** — the one-door rule. `'mark'` is the honest kind: the
+  report is written ABOUT marking, so it gets the teacher's marking standard and deliberately not
+  the key facts and exemplars, which would tempt it into answering the paper again.
+- **`reportEligible` decides who gets one**: two or more MARKED page questions. A fresh worksheet
+  has nothing to report on, and one marked question is the feedback card again in longer words. An
+  answer to a typed question (`kind: 'ask'`) was never on a paper and is never a script.
+- **A failed call still leaves a real report** — the score is on screen the moment the run ends and
+  only the WORDS are waited for. 📋 Report rewrites it.
+- **A question reference the model invented is dropped** (`_reportRefs`, matched the way the option
+  labels are, so "7(a)", "7a" and "(7a)" are one question): a reference to a question that is not
+  on this paper points the student at nothing.
+- **It PRINTS.** `#reportWrap` sits outside the `noPrint` header card on purpose — the chips at the
+  top of the page do not print, and a printed script with no score on it loses the half a parent
+  reads. It goes out with Copy too. Nothing is saved, as everywhere else here.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -402,7 +447,9 @@ step, and ship a change to the shape in both repos together**:
   `VET_TARGETS`, `VET_SOURCE`, `_vetSend`, `_vetSendBySubject`, `_vetPortalDoc`, `_vetMathDoc`,
   `_vetCorrectIndex`, `_vetTitle`, `_vetHtml`, `_vetCardFootHtml`, `vetOpen`, `vetChoose`,
   `vetChooseAuto`, `_vetAutoFile`, `SCAN_SUBJECT_FIELD_RULE`, `_scanSubject`, `itemSubject`,
-  `itemTarget`, `_vetGroupBySubject`),
+  `itemTarget`, `_vetGroupBySubject`,
+  `REPORT_SYS`, `REPORT_CREDIT`, `_reportMarkStr`, `reportScore`, `reportEligible`,
+  `_reportPrompt`, `_reportNew`, `_reportRefs`, `reportAsText`, `runReport`),
   run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
   against stubs. Every failure here is silent and the app carries on looking perfectly right: a
@@ -425,6 +472,10 @@ step, and ship a change to the shape in both repos together**:
   reader is in there for the mirror of that reason: too eager and it spends the run's whole ration
   rewriting good unitary answers, too timid and a pupil is handed a method they were never taught and
   cannot use in the exam — and both look, on the screen, like an app working perfectly.
+  The report is in there because every number on it is counted in code from the cards beside it: a
+  score worked out the wrong way is a wrong number on a page a parent reads, with the chips directly
+  above it saying something else and nothing to say which is lying — and a blank folded into the
+  denominator marks a child down for the questions they never reached.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.

@@ -2,7 +2,8 @@
 
 Photograph a worksheet or an exam paper — or pick pictures out of the gallery — and every question
 printed on them is read: whatever the student has already written is **marked**, whatever is still
-blank is **answered**, in the teacher's own words. Science, Mathematics, English and Chinese.
+blank is **answered**, in the teacher's own words — and then the whole paper comes back as a
+**report**. Science, Mathematics, English and Chinese.
 Type or dictate a question alongside the photo — or with no photo at all.
 
 Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app` Firebase project:
@@ -68,6 +69,27 @@ on the paper:
 A page holding some of each — the ordinary case — comes back with some of each, and the chips above
 the answers say how it went. The correct answer is always worked out from scratch **first**, from
 the printed question alone, so what the student wrote can never talk the app into agreeing with it.
+
+## 📋 And then the report on the whole paper
+
+Twenty marked cards are twenty separate verdicts. What a teacher writes at the bottom of a paper
+they have just marked is the thing none of those cards can say — so once the last page has been
+read, the marked script is looked at **as a whole** and the report appears above the answers:
+
+- **the score**, and how it was arrived at;
+- **what went well** — what the student can already do, named;
+- **what to work on** — the mistakes grouped into *themes*, each naming the questions it shows up
+  in, because the same slip in questions 3, 7 and 12 is one misunderstanding, not three;
+- **what to practise next.**
+
+It writes itself; there is nothing to switch on. **The score is counted by the app, never by the
+AI** — out of the paper's own marks where every question prints one, and otherwise a question at a
+time with a partly right answer worth half. The card says which of the two it did. A question left
+blank is never counted against you, and an answer the AI would not commit to a verdict on is left
+out rather than marked wrong.
+
+A paper with nothing written on it gets no report — there is nothing to report on, only answers.
+The report goes out with **Copy** and **Print**, and **📋 Report** writes it again.
 
 ## ✎ Fix an answer, and teach it for next time
 
