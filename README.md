@@ -2,8 +2,8 @@
 
 Photograph a worksheet or an exam paper — or pick pictures out of the gallery — and every question
 printed on them is read: whatever the student has already written is **marked**, whatever is still
-blank is **answered**, in the teacher's own words — and then the whole paper comes back as a
-**report**. Science, Mathematics, English and Chinese.
+blank is **answered**, in the teacher's own words — the whole paper comes back as a **report**, and
+every question the student got wrong is kept in their own **mistake book** to try again later. Science, Mathematics, English and Chinese.
 Type or dictate a question alongside the photo — or with no photo at all.
 
 Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app` Firebase project:
@@ -24,7 +24,7 @@ Three buttons and two tabs. The **Snap** tab is a camera:
 |  |  |
 | --- | --- |
 | 🖼 **left** | your gallery — and the badge on it is how many pages you have so far |
-| 📷 **middle** | the shutter: one photo per page, in the order they are printed |
+| 📷 **middle** | the shutter — and the camera **stays open**: page after page, no "use photo / retake" |
 | ✓ **right** | read the lot: mark what has been answered, answer what has not |
 
 Above those three there is a box to type in, and a 🎤 beside it where your browser can hear you.
@@ -90,6 +90,31 @@ out rather than marked wrong.
 
 A paper with nothing written on it gets no report — there is nothing to report on, only answers.
 The report goes out with **Copy** and **Print**, and **📋 Report** writes it again.
+
+## 📕 Your mistake book
+
+Every question you get **wrong** or **partly right** on a scanned paper is kept — the question, its
+diagram, what you wrote, the right answer and the feedback. It fills itself as you scan; the number
+on **📕 Mistake book** at the top of the screen is how many are in it, and every marked-wrong card
+carries a 📕 chip that takes it back out in one tap.
+
+**This is the only thing the app keeps.** Your photographs are not saved and your right answers are
+not saved. The book is under your own account: nobody else can see it, and your teacher's book is
+their own mistakes, not yours. Everyone has one — students and teacher alike.
+
+### 📤 …and a worksheet of the ones you choose
+
+Open the book, tick the questions you want to try again, and press **📤 Make a worksheet**. A link
+is sent to the email you sign in with (and it is always on screen with a **Copy** button, so it
+never depends on the email arriving). The page it opens is the questions on their own, with the
+answers on a page at the back — ready to print or save as a PDF.
+
+It opens **cleaned up**: the printing sharpened to black and white and your own working rubbed out,
+so the question is blank again and can honestly be attempted a second time. One switch brings back
+**the original photograph** instead. The wording is the same in both — only the pictures are
+redrawn, and the answers, options and marking never pass through an image model.
+
+The worksheet keeps for a year, and only you and your teacher can open it.
 
 ## ✎ Fix an answer, and teach it for next time
 

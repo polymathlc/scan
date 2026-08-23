@@ -10,7 +10,9 @@ Guidance for Claude when working in this repo.
   Science, Mathematics, English, Chinese. **A typed or dictated question is the other way in**:
   with pages it governs the run, with no pages it *is* the run. **When the last page has been read,
   the marked script comes back as a REPORT** — the score, what went well, what the mistakes have in
-  common, what to practise next. See that section below. Nothing is saved anywhere: a
+  common, what to practise next. See that section below. **Every question the student gets WRONG is
+  kept, in their own mistake book**, and a worksheet of the ones they choose is emailed to them as a
+  link — see those sections too. Nothing else is saved anywhere: a
   photographed paper is somebody's work, so it lives in the tab and leaves through Copy or Print —
   **except on the admin's own press**: ✎ Edit teaches a corrected answer into the shared notebook,
   and **📥 Send to vetting** files one question (never the student's answer to it) in another
@@ -370,6 +372,101 @@ step, and ship a change to the shape in both repos together**:
   reads. It goes out with Copy too. Nothing is saved, as everywhere else here.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 📷 The camera stays open (v1.10.0)
+- **`<input capture>` hands the job to the PHONE'S OWN camera app**, and that app is built around
+  taking ONE photograph: "use photo / retake", and then it closes. On a twelve-page paper that is
+  four taps a page and eleven trips in and out of the browser, and the pages that get skipped are
+  the ones at the end. So the page grows its own camera: `getUserMedia` puts the live picture on
+  screen, the shutter grabs the frame, and **nothing else happens** — no confirmation, no leaving
+  the page, the lens still open on the next page. Done closes it.
+- **`camAvailable()` is the ONE test, and the fallback is the route that was always there.** No
+  `getUserMedia`, no camera, a permission refused, a lens another tab is holding — every one of
+  them falls back to `$('cameraInput').click()` rather than leaving a shutter that does nothing. A
+  refusal says once why the screen looks different and then gets out of the way.
+- **`facingMode` is asked for as `ideal`, never `exact`.** A laptop with only a front camera must
+  still get a camera rather than an `OverconstrainedError`.
+- **BOTH ROUTES END AT `addShots`**, the one queue: a frame is drawn to a canvas at
+  `SCAN_PHOTO_MAX_SIDE`, encoded as **JPEG (never PNG** — a photograph re-encoded as PNG comes out
+  bigger), wrapped as a `File` and handed over, so the shrinking, the page numbering, the
+  failed-card rule and the batching are written once. Do not give the viewfinder its own pipeline.
+- **THE TRACKS ARE STOPPED ON EVERY WAY OUT** — Done, Cancel, Escape and leaving the Snap tab. A
+  camera left running is a recording light on somebody's phone and a flat battery, and there are
+  four doors out of that overlay.
+- **Cancel asks BEFORE the stream is dropped** (so "no" costs nothing) and only ever drops the
+  photos taken in THIS visit: the pages already in hand when it opened were not taken here.
+- **The strip along the bottom is the whole feedback loop.** A shutter that gives nothing back is
+  one nobody trusts, and the page you thought you took is the page nobody notices is missing until
+  the answers come back short. `renderShots` refreshes it, so one painter keeps it in step.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
+## 📕 The mistake book, and the worksheet it makes (v1.10.0)
+- **THIS IS THE ONE PLACE THIS APP KEEPS A CHILD'S WORK, and the rule above was changed on purpose
+  to put it here.** Everything else is built on nothing being saved. But a mistake nobody writes
+  down is one made again next week, and a paper marked, closed and forgotten is exactly what that
+  rule was costing. So the wrong answers — and only the wrong answers — are kept.
+- **It is the student's OWN**, under their own account (`users/{uid}/scanMistakes`). Nobody else's
+  device reads it, the teacher's book is the teacher's own mistakes, and there is no roster
+  anywhere. **Everyone gets one — student and admin alike** — which is what makes it different from
+  📥 Send to vetting.
+- **THE COLLECTION NAME IS NAMESPACED, and that is not tidiness.** The Science portal writes
+  `users/{uid}/mistakes` under this very same project and this very same uid, so a book called
+  `mistakes` here would be two apps sharing one collection — this app's questions in that app's
+  mistake log and back again, with nothing throwing and nothing looking wrong. `MB_COL`
+  (`scanMistakes`), `MB_PAPER_COL` (`scanPapers`) and `MB_IMG_PATH` (`scan-mistakes/`) are this
+  app's and nobody else's, and every path is built from those constants.
+- **It SAYS SO, every time.** The run's toast names how many went in, the header button wears the
+  count, and every marked-wrong card carries a 📕 chip that takes it back out in one tap. A thing
+  quietly saved is a thing nobody knows to delete.
+- **`mbIsWrong` is the ONE test**, and it re-states the blank rule: a blank was never attempted, so
+  it is not a mistake; a correct answer is not; an answer to a typed question was never on a paper.
+- **`mbKeyOf` folds the wording**, so a paper photographed twice is one mistake rather than two.
+- **THE PICTURE IS CROPPED AT THE MOMENT IT IS FILED**, because that is the only moment the
+  photograph is still in the tab. `SCAN_BOX_RULE` asks the model for `diagramBox` —
+  `[ymin,xmin,ymax,xmax]` as integers 0–1000, the same convention the Learning Portal's rapid
+  question adder uses — and **`_mbBoxOk` is the one test** that refuses a box that is malformed, off
+  the page, minute, or so nearly the whole page that the selection plainly failed. **A wrong
+  rectangle is worse than none**: it keeps somebody else's question and looks like a working crop.
+  The prompt says to OMIT it for a question that is only words.
+- **A crop that fails costs the DIAGRAM and never the mistake.** The document is written last, the
+  picture is only ever an extra on it, and `imgNote` puts the gap on the card rather than leaving a
+  question that quietly lost its figure. Storage being absent is survivable in the same way.
+- **A stitched question crops from the page its rectangle was drawn on** (`boxPage`), or a question
+  running over the page keeps a rectangle of the wrong sheet.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
+## 📤 The worksheet, and the link that reaches it (v1.10.0)
+- The chosen mistakes are written as ONE `scanPapers` document and the student is sent a link. **The
+  page at the other end is NOT in this repository**: it is `mistakes.html` in the Science Learning
+  Portal (`polymathlc/cer`), which already owns the printed-worksheet look and the image model that
+  cleans a photographed figure up. This app keeps the photographs, so it crops; that app renders and
+  cleans.
+- **IT MUST NOT DISTURB THAT APP.** Nothing is written into the Portal's question bank, its vetting
+  list, its notebook or a student's progress there, and the page that reads the paper is a
+  standalone file that touches nothing else of its own. Same reason as the collection names above.
+- **The link is built RELATIVELY and then made absolute.** `MB_VIEWER_PATH` is
+  `../cer/mistakes.html` — the four portals are sibling folders on one host, so that resolves on
+  GitHub Pages, on a local checkout and on a domain of the centre's own later — and
+  `new URL(..., location.href).href` gives the whole address an email needs without this file ever
+  naming a host.
+- **THE EMAIL IS BEST-EFFORT AND THE LINK IS NOT.** The mail document is written in the shape
+  Firebase's Trigger Email extension reads (`mail/{id}` = `{ to: [address], message: {…} }`), and a
+  queue that failed is REPORTED. The link is always on screen with a Copy button, and the window
+  says plainly whether the email could even be queued: telling a student an email is on its way when
+  nothing can send it is the outcome worth engineering against.
+- **The student's own answer TRAVELS with their own paper** — unlike a question sent to a vetting
+  list, where it must never go. The difference is who it is for: a bank question is for thirty other
+  children, and this is the child's own paper coming back to them.
+- **A paper expires** after `MB_PAPER_DAYS` (365) and only the account that made it, or the admin,
+  can open it. There is no backend, so nothing sweeps an expired paper: the viewer refuses to render
+  one, which is the honest half that can be done from a browser.
+- **The rules this needs live in `polymathlc/math/firestore.rules` and `storage.rules`** — that is
+  where the shared project's rules are kept, and **deploying them replaces the rules for the WHOLE
+  project**, so read that file's own DEPLOY WARNING first. The `mail` rule had to be widened to let
+  a signed-in user enqueue a message **to their own address and no other**; until it is deployed the
+  writes are refused and the app degrades exactly as it is built to — the book cannot be written and
+  says so, the email cannot be queued and says so.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -449,7 +546,11 @@ step, and ship a change to the shape in both repos together**:
   `vetChooseAuto`, `_vetAutoFile`, `SCAN_SUBJECT_FIELD_RULE`, `_scanSubject`, `itemSubject`,
   `itemTarget`, `_vetGroupBySubject`,
   `REPORT_SYS`, `REPORT_CREDIT`, `_reportMarkStr`, `reportScore`, `reportEligible`,
-  `_reportPrompt`, `_reportNew`, `_reportRefs`, `reportAsText`, `runReport`),
+  `_reportPrompt`, `_reportNew`, `_reportRefs`, `reportAsText`, `runReport`,
+  `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
+  `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`,
+  `_mbShotForPage`, `mbIsWrong`, `mbKeyOf`, `mbSaveOne`, `mbFileRun`, `_mbPaperDoc`,
+  `_mbMailDoc`, `_mbPaperUrl`, `MB_VIEWER_PATH`),
   run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
   against stubs. Every failure here is silent and the app carries on looking perfectly right: a
@@ -476,6 +577,15 @@ step, and ship a change to the shape in both repos together**:
   score worked out the wrong way is a wrong number on a page a parent reads, with the chips directly
   above it saying something else and nothing to say which is lying — and a blank folded into the
   denominator marks a child down for the questions they never reached.
+  The camera is in there because every one of its failures is a page that is simply not in the run:
+  a shutter that does nothing on a browser without `getUserMedia`, a frame that never reached the
+  one queue, or a camera left running after the overlay closed. And the mistake book is in there
+  because it is the only thing this app keeps, and the way it goes wrong is the way the whole family
+  has gone wrong before: `users/{uid}/mistakes` is the SCIENCE app's own log under this same uid, so
+  a book named `mistakes` here merges two apps' data with nothing throwing on either screen. A box
+  that is not really round a figure keeps somebody else's question and looks like a working crop,
+  and an email announced as sent by a queue that refused the write is a worksheet nobody ever
+  receives.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.

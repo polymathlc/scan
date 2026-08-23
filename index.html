@@ -428,6 +428,110 @@
     border-radius: 999px; padding: 2px 10px;
   }
 
+  /* ---------- 📷 The live viewfinder ----------
+     A camera that stays open. The `<input capture>` route hands the phone's
+     OWN camera app the job, and that app asks "use photo / retake" after every
+     single shot and then closes — which is four taps a page on a twelve-page
+     paper. This is the page's own camera: the shutter takes the frame and
+     nothing else happens, so the next page can go straight under the lens. */
+  .camLive {
+    position: fixed; inset: 0; z-index: 400; display: none;
+    flex-direction: column; background: #000;
+  }
+  .camLive.open { display: flex; }
+  .camStage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .camStage video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+  .camFlash {
+    position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none;
+  }
+  .camFlash.on { animation: camPop .22s ease-out; }
+  @keyframes camPop { from { opacity: .85; } to { opacity: 0; } }
+  .camHint {
+    position: absolute; left: 0; right: 0; top: 0; padding: 14px 18px;
+    padding-top: calc(14px + env(safe-area-inset-top));
+    color: #fff; font-size: 0.84rem; line-height: 1.6;
+    background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,0));
+    text-align: center; pointer-events: none;
+  }
+  .camStrip {
+    display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px;
+    background: #111; -webkit-overflow-scrolling: touch;
+  }
+  .camStrip:empty { display: none; }
+  .camStrip img {
+    height: 54px; width: 42px; object-fit: cover; border-radius: 6px;
+    border: 1px solid #333; flex: none;
+  }
+  .camStrip .camMore { color: #999; font-size: 0.78rem; align-self: center; flex: none; padding: 0 6px; }
+  .camLiveBar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 18px 22px; padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    background: #111;
+  }
+  .camLiveBtn {
+    flex: none; min-width: 86px; padding: 12px 16px; border-radius: 999px;
+    border: 1px solid #3A3A3A; background: #1E1E1E; color: #fff;
+    font-family: var(--font); font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  }
+  .camLiveBtn:disabled { opacity: .45; cursor: not-allowed; }
+  .camLiveBtn.go { background: var(--accent-deep); border-color: var(--accent-deep); color: #1A1A1A; }
+  .camSnap {
+    flex: none; width: 78px; height: 78px; border-radius: 50%;
+    background: #fff; border: 5px solid #4A4A4A; cursor: pointer;
+    box-shadow: 0 0 0 3px #111 inset;
+  }
+  .camSnap:active { transform: scale(.94); }
+  .camSnap:disabled { opacity: .5; cursor: not-allowed; }
+  .camCount { color: #fff; font-size: 0.82rem; text-align: center; margin-top: 6px; }
+
+  /* ---------- 📕 The mistake book ---------- */
+  .mbRow {
+    display: flex; gap: 14px; align-items: flex-start;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    padding: 16px 18px; margin-bottom: 12px; background: var(--bg);
+  }
+  .mbRow.picked { border-color: var(--accent-deep); background: #FFFBF3; }
+  /* Tailwind is not here, but a bare checkbox still needs saying: this is the
+     one control the whole window turns on. */
+  .mbPick { flex: none; width: 19px; height: 19px; margin-top: 3px; accent-color: var(--accent-deep); appearance: auto; -webkit-appearance: checkbox; }
+  .mbMain { flex: 1; min-width: 0; }
+  .mbChips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px; align-items: center; }
+  .mbChip {
+    font-size: 0.7rem; font-weight: 600; border-radius: 999px; padding: 3px 10px;
+    border: 1px solid var(--line); background: var(--bg-soft); color: var(--ink-soft);
+  }
+  .mbChip.mWrong { background: #FCEDEB; color: #8C2E1D; border-color: #EFC6BF; }
+  .mbChip.mPartial { background: #FDF4E3; color: #7A5410; border-color: #E7BD72; }
+  .mbQ { font-size: 0.88rem; color: var(--ink); line-height: 1.65; white-space: pre-wrap; }
+  .mbYou { font-size: 0.8rem; color: #8C2E1D; margin-top: 7px; }
+  .mbAns { font-size: 0.8rem; color: #2C6B30; margin-top: 3px; }
+  .mbThumb {
+    flex: none; width: 78px; height: 78px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--line); background: var(--bg-soft);
+  }
+  .mbThumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mbDrop { flex: none; }
+  .mbBar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 0 18px; border-bottom: 1px solid var(--line); margin-bottom: 18px;
+  }
+  .mbLink {
+    margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm);
+    background: var(--bg-soft); border: 1px solid var(--line); word-break: break-all;
+    font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6;
+  }
+  .mbBookChip {
+    font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 3px 11px;
+    border: 1px solid #E7BD72; background: #FDF4E3; color: #7A5410; cursor: pointer;
+    font-family: var(--font);
+  }
+  .mbBookChip.off { border-color: var(--line); background: var(--bg-soft); color: var(--ink-faint); }
+  .mbCount {
+    display: inline-grid; place-items: center; min-width: 21px; height: 21px; padding: 0 6px;
+    margin-left: 7px; border-radius: 999px; background: var(--accent-deep); color: #fff;
+    font-size: 0.72rem; font-weight: 700;
+  }
+
   /* ---------- Modals ---------- */
   .modalBack {
     position: fixed; inset: 0; z-index: 200; display: none;
@@ -556,6 +660,7 @@
       <div class="brandSub"><span class="brandOrg">Polymath Learning Centre · </span><span id="versionTag"></span></div>
     </div>
   </div>
+  <button class="btn" id="mbBtn" title="Your mistake book" style="display:none">📕<span class="btnLabel">Mistake book</span><span class="mbCount hidden" id="mbBadge">0</span></button>
   <button class="btn" id="quickNoteBtn" title="Add a note" style="display:none">✍️<span class="btnLabel">Add a note</span></button>
   <button class="btn" id="notesBtn" title="Teaching notes" style="display:none">📚<span class="btnLabel">Teaching notes</span></button>
   <span id="whoAmI" class="hint"></span>
@@ -637,6 +742,10 @@
       <ol class="howList" style="margin-top:16px">
         <li><b>Photograph each page.</b> Press the big button and take one photo per page, in the order they are printed. Flat on a table, in good light — the answers are only as good as the small print.</li>
         <li><b>Or pick them out of your gallery.</b> The button on the left opens it, and the number on it is how many pages you have so far. Tap a page to take it out or move it.</li>
+        <li><b>The camera stays open.</b> Tap the shutter and it takes the page — no “use photo / retake”, no
+          leaving the app. Keep going, page after page, and press <b>Done</b> when the paper is finished. (Where a
+          browser will not give the page a camera of its own, the 📷 button opens your phone's camera app instead,
+          exactly as it always did.)</li>
         <li><b>Press ✓ when the paper is complete.</b> Every question printed on the pages comes back answered — multiple choice, fill in the blank, open-ended and lettered parts alike.</li>
       </ol>
       <p class="sub" style="margin-top:6px">A question that carries on over the page is fine: the pages are read as one paper, so it is stitched back together instead of coming back as two halves.</p>
@@ -670,6 +779,20 @@
       <p class="sub" style="margin-top:10px">A paper with nothing written on it gets no report — there is nothing to report
         on, only answers. The report goes out with <b>Copy</b> and <b>Print</b>; press <b>📋 Report</b> to have it written
         again.</p>
+      <h3 style="margin-top:22px">📕 Your mistake book</h3>
+      <p class="sub" style="margin-top:6px">Every question you get <b>wrong</b> or <b>partly right</b> on a scanned
+        paper is kept in your own mistake book — the question, its diagram, what you wrote, the right answer and the
+        feedback. It fills itself as you scan; the number on <b>📕 Mistake book</b> at the top of the screen is how
+        many are in it, and every marked-wrong card has a 📕 chip that takes it back out again in one tap.</p>
+      <p class="sub" style="margin-top:10px">This is the <b>only</b> thing this app keeps. Your photographs are not
+        saved, your right answers are not saved, and nobody else can see your book — it is under your own account,
+        and your teacher's book is their own.</p>
+      <p class="sub" style="margin-top:10px">Open it, tick the questions you want to try again, and press
+        <b>📤 Make a worksheet</b>. A link is sent to the email you sign in with, and the page it opens is the
+        questions on their own with the answers on a page at the back — ready to print. It opens
+        <b>cleaned up</b>: the printing sharpened to black and white and your own working rubbed out, so the
+        question is blank again. One switch on the page brings back the original photograph instead. The worksheet
+        keeps for a year and only you and your teacher can open it.</p>
       <h3 style="margin-top:22px">If an answer is not good enough, fix it — and teach it</h3>
       <p class="sub" style="margin-top:6px">Every answer card carries a <b>✎ Edit</b> — yours alone, never a
         student's. Rewrite the answer, the
@@ -788,6 +911,44 @@
     </button>
     <button class="shutter" id="cameraBtn" title="Take a photo">📷</button>
     <button class="camSide camDone" id="readBtn" title="Read and answer" disabled>✓</button>
+  </div>
+</div>
+
+<!-- ---------- 📷 The live viewfinder ----------
+     The page's own camera, so a page is one tap and the lens stays open for
+     the next one. Only ever shown where getUserMedia really works; everywhere
+     else the 📷 button falls back to the phone's own camera app, unchanged. -->
+<div class="camLive" id="camLive">
+  <div class="camStage">
+    <video id="camVideo" playsinline autoplay muted></video>
+    <div class="camFlash" id="camFlash"></div>
+    <div class="camHint" id="camHint">Hold the page flat, fill the frame, then tap the shutter. It stays open — keep going, page after page.</div>
+  </div>
+  <div class="camStrip" id="camStrip"></div>
+  <div class="camLiveBar">
+    <button class="camLiveBtn" id="camCancelBtn" type="button">Cancel</button>
+    <div>
+      <button class="camSnap" id="camSnapBtn" type="button" title="Take the photo" aria-label="Take the photo"></button>
+      <div class="camCount" id="camCount"></div>
+    </div>
+    <button class="camLiveBtn go" id="camDoneBtn" type="button">Done</button>
+  </div>
+</div>
+
+<!-- ---------- 📕 The mistake book ---------- -->
+<div class="modalBack" id="mbModal">
+  <div class="modalCard wide">
+    <div class="modalHead">
+      <h2>📕 Your mistake book</h2>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn btnGhost" id="mbCloseBtn">✕</button>
+    </div>
+    <div class="modalBody" id="mbBody"></div>
+    <div class="modalFoot">
+      <span class="sub" id="mbFootNote" style="flex:1;text-align:left;margin:0"></span>
+      <button class="btn" id="mbRemoveBtn" disabled>🗑 Remove</button>
+      <button class="btn btnPrimary" id="mbSendBtn" disabled>📤 Make a worksheet</button>
+    </div>
   </div>
 </div>
 
@@ -963,6 +1124,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Storage carries the cropped diagrams a mistake keeps. A Firestore document
+     dies at ~1 MB and a photograph of one figure is a good part of that, so the
+     picture goes to Storage and only its URL is written to the document. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
 <script>
 'use strict';
@@ -984,7 +1149,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.9.0';
+var APP_VERSION = 'v1.10.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -1001,6 +1166,11 @@ firebase.initializeApp({
 });
 var db = firebase.firestore();
 var auth = firebase.auth();
+/* Storage is OPTIONAL here and everything that uses it must survive its
+   absence: a project without it, or rules that refuse the write, must cost a
+   diagram — never the mistake it belongs to. */
+var storage = null;
+try { storage = firebase.storage(); } catch (e) { console.warn('Storage unavailable', e); }
 
 /* ================= Small helpers ================= */
 function $(id) { return document.getElementById(id); }
@@ -2036,6 +2206,27 @@ var SCAN_SUBJECT_FIELD_RULE =
   'subject, so file each question by what it asks rather than by what happens to be printed around it. If you ' +
   'genuinely cannot tell, return an empty string: a wrong subject is worse than none. ';
 
+/* ---- The rectangle round the figure ----
+   The SAME convention the Learning Portal's rapid question adder and exam
+   paper builder already use: [ymin, xmin, ymax, xmax] as integers 0–1000 over
+   the WHOLE page, 0,0 at its top-left corner. It is what lets a question the
+   student got wrong keep its diagram when it is filed in the mistake book —
+   the wording can be transcribed, a figure cannot.
+
+   IT IS ASKED FOR ONLY WHERE THERE IS A FIGURE, and an omitted box is a
+   perfectly good answer. A box invented for a question that is nothing but
+   words crops a rectangle of somebody else's question and files it under
+   this one, which looks exactly like a working crop. */
+var SCAN_BOX_RULE =
+  '"diagramBox" is ONLY for a question that cannot be understood without a picture — a diagram, a graph, a ' +
+  'figure, an experimental set-up, a map, a number line or a data table printed with the question. Draw the ' +
+  'rectangle round THAT picture and give it as [ymin, xmin, ymax, xmax], four integers from 0 to 1000 measured ' +
+  'on the whole page the question is printed on: 0,0 is the page\'s top-left corner and 1000,1000 its ' +
+  'bottom-right. Include the figure\'s own labels and its caption; leave the question\'s wording, its options ' +
+  'and any neighbouring question OUT of it. OMIT "diagramBox" entirely for a question that is only words, for ' +
+  'one whose picture you cannot locate, and for a picture that is really the whole page — a wrong rectangle is ' +
+  'worse than none, because it keeps the wrong picture and nothing anywhere says so. ';
+
 var SCAN_SYS =
   'You are an experienced Singapore tuition teacher (P3 to Secondary 1) working through the photographs of a ' +
   'Science, Mathematics, English or Chinese worksheet or exam paper that are attached. You do TWO things at once, ' +
@@ -2047,7 +2238,8 @@ var SCAN_SYS =
   '"verdict":"correct | partial | wrong, or an empty string when nothing was written",' +
   '"marks":"2/3 when the paper prints a mark allocation, otherwise an empty string",' +
   '"feedback":"what to say to the student about what they wrote, or an empty string",' +
-  '"subject":"science | math | english | chinese"}]}. ' +
+  '"subject":"science | math | english | chinese",' +
+  '"diagramBox":[ymin,xmin,ymax,xmax]}]}. ' +
   'Rules: one entry for every question actually PRINTED on the ' +
   'attached pictures, in the order they appear, keeping the paper\'s own numbering in "number" ("16", "3a"). ' +
   'ONE ENTRY PER LETTERED PART: a question printed as 8(a) and 8(b) is TWO entries, numbered "8(a)" and "8(b)", ' +
@@ -2060,6 +2252,7 @@ var SCAN_SYS =
   'reply and check your list has that many entries. Never invent a question that is not there — a cover page, an ' +
   'instructions page or a blank page returns {"questions":[]}. ' +
   '"page" is which of the attached pictures the question is printed on, 1 for the first attached picture. ' +
+  SCAN_BOX_RULE +
   '"question" is the printed wording as plain text, without the number itself; when the question depends on a ' +
   'diagram, graph or table, add a short factual description of it in brackets at the end. ' +
   'For a multiple-choice question, "type" is "mcq", "options" lists every printed option as ' +
@@ -2191,6 +2384,165 @@ function scanDetail() {
   return SCAN_DETAIL_RULE[v] ? v : 'normal';
 }
 
+/* =====================================================================
+   📷 THE LIVE VIEWFINDER — a camera that stays open
+   ---------------------------------------------------------------------
+   `<input type=file capture>` hands the job to the PHONE'S OWN camera app,
+   and that app is built around taking one photograph: it shows "use photo /
+   retake" afterwards and then closes. On a twelve-page paper that is four
+   taps a page and eleven trips in and out of the browser, and the pages that
+   get skipped are the ones at the end.
+
+   So the page grows its own camera. `getUserMedia` puts the live picture on
+   screen, the shutter grabs the current frame, and NOTHING ELSE HAPPENS —
+   no confirmation, no leaving the page, the lens still open on the next page.
+   Done closes it.
+
+   IT IS FEATURE-DETECTED, NEVER ASSUMED, and the fallback is the route that
+   was always there. A browser with no `getUserMedia`, a laptop with no
+   camera, a permission refused, a lens another tab is already holding: every
+   one of them falls back to the phone's own camera app rather than leaving a
+   shutter that does nothing. `camAvailable()` is the ONE test.
+
+   BOTH ROUTES END AT `addShots`, the one queue — a frame off the viewfinder
+   is wrapped as a JPEG File and prepared exactly as a gallery picture is, so
+   the shrinking, the page numbering, the failed-card rule and the batching
+   are written once. Do not give the viewfinder its own pipeline.
+
+   THE TRACKS ARE STOPPED ON EVERY WAY OUT. A camera left running is a
+   recording light on somebody's phone and a flat battery, and there are four
+   ways out of this overlay — Done, Cancel, Escape and the tab being left.
+   ===================================================================== */
+
+var CAM_STRIP_MAX = 8;        // thumbnails on the strip; the badge counts the rest
+var _camStream = null;
+var _camBusy = false;
+var _camShotsAtOpen = 0;
+
+function camAvailable() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.HTMLCanvasElement);
+}
+
+async function camOpen() {
+  if (_scanning) return;
+  if (_shots.length >= SCAN_MAX_SHOTS) {
+    toast('That is ' + SCAN_MAX_SHOTS + ' pictures already — read these first.', 5000);
+    return;
+  }
+  // No camera the page can drive → the phone's own camera app, exactly as
+  // before. This is the ONLY place that decision is made.
+  if (!camAvailable()) { $('cameraInput').click(); return; }
+  var stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      // `ideal`, never `exact`: a laptop with only a front camera must still
+      // get a camera rather than an OverconstrainedError.
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1920 } },
+      audio: false
+    });
+  } catch (err) {
+    console.warn('camera unavailable', err);
+    // A refusal is not an error worth a dialog: fall back to the camera app
+    // the phone already has, and say once why the screen looks different.
+    toast('Using your phone’s camera app instead — this page could not open the camera itself.', 5000);
+    $('cameraInput').click();
+    return;
+  }
+  _camStream = stream;
+  _camShotsAtOpen = _shots.length;
+  var v = $('camVideo');
+  v.srcObject = stream;
+  try { await v.play(); } catch (e) { /* autoplay on a muted, inline video */ }
+  $('camLive').classList.add('open');
+  camRenderStrip();
+}
+
+function camClose() {
+  var live = $('camLive');
+  if (live) live.classList.remove('open');
+  var v = $('camVideo');
+  if (v) { try { v.pause(); } catch (e) {} v.srcObject = null; }
+  if (_camStream) {
+    _camStream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+    _camStream = null;
+  }
+  _camBusy = false;
+}
+function camIsOpen() { return !!_camStream; }
+
+/* The shutter. The frame is drawn to a canvas at the same ceiling a gallery
+   photo is shrunk to, encoded as JPEG (never PNG — a photograph re-encoded as
+   PNG comes out bigger than it went in) and handed to `addShots` as a File,
+   so it takes the one pipeline every other picture takes. */
+async function camSnap() {
+  if (_camBusy || !_camStream) return;
+  var v = $('camVideo');
+  var w = v.videoWidth, h = v.videoHeight;
+  if (!w || !h) { toast('The camera is still warming up — try again in a moment.'); return; }
+  if (_shots.length >= SCAN_MAX_SHOTS) {
+    toast('That is ' + SCAN_MAX_SHOTS + ' pictures — that is the most one paper can hold.', 5000);
+    return;
+  }
+  _camBusy = true;
+  camSyncBar();
+  var flash = $('camFlash');
+  if (flash) { flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on'); }
+  try {
+    var s = Math.min(1, SCAN_PHOTO_MAX_SIDE / Math.max(w, h));
+    var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+    var c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(v, 0, 0, cw, ch);
+    var blob = await new Promise(function (res) { c.toBlob(res, 'image/jpeg', SCAN_JPEG_Q); });
+    if (!blob) throw new Error('the frame could not be saved');
+    var file = new File([blob], 'page-' + (_shots.length + 1) + '.jpg', { type: 'image/jpeg' });
+    await addShots([file]);
+  } catch (e) {
+    console.warn('shutter failed', e);
+    toast('That photo could not be taken — try again.', 4000);
+  }
+  _camBusy = false;
+  camRenderStrip();
+}
+
+/* What has been taken WITHOUT leaving the camera: the strip along the bottom
+   is the whole feedback loop. A shutter that gives nothing back is one nobody
+   trusts, and the page you thought you took is the page nobody notices is
+   missing until the answers come back short. */
+function camRenderStrip() {
+  var strip = $('camStrip');
+  if (strip) {
+    var ready = _shots.filter(function (s) { return s.data; });
+    var show = ready.slice(-CAM_STRIP_MAX);
+    var hidden = ready.length - show.length;
+    strip.innerHTML = (hidden > 0 ? '<span class="camMore">+' + hidden + '</span>' : '') +
+      show.map(function (s) { return '<img src="' + s.url + '" alt="">'; }).join('');
+  }
+  camSyncBar();
+}
+function camSyncBar() {
+  var n = _shots.filter(function (s) { return s.data; }).length;
+  var el = $('camCount');
+  if (el) el.textContent = n ? n + ' page' + (n === 1 ? '' : 's') : '';
+  var snap = $('camSnapBtn');
+  if (snap) snap.disabled = _camBusy || n >= SCAN_MAX_SHOTS;
+  var hint = $('camHint');
+  if (hint && n >= SCAN_MAX_SHOTS) hint.textContent = 'That is ' + SCAN_MAX_SHOTS + ' pages — press Done and read them.';
+}
+/* Cancel undoes THIS visit to the camera and nothing else: the pages that
+   were already in hand when it opened were not taken here and are not the
+   camera's to throw away. */
+function camCancel() {
+  var taken = _shots.length - _camShotsAtOpen;
+  // Asked BEFORE the stream is dropped, so answering "no" leaves the camera
+  // exactly as it was rather than having to open it a second time.
+  if (taken > 0 && !confirm('Discard the ' + taken + ' photo' + (taken === 1 ? '' : 's') + ' you just took?')) return;
+  if (taken > 0) _shots = _shots.slice(0, _camShotsAtOpen);
+  camClose();
+  renderShots();
+}
+
 /* ---- Getting the pictures in ---- */
 function _loadImageEl(src) {
   return new Promise(function (res, rej) {
@@ -2314,6 +2666,7 @@ function renderShots() {
     '</div>';
   }).join('');
   renderCamBar();
+  if (camIsOpen()) camRenderStrip();
 }
 
 /* The three buttons, and the only status the snap screen has room for: how
@@ -2668,6 +3021,9 @@ function _scanNewItem(r, batchStart, batchLen) {
   return {
     kind: 'page',
     subject: _scanSubject(r),
+    // The rectangle round this question's figure, on ITS page — normalised the
+    // moment it arrives, so an invented or malformed box never reaches a crop.
+    box: _mbBoxOk(r.diagramBox) ? r.diagramBox.map(Number) : null,
     number: _scanStr(r.number, 16),
     page: batchStart + page,          // 1-based across the whole run
     endPage: batchStart + page,
@@ -2706,6 +3062,9 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
       if (it.answer) prev.answer = it.answer;
       if (it.explanation) prev.explanation = it.explanation;
       if (it.type === 'mcq') prev.type = 'mcq';
+      // A question stitched across a batch boundary takes its figure from
+      // whichever half could draw a rectangle round one.
+      if (it.box && !prev.box) { prev.box = it.box; prev.boxPage = it.page; }
       if (it.subject && !prev.subject) prev.subject = it.subject;
       // The student may have written their answer on either half of a question
       // that runs over the page, so the marking is merged rather than
@@ -3004,6 +3363,11 @@ async function runScan() {
   await runReport(run);
   if (run !== _scanRun) return;
 
+  // 📕 Keep the wrong answers. Every account has a book of its own, and the
+  // toast names how many went in — see `mbFileRun`.
+  await mbFileRun(run);
+  if (run !== _scanRun) return;
+
   // 📥 File the whole paper, where the teacher has asked for that on the How
   // tab. Admin only, and it says so when it has — see `_vetAutoFile`.
   await _vetAutoFile();
@@ -3236,6 +3600,10 @@ function answerCardHtml(it, i) {
       : '') +
     (it.explanation ? '<div class="whyBox"><div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
     _vetCardFootHtml(it, i) +
+    (function () {
+      var chip = mbCardChipHtml(it);
+      return chip ? '<div class="ansSend noPrint">' + chip + '</div>' : '';
+    })() +
   '</div>';
 }
 
@@ -3876,6 +4244,541 @@ function reportAsText() {
 }
 
 /* =====================================================================
+   📕 THE MISTAKE BOOK — the questions this student got wrong
+   ---------------------------------------------------------------------
+   THIS IS THE ONE PLACE THIS APP KEEPS A CHILD'S WORK, and it took a rule
+   being changed on purpose to put it here. Everything else about this app is
+   built on nothing being saved: a photographed paper is somebody's work, it
+   lives in the tab and it leaves through Copy or Print. But a mistake nobody
+   writes down is a mistake made again next week, and a paper marked, closed
+   and forgotten is exactly what that rule was costing.
+
+   So the wrong answers — and only the wrong answers — are kept, and three
+   things keep it honest:
+
+   IT IS THE STUDENT'S OWN, under their OWN account (`users/{uid}/scanMistakes`).
+   Nobody else's device reads it, the teacher's copy is the teacher's own
+   mistakes, and there is no roster anywhere here. Everyone gets one — student
+   and admin alike — which is what makes it different from 📥 Send to vetting.
+
+   THE COLLECTION NAME IS NAMESPACED, and that is not tidiness. The Science
+   portal writes `users/{uid}/mistakes` under this very same project and this
+   very same uid, so a book called `mistakes` here would be two apps sharing
+   one collection: this app's questions turning up in that app's mistake log
+   and back again, with nothing anywhere throwing and nothing looking wrong.
+   That is the fault the whole family's collection-naming rule exists for.
+   `scanMistakes`, `scanPapers` and `scan-mistakes/` in Storage are this app's
+   and nobody else's.
+
+   IT SAYS SO OUT LOUD, every time. The run's own toast names how many went
+   in, the answers note says the book is being kept, and every marked-wrong
+   card wears a 📕 chip that takes it back out again in one tap. A thing
+   quietly saved is a thing nobody knows to delete.
+
+   THE PICTURE IS CROPPED AT THE MOMENT IT IS FILED, because that is the only
+   moment the photograph is still in the tab. `_mbCropFor` cuts the figure out
+   of the page using the rectangle the model drew (`diagramBox`, the same
+   0–1000 convention the Learning Portal's rapid question adder uses) and puts
+   it in Storage. A crop that fails costs the DIAGRAM and never the mistake —
+   the wording, the answer and the feedback are the part that has to survive.
+   ===================================================================== */
+
+var MB_COL = 'scanMistakes';        // NEVER 'mistakes' — that is the cer app's
+var MB_PAPER_COL = 'scanPapers';
+var MB_IMG_PATH = 'scan-mistakes';
+var MB_MAX_LOAD = 300;
+var MB_PAPER_MAX = 30;              // questions on one worksheet
+var MB_PAPER_DAYS = 365;            // a paper is swept a year after it is made
+var MB_CROP_MAX_SIDE = 1400;
+
+var _mistakes = [];                 // newest first
+var _mbSel = {};                    // id -> true, the ticked rows
+var _mbLoaded = false;
+var _mbBusy = false;
+var _mbLastLink = '';
+
+function mbAvailable() { return !!(currentUser && currentUser.uid); }
+function _mbCol() { return db.collection('users').doc(currentUser.uid).collection(MB_COL); }
+
+/* A wrong answer is one that was MARKED and judged less than right. A blank
+   was never attempted, so it is not a mistake — the same rule the marking and
+   the report are both built on. An answer to a typed question was never on a
+   paper and has no page to crop a diagram out of. */
+function mbIsWrong(it) {
+  return !!(it && it.kind === 'page' && it.marked && (it.verdict === 'wrong' || it.verdict === 'partial'));
+}
+/* The same question scanned twice — a paper re-photographed, a page shot
+   again — is ONE mistake. The key is the wording, folded, so a second reading
+   that differs by a space does not file it a second time. */
+function mbKeyOf(it) {
+  return String((it && it.question) || '').toLowerCase().replace(/[^a-z0-9一-鿿]+/g, ' ').trim().slice(0, 160);
+}
+function mbHasKey(key) {
+  if (!key) return false;
+  return _mistakes.some(function (m) { return m.key === key; });
+}
+function mbEntryFor(it) {
+  var key = mbKeyOf(it);
+  return _mistakes.filter(function (m) { return m.key === key; })[0] || null;
+}
+
+async function mbLoad(force) {
+  if (!mbAvailable()) { _mistakes = []; _mbLoaded = false; renderMbBadge(); return; }
+  if (_mbLoaded && !force) return;
+  try {
+    var snap = await _mbCol().orderBy('at', 'desc').limit(MB_MAX_LOAD).get();
+    var out = [];
+    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    _mistakes = out;
+    _mbLoaded = true;
+  } catch (e) {
+    // A read that is denied is not an error worth showing — the app carries
+    // on exactly as it did before the book existed.
+    console.warn('mistake book: could not be read', e);
+    _mistakes = [];
+    _mbLoaded = true;
+  }
+  renderMbBadge();
+}
+function mbForget() { _mistakes = []; _mbSel = {}; _mbLoaded = false; renderMbBadge(); }
+
+/* ---- Cutting the figure out of the page ----
+   The rectangle is the model's own (`diagramBox`, [ymin,xmin,ymax,xmax] as
+   integers 0–1000 measured on the page the question is printed on), which is
+   the convention the Learning Portal's readers already use. A box that is
+   missing, malformed, minute or very nearly the whole page is a selection
+   that failed, and a failed selection returns nothing rather than a crop of
+   the wrong half of the paper. */
+function _mbBoxOk(box) {
+  if (!Array.isArray(box) || box.length !== 4) return false;
+  var n = box.map(Number);
+  if (!n.every(function (v) { return isFinite(v) && v >= 0 && v <= 1000; })) return false;
+  if (n[2] - n[0] < 25 || n[3] - n[1] < 25) return false;                     // too small to be a figure
+  if ((n[2] - n[0]) / 1000 > 0.94 && (n[3] - n[1]) / 1000 > 0.94) return false; // ≈ the whole page
+  return true;
+}
+async function _mbCropBox(dataUrl, box) {
+  if (!_mbBoxOk(box)) return '';
+  var n = box.map(Number);
+  var img = await _loadImageEl(dataUrl);
+  var W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  if (!W || !H) return '';
+  var mx = W * 0.03, my = H * 0.025;                 // a little air, so a label is not shaved off
+  var x = Math.max(0, n[1] / 1000 * W - mx);
+  var y = Math.max(0, n[0] / 1000 * H - my);
+  var w = Math.min(W - x, (n[3] - n[1]) / 1000 * W + mx * 2);
+  var h = Math.min(H - y, (n[2] - n[0]) / 1000 * H + my * 2);
+  if (w < 24 || h < 24) return '';
+  var s = Math.min(1, MB_CROP_MAX_SIDE / Math.max(w, h));
+  var c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * s));
+  c.height = Math.max(1, Math.round(h * s));
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, x, y, w, h, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', SCAN_JPEG_Q);
+}
+/* The page an answer cites is counted over the pictures actually SENT, so the
+   shot it belongs to is found the same way — one that could not be opened is
+   not in the run and holds no page number. */
+function _mbShotForPage(page) {
+  var sent = _shots.filter(function (s) { return s.data; });
+  var i = Number(page) - 1;
+  return (i >= 0 && i < sent.length) ? sent[i] : null;
+}
+async function _mbCropFor(it) {
+  try {
+    // `boxPage` is set only when the rectangle came from the SECOND half of a
+    // question that ran over the page: the box is measured on that page, so
+    // cropping it out of the first one takes a rectangle of the wrong sheet.
+    var shot = _mbShotForPage(it.boxPage || it.page);
+    if (!shot || !shot.url) return '';
+    return await _mbCropBox(shot.url, it.box);
+  } catch (e) { console.warn('mistake crop failed', e); return ''; }
+}
+async function _mbUpload(dataUrl, id) {
+  if (!storage || !dataUrl) return '';
+  var ref = storage.ref(MB_IMG_PATH + '/' + currentUser.uid + '/' + id + '.jpg');
+  await ref.putString(dataUrl, 'data_url');
+  return await ref.getDownloadURL();
+}
+
+/* ---- Filing one ----
+   The document is written LAST and the picture is only ever an extra on it: a
+   Storage bucket that is not there, or rules that refuse the write, must cost
+   the diagram and never the mistake. `imgNote` is what puts that on the card
+   rather than leaving a question that quietly lost its figure. */
+async function mbSaveOne(it) {
+  var key = mbKeyOf(it);
+  if (!key || mbHasKey(key)) return null;
+  var id = 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  var img = '', imgNote = '';
+  var crop = await _mbCropFor(it);
+  if (crop) {
+    try { img = await _mbUpload(crop, id); }
+    catch (e) { console.warn('mistake picture upload failed', e); imgNote = 'the diagram could not be kept'; }
+  }
+  var doc = {
+    key: key,
+    at: new Date().toISOString(),
+    subject: wsMeta.subject || '',
+    level: wsMeta.level || '',
+    number: String(it.number || ''),
+    question: _scanStr(it.question, 1400),
+    options: (it.options || []).slice(0, 8).map(function (o) {
+      return { label: String(o.label || '').slice(0, 4), text: _scanStr(o.text, 240) };
+    }),
+    option: String(it.option || '').slice(0, 8),
+    type: it.type === 'mcq' ? 'mcq' : 'open',
+    answer: _scanStr(it.answer, 900),
+    explanation: _scanStr(it.explanation, 2400),
+    studentAnswer: _scanStr(it.studentAnswer, 900),
+    verdict: it.verdict || '',
+    marks: String(it.marks || ''),
+    feedback: _scanStr(it.feedback, 1200),
+    img: img,
+    imgNote: imgNote
+  };
+  await _mbCol().doc(id).set(doc);
+  var entry = Object.assign({ id: id }, doc);
+  _mistakes.unshift(entry);
+  return entry;
+}
+
+/* Every wrong answer on the paper, filed in one pass once the run has
+   finished. Automatic, like the marking and the report — a picker asking
+   "keep this one?" twenty times is a picker nobody answers — and it SAYS how
+   many went in, because a thing saved without a word is a thing nobody knows
+   is there. */
+async function mbFileRun(run) {
+  if (!mbAvailable()) return 0;
+  await mbLoad(false);
+  var wrong = _answers.filter(mbIsWrong);
+  if (!wrong.length) return 0;
+  var added = 0, failed = 0;
+  for (var i = 0; i < wrong.length; i++) {
+    if (run !== _scanRun) return added;          // a newer run owns the screen
+    try { if (await mbSaveOne(wrong[i])) added++; }
+    catch (e) { console.warn('mistake book write failed', e); failed++; }
+  }
+  renderMbBadge();
+  renderAnswers();
+  if (added) {
+    toast('📕 ' + added + ' wrong answer' + (added === 1 ? '' : 's') + ' added to your mistake book' +
+      (failed ? ' — ' + failed + ' could not be saved' : '') + '.', 6000);
+  } else if (failed) {
+    toast('📕 Your mistake book could not be written to just now.', 5000);
+  }
+  return added;
+}
+
+async function mbRemove(id) {
+  try { await _mbCol().doc(id).delete(); }
+  catch (e) { console.warn('mistake delete failed', e); toast('That could not be removed — try again.', 4000); return; }
+  _mistakes = _mistakes.filter(function (m) { return m.id !== id; });
+  delete _mbSel[id];
+  renderMbBadge();
+  mbRenderBody();
+  renderAnswers();
+}
+/* The chip on an answer card, which is the other way in and the only way back
+   out from the paper itself. It is drawn only on a card that IS a mistake, so
+   it can never appear on a blank or on a right answer. */
+function mbCardChipHtml(it) {
+  if (!mbAvailable() || !mbIsWrong(it) || _scanning) return '';
+  var e = mbEntryFor(it);
+  return '<button class="mbBookChip' + (e ? '' : ' off') + '" ' +
+    'onclick="mbCardChipClick(' + JSON.stringify(mbKeyOf(it)).replace(/"/g, '&quot;') + ')" ' +
+    'title="' + (e ? 'Take this out of your mistake book' : 'Put this back in your mistake book') + '">' +
+    (e ? '📕 In your mistake book' : '📕 Add to mistake book') + '</button>';
+}
+async function mbCardChipClick(key) {
+  var e = _mistakes.filter(function (m) { return m.key === key; })[0];
+  if (e) { await mbRemove(e.id); return; }
+  var it = _answers.filter(function (a) { return mbKeyOf(a) === key; })[0];
+  if (!it) return;
+  try {
+    if (await mbSaveOne(it)) { renderMbBadge(); renderAnswers(); toast('📕 Added.'); }
+  } catch (err) { console.warn(err); toast('That could not be saved — try again.', 4000); }
+}
+
+/* ---- The window ---- */
+function renderMbBadge() {
+  var b = $('mbBtn');
+  if (!b) return;
+  b.style.display = mbAvailable() ? '' : 'none';
+  var n = $('mbBadge');
+  if (!n) return;
+  n.textContent = String(_mistakes.length);
+  n.classList.toggle('hidden', !_mistakes.length);
+}
+async function mbOpen() {
+  if (!mbAvailable()) return;
+  $('mbModal').classList.add('open');
+  mbRenderBody();
+  await mbLoad(true);
+  mbRenderBody();
+}
+function mbClose() { $('mbModal').classList.remove('open'); }
+
+function mbRowHtml(m) {
+  var picked = !!_mbSel[m.id];
+  var chips = [];
+  if (m.subject) chips.push('<span class="mbChip">' + escHtml(subjectLabel(m.subject) || m.subject) + '</span>');
+  if (m.level) chips.push('<span class="mbChip">' + escHtml(levelLabel(m.level)) + '</span>');
+  if (m.verdict === 'wrong') chips.push('<span class="mbChip mWrong">✗ Wrong</span>');
+  else if (m.verdict === 'partial') chips.push('<span class="mbChip mPartial">~ Partly right</span>');
+  if (m.number) chips.push('<span class="mbChip">Q' + escHtml(m.number) + '</span>');
+  chips.push('<span class="mbChip">' + escHtml(String(m.at || '').slice(0, 10)) + '</span>');
+  if (m.imgNote) chips.push('<span class="mbChip">⚠ ' + escHtml(m.imgNote) + '</span>');
+  return '<div class="mbRow' + (picked ? ' picked' : '') + '">' +
+    '<input class="mbPick" type="checkbox" ' + (picked ? 'checked ' : '') +
+      'onchange="mbTogglePick(\'' + m.id + '\')" aria-label="Choose this question">' +
+    '<div class="mbMain">' +
+      '<div class="mbChips">' + chips.join('') + '</div>' +
+      '<div class="mbQ">' + escHtml(m.question || '(no wording)') + '</div>' +
+      (m.studentAnswer ? '<div class="mbYou">You wrote: ' + escHtml(m.studentAnswer) + '</div>' : '') +
+      (m.answer ? '<div class="mbAns">Answer: ' + escHtml(m.answer) + '</div>' : '') +
+    '</div>' +
+    (m.img ? '<div class="mbThumb"><img src="' + escHtml(m.img) + '" alt=""></div>' : '') +
+    '<div class="mbDrop"><button class="btn btnGhost" title="Remove" onclick="mbRemove(\'' + m.id + '\')">✕</button></div>' +
+  '</div>';
+}
+function mbSelectedIds() {
+  return _mistakes.filter(function (m) { return _mbSel[m.id]; }).map(function (m) { return m.id; });
+}
+function mbTogglePick(id) {
+  if (_mbSel[id]) delete _mbSel[id]; else _mbSel[id] = true;
+  mbRenderBody();
+}
+function mbPickAll(on) {
+  _mbSel = {};
+  if (on) _mistakes.forEach(function (m) { _mbSel[m.id] = true; });
+  mbRenderBody();
+}
+function mbRenderBody() {
+  var body = $('mbBody');
+  if (!body) return;
+  if (!_mbLoaded) { body.innerHTML = '<div class="empty">Opening your mistake book…</div>'; mbSyncFoot(); return; }
+  if (!_mistakes.length) {
+    body.innerHTML = '<div class="empty">Nothing in here yet. Every question you get wrong on a scanned paper ' +
+      'is kept here, so you can come back and try them again.</div>';
+    mbSyncFoot();
+    return;
+  }
+  var n = mbSelectedIds().length;
+  body.innerHTML =
+    '<p class="sub" style="margin-top:0">These are the questions you got wrong. Tick the ones you want on a ' +
+      'worksheet, and a link to it is sent to your email — the questions only, with the answers on a separate ' +
+      'page at the back.</p>' +
+    '<div class="mbBar">' +
+      '<button class="btn" onclick="mbPickAll(true)">Select all</button>' +
+      '<button class="btn" onclick="mbPickAll(false)"' + (n ? '' : ' disabled') + '>Clear</button>' +
+      '<span class="sub" style="margin:0">' + _mistakes.length + ' kept' + (n ? ' · ' + n + ' chosen' : '') + '</span>' +
+    '</div>' +
+    _mistakes.map(mbRowHtml).join('') +
+    (_mbLastLink
+      ? '<div class="mbLink"><b>Your last worksheet</b><br><a href="' + escHtml(_mbLastLink) + '" target="_blank" rel="noopener">' +
+        escHtml(_mbLastLink) + '</a></div>'
+      : '');
+  mbSyncFoot();
+}
+function mbSyncFoot() {
+  var n = mbSelectedIds().length;
+  var send = $('mbSendBtn'), drop = $('mbRemoveBtn'), note = $('mbFootNote');
+  if (send) {
+    send.disabled = _mbBusy || !n || n > MB_PAPER_MAX;
+    send.textContent = _mbBusy ? '⏳ Working…' : (n ? '📤 Make a worksheet (' + n + ')' : '📤 Make a worksheet');
+  }
+  if (drop) drop.disabled = _mbBusy || !n;
+  if (note) {
+    note.textContent = n > MB_PAPER_MAX
+      ? 'That is more than ' + MB_PAPER_MAX + ' questions — choose fewer for one worksheet.'
+      : (currentUser && currentUser.email ? 'The link goes to ' + currentUser.email : '');
+  }
+}
+async function mbRemovePicked() {
+  var ids = mbSelectedIds();
+  if (!ids.length) return;
+  if (!confirm('Remove ' + ids.length + ' question' + (ids.length === 1 ? '' : 's') + ' from your mistake book?')) return;
+  _mbBusy = true; mbSyncFoot();
+  for (var i = 0; i < ids.length; i++) {
+    try { await _mbCol().doc(ids[i]).delete(); _mistakes = _mistakes.filter(function (m) { return m.id !== ids[i]; }); delete _mbSel[ids[i]]; }
+    catch (e) { console.warn('delete failed', e); }
+  }
+  _mbBusy = false;
+  renderMbBadge();
+  mbRenderBody();
+  renderAnswers();
+}
+
+/* =====================================================================
+   📤 THE WORKSHEET, AND THE LINK THAT REACHES IT
+   ---------------------------------------------------------------------
+   The chosen mistakes are written as ONE paper document and the student is
+   sent a link to it. The page at the other end is NOT in this repository: it
+   is `mistakes.html` in the Science Learning Portal (`polymathlc/cer`), which
+   already owns the printed-worksheet machinery and the image model that
+   cleans a photographed figure up. This app keeps the photographs, so it does
+   the cropping; that app does the rendering and the clean-up.
+
+   IT MUST NOT DISTURB THAT APP. Nothing here is written into the Portal's
+   question bank, its vetting list, its notebook or a student's progress
+   there. `scanPapers` is this app's own top-level collection and the page
+   that reads it is a standalone file that touches nothing else — the same
+   reason the book above is `scanMistakes` and not `mistakes`.
+
+   THE LINK IS BUILT RELATIVELY AND THEN MADE ABSOLUTE. The four portals are
+   sibling folders on one host, so `../cer/mistakes.html` resolves on GitHub
+   Pages, on a local checkout with the repos side by side, and on a domain of
+   the centre's own later — while an email needs a whole address, which
+   `new URL(...).href` gives us without this file ever naming a host.
+
+   THE EMAIL IS BEST-EFFORT AND THE LINK IS NOT. The mail document is written
+   in the shape Firebase's "Trigger Email" extension reads, and if that
+   extension is not installed the document simply sits there. So the link is
+   ALWAYS put on screen with a Copy button and the window says plainly whether
+   the email could even be queued. Telling a student an email is on its way
+   when nothing can send it is the one outcome worth engineering against.
+   ===================================================================== */
+
+var MB_VIEWER_PATH = '../cer/mistakes.html';   // the Portal's standalone page
+var MB_MAIL_COL = 'mail';                      // Firebase Trigger Email extension
+
+function _mbPaperUrl(id) {
+  try { return new URL(MB_VIEWER_PATH + '?p=' + encodeURIComponent(id), location.href).href; }
+  catch (e) { return MB_VIEWER_PATH + '?p=' + encodeURIComponent(id); }
+}
+function _mbPaperTitle(items) {
+  var subj = '';
+  items.some(function (m) { if (m.subject) { subj = subjectLabel(m.subject) || ''; return true; } return false; });
+  var lvl = '';
+  items.some(function (m) { if (m.level) { lvl = levelLabel(m.level) || ''; return true; } return false; });
+  return [lvl, subj, 'corrections'].filter(Boolean).join(' ') || 'Questions to try again';
+}
+/* What the paper carries. The student's own answer, the verdict and the
+   feedback travel WITH it — unlike a question sent to a vetting list, where
+   they must never go. The difference is who it is for: a bank question is for
+   thirty other children, and this is the child's own paper coming back to
+   them. */
+function _mbPaperDoc(items) {
+  var now = new Date();
+  var ends = new Date(now.getTime() + MB_PAPER_DAYS * 86400000);
+  return {
+    owner: currentUser.uid,
+    ownerEmail: currentUser.email || '',
+    ownerName: currentUser.displayName || '',
+    title: _mbPaperTitle(items),
+    source: VET_SOURCE,                 // 'scan' — the same word the four portals read
+    sourceApp: VET_SOURCE_APP,
+    mode: 'clean',                      // the cleaned-up version is what opens first
+    createdAt: now.toISOString(),
+    expiresAt: ends.toISOString(),
+    items: items.map(function (m, i) {
+      return {
+        n: i + 1,
+        number: m.number || '',
+        subject: m.subject || '',
+        level: m.level || '',
+        type: m.type || 'open',
+        question: m.question || '',
+        options: m.options || [],
+        option: m.option || '',
+        answer: m.answer || '',
+        explanation: m.explanation || '',
+        studentAnswer: m.studentAnswer || '',
+        verdict: m.verdict || '',
+        feedback: m.feedback || '',
+        img: m.img || '',        // the crop as photographed
+        cleanImg: ''             // filled in by the viewer, once, when it cleans it
+      };
+    })
+  };
+}
+function _mbMailDoc(to, url, items) {
+  var n = items.length;
+  var title = _mbPaperTitle(items);
+  var line = 'Here are ' + n + ' question' + (n === 1 ? '' : 's') + ' to try again.';
+  return {
+    to: [to],
+    message: {
+      subject: '📕 ' + title + ' — ' + n + ' question' + (n === 1 ? '' : 's') + ' to try again',
+      text: line + '\n\n' + url + '\n\nSign in with this same account to open it. ' +
+            'Polymath Learning Centre.',
+      html: '<p>' + escHtml(line) + '</p>' +
+            '<p><a href="' + escHtml(url) + '">Open your worksheet</a></p>' +
+            '<p style="color:#666;font-size:13px">Sign in with this same account to open it.<br>' +
+            'Polymath Learning Centre</p>'
+    }
+  };
+}
+
+async function mbSendPicked() {
+  if (_mbBusy) return;
+  var ids = mbSelectedIds();
+  var items = _mistakes.filter(function (m) { return _mbSel[m.id]; });
+  if (!items.length || items.length > MB_PAPER_MAX) return;
+  var to = (currentUser && currentUser.email) || '';
+  _mbBusy = true; mbSyncFoot();
+  var url = '', mailed = false, err = '';
+  try {
+    var ref = db.collection(MB_PAPER_COL).doc();
+    await ref.set(_mbPaperDoc(items));
+    url = _mbPaperUrl(ref.id);
+    _mbLastLink = url;
+    if (to) {
+      // Best effort, and its failure is reported rather than swallowed: an
+      // email nobody can send must not be announced as one that was.
+      try { await db.collection(MB_MAIL_COL).add(_mbMailDoc(to, url, items)); mailed = true; }
+      catch (e) { console.warn('mail queue failed', e); }
+    }
+  } catch (e) {
+    console.warn('worksheet could not be written', e);
+    err = (e && e.message) || 'it could not be saved';
+  }
+  _mbBusy = false;
+  if (!url) { toast('That worksheet could not be made — ' + err, 6000); mbSyncFoot(); return; }
+  mbShowLink(url, to, mailed, items.length);
+}
+
+/* The link, said plainly, whatever happened to the email. Copy is the part
+   that always works. */
+function mbShowLink(url, to, mailed, n) {
+  var body = $('mbBody');
+  if (!body) return;
+  body.innerHTML =
+    '<div class="tnPanel">' +
+      '<h3>📤 Your worksheet is ready</h3>' +
+      '<p class="tnSub">' + n + ' question' + (n === 1 ? '' : 's') + ', with the answers on a page at the back. ' +
+        'It opens in the <b>cleaned-up</b> version — the printing sharpened and your own working rubbed out — and ' +
+        'there is a switch on the page for the original photograph instead. Sign in with this same account to open it.</p>' +
+      '<p class="tnSub">' + (mailed
+        ? 'A link has been sent to <b>' + escHtml(to) + '</b>. If it does not arrive, the link is here:'
+        : (to ? 'The email could not be sent from this device, so here is the link — copy it or open it now:'
+              : 'Your account has no email address on it, so here is the link — copy it or open it now:')) + '</p>' +
+      '<div class="mbLink" id="mbLinkBox">' + escHtml(url) + '</div>' +
+      '<div class="rowBtns" style="margin-top:14px">' +
+        '<button class="btn btnPrimary" onclick="mbCopyLink()">📋 Copy the link</button>' +
+        '<a class="btn" href="' + escHtml(url) + '" target="_blank" rel="noopener">Open it now</a>' +
+        '<button class="btn" onclick="mbRenderBody()">← Back to the book</button>' +
+      '</div>' +
+      '<p class="hint" style="margin-top:14px">The worksheet keeps for a year, and only you (and your teacher) ' +
+        'can open it.</p>' +
+    '</div>';
+  mbSyncFoot();
+}
+function mbCopyLink() {
+  var text = _mbLastLink;
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { toast('Copied.'); }).catch(function () { _copyFallback(text); });
+  } else _copyFallback(text);
+}
+
+/* =====================================================================
    📥 SENDING A SCANNED QUESTION TO A VETTING LIST   (admin only)
    ---------------------------------------------------------------------
    A question read off a photograph is a question the centre does not have.
@@ -4389,6 +5292,8 @@ function renderAuth() {
   showTab(_tab);
   applyNotesVisibility();
   applyVetVisibility();
+  renderMbBadge();
+  if (!signedIn) mbClose();
   // The ✎ and the 📥 belong to the account, so the cards are repainted when it
   // changes —
   // otherwise the button the last account was offered stays on every card.
@@ -4417,8 +5322,14 @@ auth.onAuthStateChanged(function (user) {
   // to sign in on the same device. The new account keeps only what its own
   // read is allowed to bring back.
   stopTeachingNotes();
+  // One account's mistake book must never be left on screen for the next
+  // person to sign in on the same device.
+  mbForget();
   renderAuth();
-  if (user) loadTeachingNotes(true).then(function () { renderAnswers(); });
+  if (user) {
+    loadTeachingNotes(true).then(function () { renderAnswers(); });
+    mbLoad(true).then(function () { if (_answers.length) renderAnswers(); });
+  }
 });
 
 /* ================= Wiring ================= */
@@ -4501,8 +5412,9 @@ function showTab(name) {
   $('camDock').classList.toggle('hidden', !on || _tab !== 'snap');
   $('camBar').classList.toggle('hidden', !on || _tab !== 'snap');
   // Left listening under the How tab it would go on typing into a box nobody
-  // can see.
-  if (_tab !== 'snap') micStop();
+  // can see — and a camera left running under it is a recording light on
+  // somebody's phone for a screen they are not even looking at.
+  if (_tab !== 'snap') { micStop(); camClose(); }
   if (_tab === 'how') renderGroundingLine();
 }
 $('tabSnap').addEventListener('click', function () { showTab('snap'); });
@@ -4526,7 +5438,10 @@ function pickFrom(input) {
 }
 pickFrom($('cameraInput'));
 pickFrom($('galleryInput'));
-$('cameraBtn').addEventListener('click', function () { $('cameraInput').click(); });
+$('cameraBtn').addEventListener('click', camOpen);
+$('camSnapBtn').addEventListener('click', camSnap);
+$('camDoneBtn').addEventListener('click', function () { camClose(); renderShots(); });
+$('camCancelBtn').addEventListener('click', camCancel);
 $('galleryBtn').addEventListener('click', function () { $('galleryInput').click(); });
 
 $('readBtn').addEventListener('click', runScan);
@@ -4543,6 +5458,11 @@ $('askText').addEventListener('keydown', function (e) {
   if (!$('readBtn').disabled) runScan();
 });
 $('vetAllBtn').addEventListener('click', function () { vetOpen(null); });
+$('mbBtn').addEventListener('click', mbOpen);
+$('mbCloseBtn').addEventListener('click', mbClose);
+$('mbSendBtn').addEventListener('click', mbSendPicked);
+$('mbRemoveBtn').addEventListener('click', mbRemovePicked);
+$('mbModal').addEventListener('click', function (e) { if (e.target === $('mbModal')) mbClose(); });
 $('reportBtn').addEventListener('click', reportRewrite);
 $('copyAnswersBtn').addEventListener('click', copyAnswers);
 $('printAnswersBtn').addEventListener('click', function () { window.print(); });
@@ -4610,7 +5530,11 @@ $('ansEditModal').addEventListener('click', function (e) { if (e.target === $('a
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
   if (_recOn) { micStop(); return; }
-  if ($('vetModal').classList.contains('open')) vetClose();
+  // A live camera is the one thing on this page that keeps costing something
+  // while it is merely on screen, so Escape reaches it first.
+  if (camIsOpen()) { camCancel(); return; }
+  if ($('mbModal').classList.contains('open')) mbClose();
+  else if ($('vetModal').classList.contains('open')) vetClose();
   else if ($('ansEditModal').classList.contains('open')) answerEditClose();
   else if ($('noteEditModal').classList.contains('open')) notesEditClose();
   else if ($('quickNoteModal').classList.contains('open')) closeQuickNoteModal();
