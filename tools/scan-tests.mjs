@@ -1491,6 +1491,7 @@ return {
   get last() { return window.aiLastCall; },
   AI_ENGINE_STORE, OPENAI_DEFAULT_MODEL, AI_DOWN_MS, OPENAI_URL, OPENAI_MAX_OUTPUT,
   openAiKey, openAiModel, openAiReady, aiEnginePref,
+  kimiKey, kimiModel, kimiReady, KIMI_DEFAULT_MODEL, AI_ENGINES,
   aiEngineOrder, aiEngineIsDown, _openAiBody, _openAiText, aiAskWith
 };
 `)();
@@ -1505,6 +1506,7 @@ ok('the engine slot is the shared one', eng.AI_ENGINE_STORE.engine === 'sq_ai_en
 ok('the key slot is the shared one', eng.AI_ENGINE_STORE.key === 'sq_openai_key');
 ok('the model slot is the shared one', eng.AI_ENGINE_STORE.model === 'sq_openai_model');
 ok('the image-model slot is the shared one', eng.AI_ENGINE_STORE.imageModel === 'sq_openai_image_model');
+ok('Kimi has slots of its own', eng.AI_ENGINE_STORE.kimiKey === 'sq_kimi_key' && eng.AI_ENGINE_STORE.kimiModel === 'sq_kimi_model');
 ok('the backup model is the one the other apps use', eng.OPENAI_DEFAULT_MODEL === 'gpt-5.6-sol');
 
 eng.store = {};
@@ -1517,35 +1519,67 @@ ok('a key is read from the shared slot, trimmed', eng.openAiKey() === KEY);
 eng.store = { sq_openai_key: KEY, sq_openai_model: 'gpt-5.7-sol' };
 ok('a model saved by another portal is honoured', eng.openAiModel() === 'gpt-5.7-sol');
 
+/* KIMI'S MODEL IS A FIELD, NOT A CONSTANT. Moonshot renames its flagship
+   with every release, so an id frozen in the file is a 404 on every call a
+   few months from now — and a 404 on every call reads as "Kimi is broken"
+   rather than "the id is a release out of date". */
+eng.store = {};
+ok('no Kimi key saved is no Kimi device route', eng.kimiReady() === false);
+ok('…and the model still has a name', eng.kimiModel() === eng.KIMI_DEFAULT_MODEL);
+eng.store = { sq_kimi_key: '  ' + KEY + '  ', sq_kimi_model: '  kimi-k4-turbo ' };
+ok('a Kimi key is read and trimmed', eng.kimiKey() === KEY);
+ok('…and so is a model the teacher typed', eng.kimiModel() === 'kimi-k4-turbo');
+eng.store = { sq_kimi_model: '   ' };
+ok('a blank model falls back rather than asking for ""', eng.kimiModel() === eng.KIMI_DEFAULT_MODEL);
+
 /* ---------- Which engine is tried first ---------- */
 /* THREE routes, and which is which is the whole point of the rebuild: the
    `openai` one is the SERVER, whose key is a Firebase secret, so it reaches a
    student's phone with nothing set up on it. `openaiKey` is a key pasted into
    this one browser, which reaches nothing else. */
 eng.store = {};
-ok('the server backup is offered with no device key at all',
-   eng.aiEngineOrder(true).join() === 'gemini,openai');
+ok('every server backup is offered with no device key at all',
+   eng.aiEngineOrder(true).join() === 'gemini,openai,kimi', eng.aiEngineOrder(true).join());
 eng.store = { sq_openai_key: KEY };
 ok('a device key sits BEHIND the server, never in front of it',
-   eng.aiEngineOrder(true).join() === 'gemini,openai,openaiKey');
+   eng.aiEngineOrder(true).join() === 'gemini,openai,openaiKey,kimi', eng.aiEngineOrder(true).join());
+eng.store = { sq_kimi_key: KEY };
+ok('…and the same for Kimi',
+   eng.aiEngineOrder(true).join() === 'gemini,openai,kimi,kimiKey', eng.aiEngineOrder(true).join());
 eng.store = { sq_openai_key: KEY, sq_ai_engine: 'openai' };
-ok('preferring ChatGPT puts Gemini behind it, never off',
-   eng.aiEngineOrder(true).join() === 'openai,openaiKey,gemini');
+ok('preferring ChatGPT puts the others behind it, never off',
+   eng.aiEngineOrder(true).join() === 'openai,openaiKey,gemini,kimi', eng.aiEngineOrder(true).join());
 /* A preference is not a key — but the SERVER is not a key either, so
    preferring ChatGPT with nothing saved in this browser is perfectly
    answerable now, which it was not before the function existed. */
 eng.store = { sq_ai_engine: 'openai' };
 ok('preferring ChatGPT with no device key still goes through the server',
-   eng.aiEngineOrder(true).join() === 'openai,gemini');
+   eng.aiEngineOrder(true).join() === 'openai,gemini,kimi', eng.aiEngineOrder(true).join());
+
+/* THE THIRD SUPPLIER IS THE POINT OF IT. Gemini and ChatGPT are two accounts
+   on two bills; the morning BOTH are out is the morning Kimi exists for, so
+   it has to be reachable as a first choice and as a last resort. */
+eng.store = { sq_kimi_key: KEY, sq_ai_engine: 'kimi' };
+ok('preferring Kimi puts it first and keeps the others behind it',
+   eng.aiEngineOrder(true).join() === 'kimi,kimiKey,gemini,openai', eng.aiEngineOrder(true).join());
+eng.store = { sq_ai_engine: 'kimi' };
+ok('…and with no device key it still goes through the server',
+   eng.aiEngineOrder(true).join() === 'kimi,gemini,openai', eng.aiEngineOrder(true).join());
+/* An engine name nobody recognises must not empty the list: a stale word in
+   the centre-wide setting would take the AI off every device at once. */
+eng.store = { sq_ai_engine: 'nosuchengine' };
+ok('an unknown preference still leaves every route on the list',
+   eng.aiEngineOrder(true).join() === 'gemini,openai,kimi', eng.aiEngineOrder(true).join());
+
 eng.store = { sq_openai_key: KEY };
 ok('a capped Firebase project answers through the server, then the device key',
-   eng.aiEngineOrder(false).join() === 'openai,openaiKey');
+   eng.aiEngineOrder(false).join() === 'openai,openaiKey,kimi', eng.aiEngineOrder(false).join());
 /* The list is NEVER empty. Whether the function is deployed is not something
    a page can know without asking, and refusing to ask is how an app that
    would have worked reports that there is no AI. */
 eng.store = {};
 ok('the server is always worth asking, so there is always a route',
-   eng.aiEngineOrder(false).join() === 'openai');
+   eng.aiEngineOrder(false).join() === 'openai,kimi', eng.aiEngineOrder(false).join());
 
 /* ---------- The failover itself ---------- */
 function runner(script) {
@@ -1573,13 +1607,13 @@ ok('…and why', eng.last.error.indexOf('spending cap') >= 0);
 /* The refusal is remembered, or a twelve-page paper pays for the same failed
    call on every batch before falling back on every batch. */
 ok('the engine that refused is skipped for a while', eng.aiEngineIsDown('gemini'));
-ok('…so the backup now leads', eng.aiEngineOrder(true).join() === 'openai,openaiKey,gemini');
+ok('…so the backup now leads', eng.aiEngineOrder(true).join() === 'openai,openaiKey,kimi,gemini', eng.aiEngineOrder(true).join());
 /* …but it is moved to the BACK, never off the list: a cap is lifted
    eventually, and an app that refuses on a stale note is worse than one that
    spends a call finding out. */
 ok('…and it is still on the list', eng.aiEngineOrder(true).indexOf('gemini') >= 0);
 ok('…and the routes below it are still tried',
-   eng.aiEngineOrder(false).join() === 'openai,openaiKey');
+   eng.aiEngineOrder(false).join() === 'openai,openaiKey,kimi', eng.aiEngineOrder(false).join());
 
 r = runner({ gemini: 'gemini is back' });
 out = await eng.aiAskWith('p', {}, ['gemini'], r.run);
@@ -1706,7 +1740,33 @@ ok('a server route that is not switched on yet says exactly that',
    /OPENAI_API_KEY secret has not been set/.test(html));
 ok('…told apart from a refusal', /The server backup refused a moment ago/.test(html));
 ok('the reason each route refused is kept',
-   /const _aiWhy = \{ gemini: '', openai: '', openaiKey: '', shared: '' \};/.test(html));
+   /const _aiWhy = \{ gemini: '', openai: '', openaiKey: '', kimi: '', kimiKey: '', shared: '' \};/.test(html));
+/* KIMI IS THE THIRD SUPPLIER, and every part of reaching it is silent when
+   it goes wrong: a route missing from the dispatcher is an engine that can
+   be chosen and never called, and a model id frozen in the file is a 404 on
+   every call a few months from now. */
+ok('the server route is the function the Maths repo deploys',
+   /httpsCallable\('askKimi', \{ timeout: 240000 \}\)/.test(html));
+ok('…and the dispatcher can reach both Kimi routes',
+   /if \(engine === 'kimi'\) return askKimiServer\(prompt, opts\);/.test(html) &&
+   /if \(engine === 'kimiKey'\) return askKimiDirect\(prompt, opts\);/.test(html));
+ok('the model travels to the server, because a teacher cannot redeploy a function',
+   /model: kimiModel\(\)/.test(html));
+ok('…and the account\'s own list fills the box', /window\.kimiListModels = async function/.test(html) && /id="kimiLoadBtn"/.test(html));
+ok('…and a stale id is NAMED rather than read as "Kimi is broken"',
+   /function kimiModelHint\(/.test(html) && /may simply be out of date/.test(html));
+ok('a Kimi server key that is not set up yet says exactly that',
+   /MOONSHOT_API_KEY secret has not been set/.test(html));
+ok('the third engine is offered in the picker', /<option value="kimi">/.test(html));
+/* The card must print the order the CALLS take. It used to build its own
+   list and reverse it — right with two engines, silently wrong with three. */
+ok('the card reads the real order rather than re-assembling it',
+   /var routes = \(st\.order \|\| \[\]\)\.map\(engineName\)/.test(html) &&
+   /order: aiEngineOrder\(!!geminiModel\)/.test(html));
+/* An empty key box is "I did not change it", never "delete it" — that is
+   what Remove Kimi key is for. Getting this backwards empties the teacher's
+   key the moment they type a model id. */
+ok('saving a model alone leaves the key alone', /if \(key !== undefined\) \{/.test(html));
 /* The screenshot that prompted this said "Gemini: billing cap" and nothing
    about ChatGPT never having been reachable — so the teacher was sent to the
    Google console when the job was to deploy a function. */
@@ -1719,7 +1779,9 @@ ok('…and the first error is kept as the cause rather than thrown away',
    feature's clothes: the teacher switches on their own phone, watches it
    work, and every student stays on the capped engine. */
 ok('the order follows the shared choice, not this browser\'s',
-   /const have = aiPreferredEngine\(\) === 'openai'/.test(html));
+   /const first = aiPreferredEngine\(\);/.test(html));
+ok('…and the three engines are named in one place',
+   /const AI_ENGINES = \['gemini', 'openai', 'kimi'\];/.test(html));
 ok('…which falls back to the device setting until the server answers',
    /function aiPreferredEngine\(\) \{ return _aiSharedEngine \|\| aiEnginePref\(\); \}/.test(html));
 ok('the teacher\'s toggle writes it for everyone',
