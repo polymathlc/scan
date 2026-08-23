@@ -865,9 +865,9 @@
       <p class="sub" id="howEngines" style="margin-top:6px"></p>
       <div class="fields hidden" id="howEngineFields">
         <div class="field">
-          <label for="openAiKey">ChatGPT key <span class="hint">(teacher only — this device)</span></label>
+          <label for="openAiKey">ChatGPT key <span class="hint">(teacher only — a fallback for this browser)</span></label>
           <input id="openAiKey" type="password" autocomplete="off" spellcheck="false"
-            placeholder="Paste a key to switch the backup on">
+            placeholder="Only needed if the server backup is not deployed">
         </div>
         <div class="field">
           <label for="openAiPrefer">Which to try first</label>
@@ -881,11 +881,15 @@
         <button class="btn btnPrimary" id="saveKeyBtn" type="button">Save key</button>
         <button class="btn" id="clearKeyBtn" type="button">Remove key</button>
       </div>
-      <p class="hint hidden" id="howEngineHint" style="margin-top:12px">The key is kept in this browser and is
-        never uploaded, never put in a paper and never written to the repository — so it works on
-        <b>this device</b> and no other. It is the very same key your Maths, English, Chinese and Science
-        portals use, so entering it here switches the backup on in all five at once, and one already saved in
-        any of them is already in use here.</p>
+      <p class="hint hidden" id="howEngineHint" style="margin-top:12px"><b>You should not normally need this.</b>
+        The backup's real key lives on the <b>server</b>, as a Firebase secret behind the <code>askOpenAi</code>
+        Cloud Function, which is what lets a student's phone use it with nothing set up on it. Set it once with
+        <code>firebase functions:secrets:set OPENAI_API_KEY</code> and deploy the functions in the Maths repo.</p>
+      <p class="hint hidden" id="howEngineHint2" style="margin-top:8px">A key typed here is only a <b>fallback for
+        this browser</b> — useful before the function is deployed, or if it ever stops answering. It is kept in
+        this browser, never uploaded and never written into a paper or the repository, and it is the very same
+        key your Maths, English, Chinese and Science portals use: one already saved in any of them is already
+        being used here.</p>
     </div>
 
     <div class="card">
@@ -1172,6 +1176,10 @@
      dies at ~1 MB and a photograph of one figure is a good part of that, so the
      picture goes to Storage and only its URL is written to the document. -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<!-- The backup AI is a Cloud Function, so its key stays on the server and
+     every device gets it. Compat, because the callable has to ride the
+     signed-in user the rest of this page already has. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 
 <script>
 'use strict';
@@ -1193,7 +1201,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.12.0';
+var APP_VERSION = 'v1.13.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -3849,37 +3857,59 @@ function renderGroundingLine() {
    with nothing on any screen having ever mentioned that there was one
    engine and no other.
    ===================================================================== */
-function engineName(e) { return e === 'openai' ? 'ChatGPT' : e === 'gemini' ? 'Gemini' : ''; }
+function engineName(e) {
+  return e === 'gemini' ? 'Gemini'
+    : e === 'openai' ? 'ChatGPT'
+    : e === 'openaiKey' ? 'ChatGPT (a key saved on this device)'
+    : '';
+}
 function aiEngineState() {
   return (window.aiEngines && window.aiEngines()) ||
-    { gemini: false, openai: false, prefer: 'gemini', last: {} };
+    { gemini: false, server: false, deviceKey: false, prefer: 'gemini', why: {}, last: {} };
 }
+/* The server route is not something the page can confirm without asking, so
+   this reports what it KNOWS: the routes in the order they will be tried, and
+   what each one said the last time it refused. A "the backup is fine" that
+   was never tested is the sentence this feature exists to stop believing. */
 function renderEngineLine() {
   var el = $('howEngines');
   if (!el) return;
   var st = aiEngineState();
-  if (!st.gemini && !st.openai) {
-    el.textContent = 'No AI is available at all — check your connection and reload the page.';
-    return;
+  var why = st.why || {};
+  var bits = [];
+
+  var routes = [];
+  if (st.gemini) routes.push('Gemini');
+  routes.push('ChatGPT on the server');
+  if (st.deviceKey) routes.push('ChatGPT on the key saved in this browser');
+  if (st.prefer === 'openai') routes.reverse();
+  bits.push(routes.length > 1
+    ? 'Answers are tried through ' + routes.join(', then ') +
+      ' — whichever one will answer. A spending cap, a quota or a connection that drops moves to the next one ' +
+      'on its own, and nobody has to do anything.'
+    : routes[0] + ' answers, and there is nothing behind it.');
+
+  /* The server route is the one that reaches a STUDENT's phone, so whether it
+     is working is the single most useful thing on this card — and "not
+     deployed yet" is a different job from "the key was refused". */
+  if (st.serverDown && why.server) {
+    bits.push(/not-?found|failed-?precondition|not configured|not loaded/i.test(why.server)
+      ? 'The server backup is not switched on yet — the OPENAI_API_KEY secret has not been set, or the function has not been deployed. Until it is, only a device with a key of its own has a backup. (' + why.server + ')'
+      : 'The server backup refused a moment ago and is being skipped for a few minutes: ' + why.server);
   }
-  var first = (st.prefer === 'openai' && st.openai) ? 'openai' : (st.gemini ? 'gemini' : 'openai');
-  var other = first === 'gemini' ? (st.openai ? 'openai' : '') : (st.gemini ? 'gemini' : '');
-  var bits = [other
-    ? engineName(first) + ' answers, and ' + engineName(other) + ' takes over the moment it will not — a ' +
-      'spending cap, a quota, a connection that drops. Nothing you do changes: the page simply keeps working.'
-    : engineName(first) + ' answers, and there is no backup on this device — if it refuses, a paper comes ' +
-      'back with nothing on it.'];
+  if (st.gemini && st.geminiDown && why.gemini) {
+    bits.push('Gemini refused a moment ago, so it is being skipped for a few minutes rather than paid for again on every page: ' + why.gemini);
+  }
+
   var last = st.last || {};
   if (last.engine) {
     bits.push(last.fellBack
-      ? 'The last answer came from ' + engineName(last.engine) + ', after the other one refused' +
+      ? 'The last answer came from ' + engineName(last.engine) + ', after an earlier route refused' +
         (last.error ? ' (' + last.error + ')' : '') + '.'
       : 'The last answer came from ' + engineName(last.engine) + '.');
   } else if (last.error) {
-    bits.push('The last attempt failed on every engine: ' + last.error);
+    bits.push('The last attempt failed on every route: ' + last.error);
   }
-  if (st.gemini && st.geminiDown) bits.push('Gemini refused a moment ago, so it is being skipped for a few minutes rather than paid for again on every page.');
-  if (st.openai && st.openaiDown) bits.push('ChatGPT refused a moment ago, so it is being skipped for a few minutes.');
   el.textContent = bits.join(' ');
 }
 
@@ -3889,14 +3919,14 @@ function renderEngineLine() {
    empty the teacher's own box on every load. */
 function applyAiVisibility() {
   var admin = isAdmin(currentUser);
-  ['howEngineFields', 'howEngineBtns', 'howEngineHint'].forEach(function (id) {
+  ['howEngineFields', 'howEngineBtns', 'howEngineHint', 'howEngineHint2'].forEach(function (id) {
     var el = $(id);
     if (el) el.classList.toggle('hidden', !admin);
   });
   if (admin) {
     var st = aiEngineState();
     var k = $('openAiKey');
-    if (k && !k.value) k.placeholder = st.openai ? 'A key is saved on this device' : 'Paste a key to switch the backup on';
+    if (k && !k.value) k.placeholder = st.deviceKey ? 'A key is saved in this browser' : 'Only needed if the server backup is not deployed';
     var p = $('openAiPrefer');
     if (p) p.value = st.prefer === 'openai' ? 'openai' : 'gemini';
   }
@@ -3916,11 +3946,11 @@ function aiSaveKey() {
   // Never left in the box: a key on screen is a key over somebody's shoulder.
   k.value = '';
   applyAiVisibility();
-  toast('Backup engine on. ChatGPT answers whenever Gemini cannot — on this device.', 5000);
+  toast('Saved. This browser now has its own ChatGPT fallback, behind the server one.', 6000);
 }
 function aiClearKey() {
   if (!isAdmin(currentUser)) return;
-  if (!confirm('Remove the ChatGPT key from this browser?\n\nThe backup engine stops here — and in your Maths, English, Chinese and Science portals on this same device, because all five read the one key.')) return;
+  if (!confirm('Remove the ChatGPT key from this browser?\n\nThe server backup is unaffected — this only removes the extra fallback, here and in your Maths, English, Chinese and Science portals on this same device, because all five read the one key.')) return;
   if (window.aiSaveOpenAiKey) window.aiSaveOpenAiKey('');
   var k = $('openAiKey');
   if (k) k.value = '';
@@ -5929,13 +5959,22 @@ try {
    over — and a whole paper then comes back as a column of red cards. One
    engine is one thing standing between the centre and a dead app.
 
-   • THE KEY IS NEVER IN THIS FILE. This is a public static site served to
-     every student's browser, so a key committed here is a key handed to the
-     whole school. It lives in the admin's own localStorage and nowhere else,
-     which also means: it helps on the DEVICE it was entered on. A student's
-     phone has no key and still meets the cap — there is no backend here to
-     hold one behind, and putting it in Firestore is the same as committing
-     it.
+   • THE KEY IS ON THE SERVER, so EVERY device gets the backup — a student's
+     phone included, with nothing to set up on it. `askOpenAiServer` calls the
+     `askOpenAi` Cloud Function in `polymathlc/math/functions`, which holds
+     the key as a Firebase secret and enforces the sign-in, the model, the
+     size caps and a daily quota. A browser never sees the key and cannot read
+     it back.
+   • THE KEY IS NEVER IN THIS FILE, and that is WHY the server holds it. This
+     is a public static site served to every student's browser, so a key
+     committed here is a key handed to the whole school — and spendable
+     without limit by any of them.
+   • A KEY IN `localStorage` IS THE THIRD ROUTE, not the first. It is what the
+     other four portals already do, so a key pasted into any of them on this
+     device is picked up here — and it is what keeps the backup working before
+     the function is deployed, or if it ever stops answering. Its honest limit
+     is the one device it was typed into, which is the limit the server route
+     exists to remove.
    • …and it is the SAME localStorage the other portals already write.
      `polymathlc.github.io/{math,english,chinese,cer,scan}` are sibling
      folders on ONE origin, so `AI_ENGINE_STORE`'s four slot names are shared
@@ -5985,23 +6024,59 @@ function openAiModel() { return _aiStore(AI_ENGINE_STORE.model) || OPENAI_DEFAUL
 function openAiReady() { return !!openAiKey(); }
 function aiEnginePref() { return _aiStore(AI_ENGINE_STORE.engine) === 'openai' ? 'openai' : 'gemini'; }
 
-const _aiDown = { gemini: 0, openai: 0 };
+const _aiDown = { gemini: 0, openai: 0, openaiKey: 0 };
+/* Why each route last refused. The How tab has to be able to tell "nobody has
+   deployed the function yet" from "the key was rejected" from "the account is
+   out of credit" — three different problems with three different fixes, and
+   an app that reports them all as "AI error" sends the teacher looking in the
+   wrong place. */
+const _aiWhy = { gemini: '', openai: '', openaiKey: '' };
 function _aiNow() { return Date.now(); }
 function aiEngineIsDown(e) { return (_aiDown[e] || 0) > _aiNow(); }
 function aiEngineDownFor(e) { return Math.max(0, (_aiDown[e] || 0) - _aiNow()); }
 function _aiMarkDown(e) { _aiDown[e] = _aiNow() + AI_DOWN_MS; }
 function _aiMarkUp(e) { _aiDown[e] = 0; }
 
-/* Which engines to try, best first. Only an engine that really EXISTS is
-   listed — a preference with no key behind it is not one — and one that
-   refused a moment ago is moved to the back rather than dropped. `sort` is
-   stable, so the preference order survives underneath. */
+/* Which routes to try, best first. THREE of them, and the order is the whole
+   design: Gemini, then ChatGPT ON THE SERVER — which every device can reach,
+   because the key is not on the device — then ChatGPT on a key pasted into
+   THIS browser, which only this one can.
+
+   `openai` is ALWAYS listed. Whether the function is deployed is not
+   something a page can know without asking, and asking wrongly costs one
+   call: it is then marked down for `AI_DOWN_MS` rather than paid for again
+   on every batch. A refused route goes to the BACK and never off the list,
+   and `sort` is stable, so the preference order survives underneath. */
 function aiEngineOrder(haveGemini) {
-  const have = [];
-  if (haveGemini) have.push('gemini');
-  if (openAiReady()) have.push('openai');
-  if (aiEnginePref() === 'openai') have.reverse();
+  const chat = ['openai'];
+  if (openAiReady()) chat.push('openaiKey');
+  const have = aiEnginePref() === 'openai'
+    ? chat.concat(haveGemini ? ['gemini'] : [])
+    : (haveGemini ? ['gemini'] : []).concat(chat);
   return have.sort(function (a, b) { return (aiEngineIsDown(a) ? 1 : 0) - (aiEngineIsDown(b) ? 1 : 0); });
+}
+
+/* The SERVER route — the one that works on a phone nobody has ever typed a
+   key into. It is a callable on the COMPAT app deliberately: that is the app
+   holding the signed-in user, and the function refuses anybody else. */
+let _aiFns = null;
+async function askOpenAiServer(prompt, opts) {
+  opts = opts || {};
+  if (typeof firebase === 'undefined' || !firebase.functions) throw new Error('The server backup is not loaded on this page');
+  if (!_aiFns) _aiFns = firebase.functions();
+  const call = _aiFns.httpsCallable('askOpenAi', { timeout: 240000 });
+  const res = await call({
+    prompt: String(prompt == null ? '' : prompt),
+    system: String(opts.system || ''),
+    images: (opts.images || []).filter(function (i) { return i && i.data; })
+      .map(function (i) { return { mimeType: i.mimeType || 'image/jpeg', data: i.data }; }),
+    json: !!opts.json,
+    maxOutputTokens: opts.maxOutputTokens || 512,
+    temperature: opts.temperature
+  });
+  const text = res && res.data && res.data.text;
+  if (typeof text !== 'string' || !text.trim()) throw new Error('The server backup returned an unexpected response shape.');
+  return text.trim();
 }
 
 /* The ChatGPT request. Ported from the Science portal's `askOpenAI` so the
@@ -6076,10 +6151,12 @@ async function aiAskWith(prompt, opts, order, run) {
     try {
       const out = await run(engine, prompt, opts);
       _aiMarkUp(engine);
+      _aiWhy[engine] = '';
       window.aiLastCall = { engine: engine, fellBack: i > 0, error: first ? String(first.message || first) : '' };
       return out;
     } catch (e) {
       _aiMarkDown(engine);
+      _aiWhy[engine] = String((e && e.message) || e || '');
       if (!first) first = e;
       console.warn('AI engine ' + engine + ' refused:', e);
     }
@@ -6089,9 +6166,10 @@ async function aiAskWith(prompt, opts, order, run) {
 }
 /* ===== end of the two-engine block ===== */
 
-// Ready when EITHER engine can answer — a capped Gemini with a key saved is
-// a working app, and the call sites all ask this one question.
-window.aiReady = () => !!geminiModel || openAiReady();
+// Ready when ANY route can answer. The server route is always one of them —
+// a capped Firebase project with the function deployed is a working app, and
+// the call sites all ask this one question.
+window.aiReady = () => true;
 
 /* What the How tab prints. An app quietly running on its backup, or quietly
    running on one engine with no backup at all, looks identical to one that
@@ -6099,11 +6177,14 @@ window.aiReady = () => !!geminiModel || openAiReady();
 window.aiEngines = function () {
   return {
     gemini: !!geminiModel,
-    openai: openAiReady(),
+    server: true,                 // always worth asking; only a refusal says otherwise
+    deviceKey: openAiReady(),
     prefer: aiEnginePref(),
     model: openAiModel(),
     geminiDown: aiEngineIsDown('gemini'),
-    openaiDown: aiEngineIsDown('openai'),
+    serverDown: aiEngineIsDown('openai'),
+    deviceKeyDown: aiEngineIsDown('openaiKey'),
+    why: { gemini: _aiWhy.gemini, server: _aiWhy.openai, deviceKey: _aiWhy.openaiKey },
     last: window.aiLastCall
   };
 };
@@ -6140,7 +6221,9 @@ window.askGemini = function askGemini(prompt, opts = {}) {
   return aiAskWith(prompt, opts, aiEngineOrder(!!geminiModel), _aiRun);
 };
 function _aiRun(engine, prompt, opts) {
-  return engine === 'openai' ? askOpenAI(prompt, opts) : askGeminiDirect(prompt, opts);
+  if (engine === 'openai') return askOpenAiServer(prompt, opts);
+  if (engine === 'openaiKey') return askOpenAI(prompt, opts);
+  return askGeminiDirect(prompt, opts);
 }
 
 // An over-large budget is a 400 rather than a long answer, so it is clamped

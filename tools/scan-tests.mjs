@@ -1518,25 +1518,34 @@ eng.store = { sq_openai_key: KEY, sq_openai_model: 'gpt-5.7-sol' };
 ok('a model saved by another portal is honoured', eng.openAiModel() === 'gpt-5.7-sol');
 
 /* ---------- Which engine is tried first ---------- */
+/* THREE routes, and which is which is the whole point of the rebuild: the
+   `openai` one is the SERVER, whose key is a Firebase secret, so it reaches a
+   student's phone with nothing set up on it. `openaiKey` is a key pasted into
+   this one browser, which reaches nothing else. */
 eng.store = {};
-ok('with no key it is Gemini and nothing else',
-   eng.aiEngineOrder(true).join() === 'gemini');
-eng.store = { sq_openai_key: KEY };
-ok('with a key the backup is behind it',
+ok('the server backup is offered with no device key at all',
    eng.aiEngineOrder(true).join() === 'gemini,openai');
+eng.store = { sq_openai_key: KEY };
+ok('a device key sits BEHIND the server, never in front of it',
+   eng.aiEngineOrder(true).join() === 'gemini,openai,openaiKey');
 eng.store = { sq_openai_key: KEY, sq_ai_engine: 'openai' };
 ok('preferring ChatGPT puts Gemini behind it, never off',
-   eng.aiEngineOrder(true).join() === 'openai,gemini');
-/* A PREFERENCE IS NOT AN ENGINE. Choosing ChatGPT with no key saved must
-   leave Gemini answering, not leave an app that refuses every call. */
+   eng.aiEngineOrder(true).join() === 'openai,openaiKey,gemini');
+/* A preference is not a key — but the SERVER is not a key either, so
+   preferring ChatGPT with nothing saved in this browser is perfectly
+   answerable now, which it was not before the function existed. */
 eng.store = { sq_ai_engine: 'openai' };
-ok('a preference with no key behind it is not an engine',
-   eng.aiEngineOrder(true).join() === 'gemini');
+ok('preferring ChatGPT with no device key still goes through the server',
+   eng.aiEngineOrder(true).join() === 'openai,gemini');
 eng.store = { sq_openai_key: KEY };
-ok('a capped Firebase project still answers through the backup',
-   eng.aiEngineOrder(false).join() === 'openai');
+ok('a capped Firebase project answers through the server, then the device key',
+   eng.aiEngineOrder(false).join() === 'openai,openaiKey');
+/* The list is NEVER empty. Whether the function is deployed is not something
+   a page can know without asking, and refusing to ask is how an app that
+   would have worked reports that there is no AI. */
 eng.store = {};
-ok('nothing at all is an empty list', eng.aiEngineOrder(false).length === 0);
+ok('the server is always worth asking, so there is always a route',
+   eng.aiEngineOrder(false).join() === 'openai');
 
 /* ---------- The failover itself ---------- */
 function runner(script) {
@@ -1564,13 +1573,13 @@ ok('…and why', eng.last.error.indexOf('spending cap') >= 0);
 /* The refusal is remembered, or a twelve-page paper pays for the same failed
    call on every batch before falling back on every batch. */
 ok('the engine that refused is skipped for a while', eng.aiEngineIsDown('gemini'));
-ok('…so the backup now leads', eng.aiEngineOrder(true).join() === 'openai,gemini');
+ok('…so the backup now leads', eng.aiEngineOrder(true).join() === 'openai,openaiKey,gemini');
 /* …but it is moved to the BACK, never off the list: a cap is lifted
    eventually, and an app that refuses on a stale note is worse than one that
    spends a call finding out. */
 ok('…and it is still on the list', eng.aiEngineOrder(true).indexOf('gemini') >= 0);
-ok('…and an engine with nothing beside it is still tried',
-   eng.aiEngineOrder(false).join() === 'openai');
+ok('…and the routes below it are still tried',
+   eng.aiEngineOrder(false).join() === 'openai,openaiKey');
 
 r = runner({ gemini: 'gemini is back' });
 out = await eng.aiAskWith('p', {}, ['gemini'], r.run);
@@ -1662,8 +1671,25 @@ ok('every engine call goes through the one dispatcher',
    (html.match(/askGeminiDirect\(/g) || []).length === 2);
 ok('…and it is what askGemini calls',
    /window\.askGemini = function askGemini[\s\S]{0,200}aiAskWith\(prompt, opts, aiEngineOrder\(!!geminiModel\), _aiRun\)/.test(html));
-ok('the app is ready when EITHER engine can answer',
-   /window\.aiReady = \(\) => !!geminiModel \|\| openAiReady\(\);/.test(html));
+/* The server route needs neither Gemini nor a device key, so an app that
+   asked "is Gemini up" would refuse every button on a capped project that is
+   in fact perfectly able to answer. */
+ok('the app is ready because a route always exists',
+   /window\.aiReady = \(\) => true;/.test(html));
+ok('the server route is the one the dispatcher reaches for first',
+   /if \(engine === 'openai'\) return askOpenAiServer\(prompt, opts\);/.test(html) &&
+   /if \(engine === 'openaiKey'\) return askOpenAI\(prompt, opts\);/.test(html));
+/* The callable rides the COMPAT app, which is the one holding the signed-in
+   user; the modular app beside it has App Check but no session, and the
+   function refuses a caller it cannot name. */
+ok('the callable is on the app that has the signed-in user',
+   /firebase-functions-compat\.js/.test(html) && /_aiFns = firebase\.functions\(\)/.test(html));
+ok('…and it is the function the Maths repo deploys',
+   /httpsCallable\('askOpenAi'/.test(html));
+/* The pages ARE the scan, so a route that quietly dropped them would come
+   back fluent and about nothing at all. */
+ok('the server route sends the pages up too',
+   /images: \(opts\.images \|\| \[\]\)[\s\S]{0,200}mimeType: i\.mimeType \|\| 'image\/jpeg', data: i\.data/.test(html));
 
 /* The page SAYS which engine answered. An app quietly running on its backup —
    or quietly running on one engine with no backup at all — looks exactly like
@@ -1672,7 +1698,15 @@ ok('the How tab has a line for it', /id="howEngines"/.test(html) && /function re
 ok('…repainted when a run finishes', /renderGroundingLine\(\);\n  renderEngineLine\(\);/.test(html));
 ok('…and when the How tab is opened',
    /if \(_tab === 'how'\) \{ renderGroundingLine\(\); renderEngineLine\(\); \}/.test(html));
-ok('it says when there is no backup at all', /there is no backup on this device/.test(html));
+/* "Not deployed yet" is a job for a developer and "the key was refused" is a
+   bill — an app that reports both as "AI error" sends the teacher to the
+   wrong place. */
+ok('a server route that is not switched on yet says exactly that',
+   /The server backup is not switched on yet/.test(html) &&
+   /OPENAI_API_KEY secret has not been set/.test(html));
+ok('…told apart from a refusal', /The server backup refused a moment ago/.test(html));
+ok('the reason each route refused is kept', /const _aiWhy = \{ gemini: '', openai: '', openaiKey: '' \};/.test(html));
+ok('…and cleared by an answer', /_aiMarkUp\(engine\);\n      _aiWhy\[engine\] = '';/.test(html));
 ok('it names the engine that answered last', /The last answer came from/.test(html));
 /* The key field is the teacher's. A student's device runs this very same
    scan, and a secret has no business on it. */
