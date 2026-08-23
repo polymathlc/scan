@@ -116,6 +116,18 @@ redrawn, and the answers, options and marking never pass through an image model.
 
 The worksheet keeps for a year, and only you and your teacher can open it.
 
+### ✓✓ …and questions take themselves out again
+
+Print it, do it, and then **photograph it back in** like any other paper. Every question you get
+**fully right** counts once — get the same one right **twice in a row** and it leaves your mistake
+book for good. Get it wrong in between and the count starts again, because two in a row is the
+whole point: once is luck often enough to matter. A question left blank changes nothing either way,
+and a *partly right* answer counts as a miss.
+
+The card says where each question is up to (*right 1 of 2 — 1 more and it clears*), the book shows
+the same on every row, and the run's message names what cleared. Nothing ever disappears out of the
+book without saying so.
+
 ## ✎ Fix an answer, and teach it for next time
 
 Every answer card carries an **✎ Edit**. The top half fixes the card in front of you — the answer,

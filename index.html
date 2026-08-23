@@ -526,6 +526,10 @@
     font-family: var(--font);
   }
   .mbBookChip.off { border-color: var(--line); background: var(--bg-soft); color: var(--ink-faint); }
+  /* A status, not a button — these two say what the paper just did to the book. */
+  .mbBookChip.done { border-color: #CFE7D0; background: #EFF8EF; color: #1F5F23; cursor: default; }
+  .mbBookChip.near { cursor: default; }
+  .mbChip.mStreak { background: #EFF8EF; color: #1F5F23; border-color: #CFE7D0; }
   .mbCount {
     display: inline-grid; place-items: center; min-width: 21px; height: 21px; padding: 0 6px;
     margin-left: 7px; border-radius: 999px; background: var(--accent-deep); color: #fff;
@@ -787,6 +791,12 @@
       <p class="sub" style="margin-top:10px">This is the <b>only</b> thing this app keeps. Your photographs are not
         saved, your right answers are not saved, and nobody else can see your book — it is under your own account,
         and your teacher's book is their own.</p>
+      <p class="sub" style="margin-top:10px"><b>Questions take themselves out again.</b> Print the worksheet,
+        do it, and then <b>photograph it back in</b> like any other paper. Every question you get <b>fully
+        right</b> counts once — get the same one right <b>twice in a row</b> and it leaves your mistake book for
+        good. Get it wrong in between and the count goes back to the start, because two in a row is the whole
+        point: once is luck often enough to matter. A question you leave blank changes nothing either way.
+        The card says where each one is up to (<i>right 1 of 2</i>), and so does the book.</p>
       <p class="sub" style="margin-top:10px">Open it, tick the questions you want to try again, and press
         <b>📤 Make a worksheet</b>. A link is sent to the email you sign in with, and the page it opens is the
         questions on their own with the answers on a page at the back — ready to print. It opens
@@ -1149,7 +1159,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.10.0';
+var APP_VERSION = 'v1.11.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -4287,6 +4297,11 @@ var MB_COL = 'scanMistakes';        // NEVER 'mistakes' — that is the cer app'
 var MB_PAPER_COL = 'scanPapers';
 var MB_IMG_PATH = 'scan-mistakes';
 var MB_MAX_LOAD = 300;
+/* Right this many times IN A ROW and the question leaves the book. Two,
+   because once is luck often enough to matter and three is a chore nobody
+   finishes. */
+var MB_CLEAR_WINS = 2;
+var MB_KEY_PREFIX = 60;             // the fallback match — see `mbFindByKey`
 var MB_PAPER_MAX = 30;              // questions on one worksheet
 var MB_PAPER_DAYS = 365;            // a paper is swept a year after it is made
 var MB_CROP_MAX_SIDE = 1400;
@@ -4307,19 +4322,46 @@ function _mbCol() { return db.collection('users').doc(currentUser.uid).collectio
 function mbIsWrong(it) {
   return !!(it && it.kind === 'page' && it.marked && (it.verdict === 'wrong' || it.verdict === 'partial'));
 }
+/* Its mirror, and the one that empties the book. FULLY correct only: "partly
+   right" is an attempt that was not right, so it is a miss like any other —
+   a question cleared out of the book on half an answer is a question the
+   student will meet again in the exam and still not be able to do. */
+function mbIsRight(it) {
+  return !!(it && it.kind === 'page' && it.marked && it.verdict === 'correct');
+}
 /* The same question scanned twice — a paper re-photographed, a page shot
    again — is ONE mistake. The key is the wording, folded, so a second reading
    that differs by a space does not file it a second time. */
 function mbKeyOf(it) {
   return String((it && it.question) || '').toLowerCase().replace(/[^a-z0-9一-鿿]+/g, ' ').trim().slice(0, 160);
 }
-function mbHasKey(key) {
-  if (!key) return false;
-  return _mistakes.some(function (m) { return m.key === key; });
-}
-function mbEntryFor(it) {
-  var key = mbKeyOf(it);
-  return _mistakes.filter(function (m) { return m.key === key; })[0] || null;
+function mbHasKey(key) { return !!mbFindByKey(key); }
+function mbEntryFor(it) { return mbFindByKey(mbKeyOf(it)); }
+
+/* ---- Matching a re-done question back to the one in the book ----
+   The worksheet prints the wording the book stored, the student writes on it,
+   and the photograph of it comes back through the same reader — so the folded
+   key usually lands exactly. Usually is not always: a transcription is not
+   guaranteed character-for-character, and a question that fails to match is
+   simply one that stays in the book and gets done again, which costs nothing.
+
+   THE TWO FAILURES ARE NOT SYMMETRICAL, and that is what decides how hard
+   this tries. Failing to match leaves a mistake in the book a moment longer.
+   Matching the WRONG one deletes a question the student still cannot do, on
+   the strength of somebody else's right answer — and nothing anywhere would
+   say so. So the fallback is a long PREFIX and it must be UNIQUE: two entries
+   that both match means no match at all, never a guess between them. */
+function mbFindByKey(key) {
+  key = String(key || '');
+  if (!key) return null;
+  var exact = _mistakes.filter(function (m) { return m.key === key; });
+  if (exact.length) return exact[0];
+  var head = key.slice(0, MB_KEY_PREFIX);
+  if (head.length < MB_KEY_PREFIX) return null;     // too short to be evidence
+  var near = _mistakes.filter(function (m) {
+    return String(m.key || '').slice(0, MB_KEY_PREFIX) === head;
+  });
+  return near.length === 1 ? near[0] : null;
 }
 
 async function mbLoad(force) {
@@ -4440,7 +4482,8 @@ async function mbSaveOne(it) {
     marks: String(it.marks || ''),
     feedback: _scanStr(it.feedback, 1200),
     img: img,
-    imgNote: imgNote
+    imgNote: imgNote,
+    streak: 0                 // right MB_CLEAR_WINS times in a row and it leaves
   };
   await _mbCol().doc(id).set(doc);
   var entry = Object.assign({ id: id }, doc);
@@ -4448,31 +4491,121 @@ async function mbSaveOne(it) {
   return entry;
 }
 
-/* Every wrong answer on the paper, filed in one pass once the run has
-   finished. Automatic, like the marking and the report — a picker asking
-   "keep this one?" twenty times is a picker nobody answers — and it SAYS how
-   many went in, because a thing saved without a word is a thing nobody knows
-   is there. */
+/* =====================================================================
+   ✓✓ CLEARING A QUESTION — right TWICE IN A ROW and it leaves the book
+   ---------------------------------------------------------------------
+   The book fills itself, so it has to empty itself too, or it becomes a list
+   of everything a student has ever got wrong and therefore a list nobody
+   opens. What empties it is the thing the whole feature is for: doing the
+   question again and getting it right.
+
+   THE LOOP CLOSES BY PHOTOGRAPHING THE WORKSHEET BACK IN, because that is the
+   only place this app can honestly learn the answer is now right. The
+   worksheet is printed and done on paper; the student scans it like any other
+   paper; the run marks it like any other paper; and this pass reads the
+   verdicts that came out. There is no second marker and no button that says
+   "I got it right" — a book emptied by a student ticking their own work is a
+   book that empties itself the day before the exam.
+
+   "IN A ROW" IS THE WHOLE RULE, and the reset is the half that carries it.
+   One right answer moves the streak to 1; a second moves it to 2 and the
+   question is gone. Anything ATTEMPTED and not fully right puts it straight
+   back to 0 — including "partly right", which is an attempt that was not
+   right. Without the reset this is "right twice ever", which a student
+   reaches by accident on a question they still cannot do.
+
+   A BLANK CHANGES NOTHING, neither way. It is the rule the marking, the
+   report and the filing are all built on: a question that was not attempted
+   was not got wrong and was not got right. Skipping a question on the re-do
+   must not quietly wipe a streak the student has earned.
+   ===================================================================== */
+
+/* What happened to each question on THIS run, keyed the way the book is.
+   It is what lets the cards say "cleared" about a question that is no longer
+   in the book to be looked up — a question that vanishes with nothing on
+   screen to explain it is the one thing this must not do. */
+var _mbRunNews = {};
+
+async function mbNoteWin(entry) {
+  var streak = (Number(entry.streak) || 0) + 1;
+  if (streak >= MB_CLEAR_WINS) {
+    await _mbCol().doc(entry.id).delete();
+    _mistakes = _mistakes.filter(function (m) { return m.id !== entry.id; });
+    delete _mbSel[entry.id];
+    return 'cleared';
+  }
+  await _mbCol().doc(entry.id).update({ streak: streak, lastRightAt: new Date().toISOString() });
+  entry.streak = streak;
+  return 'closer';
+}
+async function mbNoteMiss(entry) {
+  // Nothing to write when it is already at nought — a wrong answer on a
+  // question with no streak is just a wrong answer.
+  if (!(Number(entry.streak) || 0)) return '';
+  await _mbCol().doc(entry.id).update({ streak: 0, lastWrongAt: new Date().toISOString() });
+  entry.streak = 0;
+  return 'reset';
+}
+
+/* ONE pass over the run, and the ONE place a run changes the book: what was
+   got wrong goes in, what was got right moves towards coming out, and what
+   was attempted and missed starts again. Three passes would be three places
+   for the once-per-question guard to drift apart.
+
+   `seen` is that guard. A paper photographed with the same question on two
+   pages, or a page shot twice, is ONE attempt — scoring it twice would clear
+   a question on a single sitting, which is exactly what "twice in a row" is
+   there to prevent. */
 async function mbFileRun(run) {
   if (!mbAvailable()) return 0;
   await mbLoad(false);
-  var wrong = _answers.filter(mbIsWrong);
-  if (!wrong.length) return 0;
-  var added = 0, failed = 0;
-  for (var i = 0; i < wrong.length; i++) {
+  _mbRunNews = {};
+  var added = 0, failed = 0, cleared = 0, closer = 0;
+  var seen = {};
+  for (var i = 0; i < _answers.length; i++) {
     if (run !== _scanRun) return added;          // a newer run owns the screen
-    try { if (await mbSaveOne(wrong[i])) added++; }
-    catch (e) { console.warn('mistake book write failed', e); failed++; }
+    var it = _answers[i];
+    if (!it || it.kind !== 'page' || !it.marked) continue;   // a blank changes nothing
+    var key = mbKeyOf(it);
+    if (!key || seen[key]) continue;
+    seen[key] = 1;
+    var entry = mbFindByKey(key);
+    try {
+      if (entry) {
+        if (mbIsRight(it)) {
+          var got = await mbNoteWin(entry);
+          if (got === 'cleared') { cleared++; _mbRunNews[key] = 'cleared'; }
+          else { closer++; _mbRunNews[key] = 'closer'; }
+        } else if (mbIsWrong(it)) {
+          if (await mbNoteMiss(entry)) _mbRunNews[key] = 'reset';
+        }
+      } else if (mbIsWrong(it)) {
+        if (await mbSaveOne(it)) { added++; _mbRunNews[key] = 'added'; }
+      }
+    } catch (e) { console.warn('mistake book write failed', e); failed++; }
   }
   renderMbBadge();
   renderAnswers();
-  if (added) {
-    toast('📕 ' + added + ' wrong answer' + (added === 1 ? '' : 's') + ' added to your mistake book' +
-      (failed ? ' — ' + failed + ' could not be saved' : '') + '.', 6000);
-  } else if (failed) {
-    toast('📕 Your mistake book could not be written to just now.', 5000);
-  }
+  mbRunToast(added, cleared, closer, failed);
   return added;
+}
+
+/* Said out loud, every time. The book changing itself behind a student is
+   the failure this whole feature has to avoid, and "cleared" is the half they
+   have actually earned. */
+function mbRunToast(added, cleared, closer, failed) {
+  var bits = [];
+  if (cleared) {
+    bits.push('✓ ' + cleared + ' question' + (cleared === 1 ? '' : 's') + ' cleared — right ' +
+      MB_CLEAR_WINS + ' times in a row');
+  }
+  if (closer) {
+    bits.push(closer + ' one more right answer from clearing');
+  }
+  if (added) bits.push(added + ' new mistake' + (added === 1 ? '' : 's') + ' kept');
+  if (failed) bits.push(failed + ' could not be saved');
+  if (!bits.length) return;
+  toast('📕 ' + bits.join(' · ') + '.', 7000);
 }
 
 async function mbRemove(id) {
@@ -4484,19 +4617,40 @@ async function mbRemove(id) {
   mbRenderBody();
   renderAnswers();
 }
-/* The chip on an answer card, which is the other way in and the only way back
-   out from the paper itself. It is drawn only on a card that IS a mistake, so
-   it can never appear on a blank or on a right answer. */
+/* The chip on an answer card: the other way into the book, the only way back
+   out from the paper itself, and — since the book started emptying itself —
+   the place a student reads what this paper just did to it.
+
+   A CLEARED question has no entry left to look up, so the news for THIS run
+   is what is read first. A question that disappears out of the book with
+   nothing on screen to say why is the one outcome that would make a student
+   distrust the whole thing. */
 function mbCardChipHtml(it) {
-  if (!mbAvailable() || !mbIsWrong(it) || _scanning) return '';
-  var e = mbEntryFor(it);
+  if (!mbAvailable() || _scanning || !it || it.kind !== 'page') return '';
+  var key = mbKeyOf(it);
+  var news = _mbRunNews[key];
+  if (news === 'cleared') {
+    return '<span class="mbBookChip done" title="Right ' + MB_CLEAR_WINS +
+      ' times in a row — it is out of your book">✓ Cleared from your mistake book</span>';
+  }
+  var e = mbFindByKey(key);
+  if (e && mbIsRight(it)) {
+    var left = Math.max(1, MB_CLEAR_WINS - (Number(e.streak) || 0));
+    return '<span class="mbBookChip near" title="Get it right ' + left + ' more time' +
+      (left === 1 ? '' : 's') + ' and it leaves your mistake book">📕 Right ' +
+      (Number(e.streak) || 0) + ' of ' + MB_CLEAR_WINS + ' — ' + left + ' more and it clears</span>';
+  }
+  if (news === 'reset') {
+    return '<span class="mbBookChip">📕 Back to the start — still in your mistake book</span>';
+  }
+  if (!mbIsWrong(it)) return '';
   return '<button class="mbBookChip' + (e ? '' : ' off') + '" ' +
-    'onclick="mbCardChipClick(' + JSON.stringify(mbKeyOf(it)).replace(/"/g, '&quot;') + ')" ' +
+    'onclick="mbCardChipClick(' + JSON.stringify(key).replace(/"/g, '&quot;') + ')" ' +
     'title="' + (e ? 'Take this out of your mistake book' : 'Put this back in your mistake book') + '">' +
     (e ? '📕 In your mistake book' : '📕 Add to mistake book') + '</button>';
 }
 async function mbCardChipClick(key) {
-  var e = _mistakes.filter(function (m) { return m.key === key; })[0];
+  var e = mbFindByKey(key);
   if (e) { await mbRemove(e.id); return; }
   var it = _answers.filter(function (a) { return mbKeyOf(a) === key; })[0];
   if (!it) return;
@@ -4532,6 +4686,12 @@ function mbRowHtml(m) {
   if (m.verdict === 'wrong') chips.push('<span class="mbChip mWrong">✗ Wrong</span>');
   else if (m.verdict === 'partial') chips.push('<span class="mbChip mPartial">~ Partly right</span>');
   if (m.number) chips.push('<span class="mbChip">Q' + escHtml(m.number) + '</span>');
+  // How close it is to leaving. Silent at nought — an untried question saying
+  // "0 of 2" is a scoreboard on every row of the list.
+  var streak = Number(m.streak) || 0;
+  if (streak > 0) {
+    chips.push('<span class="mbChip mStreak">✓ right ' + streak + ' of ' + MB_CLEAR_WINS + ' in a row</span>');
+  }
   chips.push('<span class="mbChip">' + escHtml(String(m.at || '').slice(0, 10)) + '</span>');
   if (m.imgNote) chips.push('<span class="mbChip">⚠ ' + escHtml(m.imgNote) + '</span>');
   return '<div class="mbRow' + (picked ? ' picked' : '') + '">' +
