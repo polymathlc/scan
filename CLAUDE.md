@@ -588,10 +588,17 @@ step, and ship a change to the shape in both repos together**:
   choice was the bug wearing a feature's clothes: the teacher switched to ChatGPT on their own
   phone, watched it work, and every student stayed on the capped Gemini. The toggle is the
   **admin's** and the function checks that again; a write that FAILED is reported, because a
-  teacher told nothing would believe the whole centre had moved. It is a CALLABLE rather than a
-  document the clients read because the shared `firestore.rules` does not contain the Science
-  app's own rules — so a world-readable document would cost a hand-assembled rules deploy, and
-  the Admin SDK bypasses rules entirely.
+  teacher told nothing would believe the whole centre had moved. (v1.14.0 read it through a
+  CALLABLE; v1.15.0 moved it onto a document this app already reads — see the next bullet — and
+  the callable stayed as the fallback.)
+- **THE SETTING LIVES ON `config/admin`** (v1.15.0) — the Portal's own admin pointer, which this
+  app ALREADY reads to learn whose teaching notes to apply and which only the admin can write. So
+  it needs no rules change and no deploy, and it is the very SAME document the Science portal's
+  toggle writes: one switch moves both apps. The write is a **MERGE**, always — a plain set would
+  take `uid` off it and every student in the Science app would lose the bank. It is a **live
+  listener**, so a phone with the app open follows the teacher within seconds, and it **comes down
+  on every account change**, or one account's setting governs the next person to sign in. An unset
+  field means Gemini, so a centre that never touches it is unaffected.
 - **WHEN NOTHING ANSWERS, EVERY ROUTE IS NAMED** (`AI_ROUTE_LABEL`, the tail of `aiAskWith`). The
   first error is kept as `cause`, but the message lists them all. Reporting one hides the rest: a
   card reading "Gemini: your billing account has exceeded its monthly spending cap" and nothing

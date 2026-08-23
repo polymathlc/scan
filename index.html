@@ -1201,7 +1201,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.14.0';
+var APP_VERSION = 'v1.15.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -3988,9 +3988,7 @@ function aiSetPrefer() {
   }).catch(function (e) {
     renderEngineLine();
     var msg = String((e && e.message) || e || '');
-    toast(/not-?found|internal|unavailable|not reachable/i.test(msg)
-      ? 'Saved on this device only — the aiEngineConfig function is not deployed yet, so other devices keep their own setting.'
-      : 'Saved on this device only — the centre-wide setting could not be written: ' + msg, 7000);
+    toast('Saved on this device only — the centre-wide setting could not be written: ' + msg, 7000);
   });
 }
 
@@ -5647,7 +5645,7 @@ function renderAuth() {
   // it — this is the one function every account change comes through.
   if (signedIn && window.aiEngineLoadShared) window.aiEngineLoadShared(true).then(renderEngineLine).catch(function () {});
   renderMbBadge();
-  if (!signedIn) mbClose();
+  if (!signedIn) { mbClose(); if (window.aiEngineStopShared) window.aiEngineStopShared(); }
   // The ✎ and the 📥 belong to the account, so the cards are repainted when it
   // changes —
   // otherwise the button the last account was offered stays on every card.
@@ -6095,31 +6093,92 @@ let _aiSharedAt = 0;
 const AI_SHARED_TTL = 5 * 60 * 1000;
 function aiPreferredEngine() { return _aiSharedEngine || aiEnginePref(); }
 
+/* WHERE THE SHARED SETTING LIVES, and why it is not a new document.
+
+   It is a field on `config/admin` — the Science Learning Portal's own admin
+   pointer, which THIS app already reads to learn whose teaching notes to
+   apply, and which only the admin can write. So it needs NO rules change and
+   NO deploy: both the read and the write are paths already exercised in
+   production. A brand-new document would have been tidier and would have
+   needed a rules deploy — and the shared `firestore.rules` does not even
+   contain the Science app's own rules, so that deploy is a hand-assembly job
+   with the whole project's access as the blast radius.
+
+   It is the SAME document the Science portal's own toggle writes, which is
+   the point: one switch moves both apps. It is a LIVE listener rather than a
+   poll, so a phone with the app open follows the teacher within seconds.
+   The `aiEngineConfig` callable is kept as a FALLBACK for the case where
+   this read is ever denied. */
+var _aiCfgStop = null;
+function aiEngineWatchShared() {
+  if (_aiCfgStop || typeof db === 'undefined' || !db) return;
+  try {
+    _aiCfgStop = db.collection('config').doc('admin').onSnapshot(function (snap) {
+      var d = (snap && snap.exists && snap.data()) || {};
+      // An unset field means nobody has chosen, which is Gemini — the default
+      // this app already had, so a centre that never touches it is unaffected.
+      _aiSharedEngine = (d.aiEngine === 'gemini' || d.aiEngine === 'openai') ? d.aiEngine : 'gemini';
+      _aiSharedAt = Date.now();
+      _aiWhy.shared = '';
+      if (window.renderEngineLine) { try { window.renderEngineLine(); } catch (e) { /* tab not built */ } }
+    }, function (err) {
+      // A denied read must never stop the app choosing at all: the device
+      // preference carries on and the How tab says the setting is this
+      // device's own rather than the centre's.
+      _aiWhy.shared = String((err && err.message) || err || '');
+      _aiCfgStop = null;
+    });
+  } catch (e) { _aiWhy.shared = String((e && e.message) || e || ''); }
+}
+function aiEngineStopShared() { if (_aiCfgStop) { try { _aiCfgStop(); } catch (e) { /* already gone */ } _aiCfgStop = null; } }
+window.aiEngineStopShared = aiEngineStopShared;
+
 async function aiEngineLoadShared(force) {
   if (!force && _aiSharedEngine && Date.now() - _aiSharedAt < AI_SHARED_TTL) return _aiSharedEngine;
+  aiEngineWatchShared();
+  try {
+    const snap = await db.collection('config').doc('admin').get();
+    const d = (snap && snap.exists && snap.data()) || {};
+    _aiSharedEngine = (d.aiEngine === 'gemini' || d.aiEngine === 'openai') ? d.aiEngine : 'gemini';
+    _aiSharedAt = Date.now();
+    _aiWhy.shared = '';
+    return _aiSharedEngine;
+  } catch (e) {
+    _aiWhy.shared = String((e && e.message) || e || '');
+  }
   try {
     if (typeof firebase === 'undefined' || !firebase.functions) throw new Error('functions SDK not loaded');
     if (!_aiFns) _aiFns = firebase.functions();
     const res = await _aiFns.httpsCallable('aiEngineConfig', { timeout: 20000 })({});
     const eng = res && res.data && res.data.engine;
     if (eng === 'gemini' || eng === 'openai') { _aiSharedEngine = eng; _aiSharedAt = Date.now(); _aiWhy.shared = ''; }
-  } catch (e) {
-    // Not deployed, or offline. The device preference carries on — a shared
-    // setting that cannot be read must never stop the app choosing at all.
-    _aiWhy.shared = String((e && e.message) || e || '');
-  }
+  } catch (e2) { /* the device preference carries on, and the How tab says so */ }
   return _aiSharedEngine;
 }
 window.aiEngineLoadShared = aiEngineLoadShared;
 
+/* MERGE, always. This document is the Portal's bank pointer as well, and a
+   plain set would take `uid` off it — which is how every student in the
+   Science app loses the bank. */
 async function aiEngineSetShared(engine) {
-  if (typeof firebase === 'undefined' || !firebase.functions) throw new Error('The server is not reachable from this page');
-  if (!_aiFns) _aiFns = firebase.functions();
-  const res = await _aiFns.httpsCallable('aiEngineConfig', { timeout: 20000 })({ set: engine });
-  const eng = res && res.data && res.data.engine;
-  _aiSharedEngine = (eng === 'gemini' || eng === 'openai') ? eng : engine;
-  _aiSharedAt = Date.now();
-  return _aiSharedEngine;
+  try {
+    await db.collection('config').doc('admin').set({
+      aiEngine: engine,
+      aiEngineAt: new Date().toISOString(),
+      aiEngineBy: (window.currentUser && window.currentUser.email) || ''
+    }, { merge: true });
+    _aiSharedEngine = engine;
+    _aiSharedAt = Date.now();
+    return engine;
+  } catch (e) {
+    if (typeof firebase === 'undefined' || !firebase.functions) throw e;
+    if (!_aiFns) _aiFns = firebase.functions();
+    const res = await _aiFns.httpsCallable('aiEngineConfig', { timeout: 20000 })({ set: engine });
+    const eng = res && res.data && res.data.engine;
+    _aiSharedEngine = (eng === 'gemini' || eng === 'openai') ? eng : engine;
+    _aiSharedAt = Date.now();
+    return _aiSharedEngine;
+  }
 }
 window.aiEngineSetShared = aiEngineSetShared;
 

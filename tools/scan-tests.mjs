@@ -1725,7 +1725,19 @@ ok('…which falls back to the device setting until the server answers',
 ok('the teacher\'s toggle writes it for everyone',
    /window\.aiEngineSetShared\(v\)/.test(html) && /is now the first engine for everyone/.test(html));
 ok('…and a write that FAILED says so rather than letting them believe it moved',
-   /Saved on this device only — the aiEngineConfig function is not deployed yet/.test(html));
+   /Saved on this device only — the centre-wide setting could not be written/.test(html));
+/* IT LIVES ON `config/admin` — the Portal's admin pointer, which this app
+   ALREADY reads to find whose notes to apply and which only the admin can
+   write. So it needs no rules change and no deploy, and it is the very same
+   document the Science portal's own toggle writes: one switch moves both. */
+ok('the shared setting rides the config/admin pointer this app already reads',
+   /db\.collection\('config'\)\.doc\('admin'\)\.onSnapshot\(/.test(html));
+ok('…written with MERGE, or it takes the Portal\'s bank pointer off with it',
+   /\}, \{ merge: true \}\);/.test(html) && /aiEngineBy:/.test(html));
+ok('…and the listener comes down with the account',
+   /if \(window\.aiEngineStopShared\) window\.aiEngineStopShared\(\);/.test(html));
+ok('an unset field means Gemini, so a centre that never touches it is unaffected',
+   /\? d\.aiEngine : 'gemini'/.test(html));
 ok('every signed-in device reads it', /window\.aiEngineLoadShared\(true\)/.test(html));
 ok('…and the page says whose setting is actually in force',
    /This order is the centre-wide setting/.test(html) &&
