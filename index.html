@@ -870,7 +870,7 @@
             placeholder="Only needed if the server backup is not deployed">
         </div>
         <div class="field">
-          <label for="openAiPrefer">Which to try first</label>
+          <label for="openAiPrefer">Which to try first <span class="hint">(everyone's devices)</span></label>
           <select id="openAiPrefer">
             <option value="gemini">Gemini, with ChatGPT behind it</option>
             <option value="openai">ChatGPT, with Gemini behind it</option>
@@ -1201,7 +1201,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.13.0';
+var APP_VERSION = 'v1.14.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -3883,6 +3883,11 @@ function renderEngineLine() {
   routes.push('ChatGPT on the server');
   if (st.deviceKey) routes.push('ChatGPT on the key saved in this browser');
   if (st.prefer === 'openai') routes.reverse();
+  bits.push(st.shared
+    ? 'This order is the centre-wide setting — every signed-in device is using it.'
+    : (st.sharedWhy
+      ? 'This order is THIS DEVICE\'s own setting: the centre-wide one could not be read, so other devices keep theirs. (' + st.sharedWhy + ')'
+      : 'Reading the centre-wide setting…'));
   bits.push(routes.length > 1
     ? 'Answers are tried through ' + routes.join(', then ') +
       ' — whichever one will answer. A spending cap, a quota or a connection that drops moves to the next one ' +
@@ -3957,12 +3962,36 @@ function aiClearKey() {
   applyAiVisibility();
   toast('Key removed from this device.');
 }
+/* The teacher's toggle. It writes the CENTRE-WIDE setting, because a choice
+   that only moved this phone is the bug this replaced: switch to ChatGPT on
+   your own device, watch it work, and every student stays on the capped
+   Gemini with the screen looking exactly as it should.
+
+   The device preference is written TOO, and deliberately: it is what this
+   browser falls back on before the shared setting has been read, and it is
+   what keeps the choice meaning something at all if the function is not
+   deployed. A failure is REPORTED rather than swallowed — a teacher told
+   nothing would believe the whole centre had moved. */
 function aiSetPrefer() {
   if (!isAdmin(currentUser)) return;
   var p = $('openAiPrefer');
-  if (!p || !window.aiSetEnginePref) return;
-  window.aiSetEnginePref(p.value);
+  if (!p) return;
+  var v = p.value === 'openai' ? 'openai' : 'gemini';
+  if (window.aiSetEnginePref) window.aiSetEnginePref(v);
   renderEngineLine();
+  if (!window.aiEngineSetShared) return;
+  window.aiEngineSetShared(v).then(function () {
+    renderEngineLine();
+    toast(v === 'openai'
+      ? 'ChatGPT is now the first engine for everyone.'
+      : 'Gemini is now the first engine for everyone.', 5000);
+  }).catch(function (e) {
+    renderEngineLine();
+    var msg = String((e && e.message) || e || '');
+    toast(/not-?found|internal|unavailable|not reachable/i.test(msg)
+      ? 'Saved on this device only — the aiEngineConfig function is not deployed yet, so other devices keep their own setting.'
+      : 'Saved on this device only — the centre-wide setting could not be written: ' + msg, 7000);
+  });
 }
 
 function answersAsText() {
@@ -5614,6 +5643,9 @@ function renderAuth() {
   applyNotesVisibility();
   applyVetVisibility();
   applyAiVisibility();
+  // The engine choice belongs to the centre, so every signed-in device reads
+  // it — this is the one function every account change comes through.
+  if (signedIn && window.aiEngineLoadShared) window.aiEngineLoadShared(true).then(renderEngineLine).catch(function () {});
   renderMbBadge();
   if (!signedIn) mbClose();
   // The ✎ and the 📥 belong to the account, so the cards are repainted when it
@@ -6030,7 +6062,8 @@ const _aiDown = { gemini: 0, openai: 0, openaiKey: 0 };
    out of credit" — three different problems with three different fixes, and
    an app that reports them all as "AI error" sends the teacher looking in the
    wrong place. */
-const _aiWhy = { gemini: '', openai: '', openaiKey: '' };
+const _aiWhy = { gemini: '', openai: '', openaiKey: '', shared: '' };
+const AI_ROUTE_LABEL = { gemini: 'Gemini', openai: 'ChatGPT (server key)', openaiKey: 'ChatGPT (key in this browser)' };
 function _aiNow() { return Date.now(); }
 function aiEngineIsDown(e) { return (_aiDown[e] || 0) > _aiNow(); }
 function aiEngineDownFor(e) { return Math.max(0, (_aiDown[e] || 0) - _aiNow()); }
@@ -6047,10 +6080,53 @@ function _aiMarkUp(e) { _aiDown[e] = 0; }
    call: it is then marked down for `AI_DOWN_MS` rather than paid for again
    on every batch. A refused route goes to the BACK and never off the list,
    and `sort` is stable, so the preference order survives underneath. */
+/* WHICH ENGINE IS PREFERRED IS A SETTING FOR THE WHOLE CENTRE, not for this
+   browser. The admin sets it once and every signed-in device follows, because
+   a device-local choice was the bug wearing a feature's clothes: the teacher
+   switched to ChatGPT on their own phone, watched it work, and every student
+   stayed on the capped Gemini.
+
+   `_aiSharedEngine` is null until the callable answers, and the device
+   preference stands in until then — so a project where the function has never
+   been deployed behaves exactly as it did before, rather than waiting on a
+   call that is never coming. */
+let _aiSharedEngine = null;
+let _aiSharedAt = 0;
+const AI_SHARED_TTL = 5 * 60 * 1000;
+function aiPreferredEngine() { return _aiSharedEngine || aiEnginePref(); }
+
+async function aiEngineLoadShared(force) {
+  if (!force && _aiSharedEngine && Date.now() - _aiSharedAt < AI_SHARED_TTL) return _aiSharedEngine;
+  try {
+    if (typeof firebase === 'undefined' || !firebase.functions) throw new Error('functions SDK not loaded');
+    if (!_aiFns) _aiFns = firebase.functions();
+    const res = await _aiFns.httpsCallable('aiEngineConfig', { timeout: 20000 })({});
+    const eng = res && res.data && res.data.engine;
+    if (eng === 'gemini' || eng === 'openai') { _aiSharedEngine = eng; _aiSharedAt = Date.now(); _aiWhy.shared = ''; }
+  } catch (e) {
+    // Not deployed, or offline. The device preference carries on — a shared
+    // setting that cannot be read must never stop the app choosing at all.
+    _aiWhy.shared = String((e && e.message) || e || '');
+  }
+  return _aiSharedEngine;
+}
+window.aiEngineLoadShared = aiEngineLoadShared;
+
+async function aiEngineSetShared(engine) {
+  if (typeof firebase === 'undefined' || !firebase.functions) throw new Error('The server is not reachable from this page');
+  if (!_aiFns) _aiFns = firebase.functions();
+  const res = await _aiFns.httpsCallable('aiEngineConfig', { timeout: 20000 })({ set: engine });
+  const eng = res && res.data && res.data.engine;
+  _aiSharedEngine = (eng === 'gemini' || eng === 'openai') ? eng : engine;
+  _aiSharedAt = Date.now();
+  return _aiSharedEngine;
+}
+window.aiEngineSetShared = aiEngineSetShared;
+
 function aiEngineOrder(haveGemini) {
   const chat = ['openai'];
   if (openAiReady()) chat.push('openaiKey');
-  const have = aiEnginePref() === 'openai'
+  const have = aiPreferredEngine() === 'openai'
     ? chat.concat(haveGemini ? ['gemini'] : [])
     : (haveGemini ? ['gemini'] : []).concat(chat);
   return have.sort(function (a, b) { return (aiEngineIsDown(a) ? 1 : 0) - (aiEngineIsDown(b) ? 1 : 0); });
@@ -6161,8 +6237,16 @@ async function aiAskWith(prompt, opts, order, run) {
       console.warn('AI engine ' + engine + ' refused:', e);
     }
   }
-  window.aiLastCall = { engine: '', fellBack: false, error: String((first && first.message) || first || '') };
-  throw first;
+  /* EVERY route's refusal, not just the first. The first names the real
+     problem only when the others are noise; when nothing answered at all,
+     reporting one of them HIDES the rest — a card reading "Gemini: billing
+     cap" and nothing else sends the teacher to the Google console when what
+     actually needs doing is deploying the ChatGPT function. */
+  const why = order.map(e => AI_ROUTE_LABEL[e] + ': ' + (_aiWhy[e] || 'refused')).join(' · ');
+  window.aiLastCall = { engine: '', fellBack: false, error: why };
+  const err = new Error(why);
+  err.cause = first;
+  throw err;
 }
 /* ===== end of the two-engine block ===== */
 
@@ -6179,7 +6263,9 @@ window.aiEngines = function () {
     gemini: !!geminiModel,
     server: true,                 // always worth asking; only a refusal says otherwise
     deviceKey: openAiReady(),
-    prefer: aiEnginePref(),
+    prefer: aiPreferredEngine(),
+    shared: _aiSharedEngine,
+    sharedWhy: _aiWhy.shared,
     model: openAiModel(),
     geminiDown: aiEngineIsDown('gemini'),
     serverDown: aiEngineIsDown('openai'),
