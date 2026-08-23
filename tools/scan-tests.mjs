@@ -33,6 +33,13 @@ const scan = section(
 const report = section(
   '/* =====================================================================\n   📋 THE REPORT',
   '/* =====================================================================\n   📥 SENDING A SCANNED QUESTION');
+/* 📕 The mistake book, and the worksheet it makes. The one place this app
+   keeps a child's work, so every guard on it matters — and the collection
+   NAME most of all: `mistakes` under this same uid is the Science portal's
+   own log, and sharing it would merge two apps' data with nothing throwing. */
+const book = section(
+  '/* =====================================================================\n   📕 THE MISTAKE BOOK',
+  '/* =====================================================================\n   📥 SENDING A SCANNED QUESTION');
 /* 📥 The admin's door into the four portals' vetting lists. Everything it can
    get wrong is silent: a document written in the wrong SHAPE renders as a
    question with no answer in it, and a `source` that stops saying 'scan'
@@ -68,6 +75,9 @@ var document = { getElementById: () => null, createElement: () => ({ getContext:
    the 🎤 is only shown where the browser really has the Web Speech API. */
 var window = {};
 var localStorage = { getItem: () => null, setItem: () => {} };
+var location = { href: 'https://polymathlc.github.io/scan/' };
+var navigator = {};
+var storage = null;
 var db = { collection: () => ({ doc: () => ({
   collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: false }) }),
                        get: () => Promise.resolve({ forEach: () => {} }) }),
@@ -75,7 +85,7 @@ var db = { collection: () => ({ doc: () => ({
 }) }) };
 `;
 
-const api = new Function(prelude + json + grounding + scan + report + vet + `
+const api = new Function(prelude + json + grounding + scan + report + book + vet + `
   return {
     set notes(v) { teachingNotes = v; },
     set style(v) { aiStyle = v; },
@@ -94,6 +104,11 @@ const api = new Function(prelude + json + grounding + scan + report + vet + `
     set answers(v) { _answers = v; },
     set report(v) { _report = v; },
     get report() { return _report; },
+    MB_COL, MB_PAPER_COL, MB_IMG_PATH, MB_PAPER_MAX, MB_PAPER_DAYS, MB_VIEWER_PATH, MB_MAIL_COL,
+    mbIsWrong, mbKeyOf, mbHasKey, _mbBoxOk, _mbShotForPage, _mbPaperUrl, _mbPaperTitle,
+    _mbPaperDoc, _mbMailDoc, camAvailable,
+    set mistakes(v) { _mistakes = v; },
+    set shots(v) { _shots = v; },
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
     _scanSubject, itemSubject, itemTarget, _vetGroupBySubject,
@@ -551,7 +566,7 @@ ok('the ask-alone call is grounded too — the one door',
    /system: SCAN_ASK_SYS \+ aiGrounding\('scan'\),/.test(html));
 ok('dictation is stopped before a run, and when the tab is left',
    /micStop\(\);/.test(html.slice(html.indexOf('async function runScan'), html.indexOf('async function runScan') + 1400)) &&
-   /if \(_tab !== 'snap'\) micStop\(\);/.test(html));
+   /if \(_tab !== 'snap'\) \{ micStop\(\); camClose\(\); \}/.test(html));
 ok('what was asked is said back above the answers',
    /renderAskedLine/.test(html) && /You asked: /.test(html));
 ok('Copy carries what was asked', /Asked: /.test(html));
@@ -670,7 +685,7 @@ ok('and the window itself refuses to open for anyone else',
    /if \(!it \|\| !isAdmin\(currentUser\)\) return;/.test(html));
 ok('an account change closes the window and repaints the cards',
    /if \(\$\('ansEditModal'\)\) \$\('ansEditModal'\)\.classList\.remove\('open'\);/.test(html) &&
-   /applyNotesVisibility\(\);[\s\S]{0,220}if \(_answers\.length\) renderAnswers\(\);/.test(html));
+   /applyNotesVisibility\(\);[\s\S]{0,400}if \(_answers\.length\) renderAnswers\(\);/.test(html));
 ok('the ✎ never prints — a printed key with a button on it is a button nobody can press',
    /class="ansEditBtn noPrint"/.test(html));
 ok('the mark picker is hidden on a question nobody attempted',
@@ -830,6 +845,186 @@ ok('the report is written after the run, not during it',
    html.indexOf('await runReport(run);') > html.indexOf('async function runScan'));
 ok('last paper\'s report never outlives its paper', /_report = null; +\/\/ last paper/.test(html));
 ok('a stale report is dropped', (report.match(/if \(run !== _scanRun\) return;/g) || []).length >= 2);
+
+/* ---------- 📷 The live viewfinder ----------
+   A camera that stays open is worth having only if it can also NOT be there:
+   a shutter that does nothing on a browser without getUserMedia, or a camera
+   left running after the overlay closes, are both worse than the phone's own
+   camera app that this replaced. */
+ok('the page camera is feature-detected, never assumed',
+   /function camAvailable\(\)[\s\S]{0,220}navigator\.mediaDevices/.test(html) &&
+   /navigator\.mediaDevices\.getUserMedia/.test(html));
+ok('no camera of our own falls back to the phone’s camera app',
+   /if \(!camAvailable\(\)\) \{ \$\('cameraInput'\)\.click\(\); return; \}/.test(html));
+ok('a refused permission falls back too, rather than a shutter that does nothing',
+   /catch \(err\) \{[\s\S]{0,420}\$\('cameraInput'\)\.click\(\);/.test(html));
+ok('facingMode is asked for as `ideal`, so a laptop with one camera still gets it',
+   /facingMode: \{ ideal: 'environment' \}/.test(html));
+ok('closing the camera stops every track',
+   /_camStream\.getTracks\(\)\.forEach\(function \(t\) \{ try \{ t\.stop\(\); \}/.test(html));
+ok('leaving the Snap tab closes the camera', /if \(_tab !== 'snap'\) \{ micStop\(\); camClose\(\); \}/.test(html));
+ok('Escape closes the camera before anything else',
+   /if \(camIsOpen\(\)\) \{ camCancel\(\); return; \}/.test(html));
+ok('Cancel asks BEFORE the stream is dropped, so “no” costs nothing',
+   /function camCancel[\s\S]{0,320}if \(taken > 0 && !confirm\([\s\S]{0,120}\) return;[\s\S]{0,90}camClose\(\);/.test(html));
+ok('Cancel only ever drops the photos taken in THIS visit',
+   /_shots = _shots\.slice\(0, _camShotsAtOpen\);/.test(html));
+/* The ONE queue. A frame off the viewfinder must be prepared exactly as a
+   gallery picture is, or the shrinking, the page numbering and the failed
+   card rule are all written twice. */
+ok('the shutter goes through addShots like every other picture',
+   /function camSnap[\s\S]{0,1400}await addShots\(\[file\]\);/.test(html));
+ok('a frame is encoded as JPEG, never PNG',
+   /c\.toBlob\(res, 'image\/jpeg', SCAN_JPEG_Q\)/.test(html));
+ok('a frame is capped at the same size a gallery photo is shrunk to',
+   /Math\.min\(1, SCAN_PHOTO_MAX_SIDE \/ Math\.max\(w, h\)\)/.test(html));
+ok('the shutter cannot run past the page ceiling',
+   /if \(_shots\.length >= SCAN_MAX_SHOTS\)/.test(html.slice(html.indexOf('async function camSnap'))));
+ok('one painter keeps the strip in step with the pages',
+   /renderCamBar\(\);\s*\n\s*if \(camIsOpen\(\)\) camRenderStrip\(\);/.test(html));
+
+/* ---------- 📕 The mistake book ----------
+   THE COLLECTION NAME IS THE ONE THAT CANNOT SLIP. `users/{uid}/mistakes` is
+   the Science portal's own log, under this same project and this same uid, so
+   a book called `mistakes` here is two apps quietly sharing one collection —
+   the exact fault the whole family's naming rule exists for, and one that
+   throws nothing and looks like nothing on either screen. */
+ok('the book is NOT the cer app’s `mistakes` collection', api.MB_COL === 'scanMistakes');
+ok('the papers are not a shared name either', api.MB_PAPER_COL === 'scanPapers');
+ok('the pictures are in this app’s own Storage folder', api.MB_IMG_PATH === 'scan-mistakes');
+ok('every path is built from those constants, never spelled out',
+   !/collection\('mistakes'\)/.test(html) && !/collection\("mistakes"\)/.test(html));
+ok('the book is read from the signed-in account’s OWN subtree',
+   /db\.collection\('users'\)\.doc\(currentUser\.uid\)\.collection\(MB_COL\)/.test(html));
+
+/* What is a mistake. The blank rule the marking and the report are both built
+   on has to hold here too — a question nobody attempted is not one they got
+   wrong, and filing it would put a child's untouched worksheet in their own
+   mistake book. */
+const wrongQ   = { kind: 'page', marked: true, verdict: 'wrong',   question: 'What is 2 + 2?' };
+const partialQ = { kind: 'page', marked: true, verdict: 'partial', question: 'Name the process.' };
+const rightQ   = { kind: 'page', marked: true, verdict: 'correct', question: 'What is 3 + 3?' };
+const blankQ2  = { kind: 'page', marked: false, verdict: '',       question: 'Untouched.' };
+const askQ     = { kind: 'ask',  marked: true, verdict: 'wrong',   question: 'I got 16?' };
+ok('a wrong answer is a mistake', api.mbIsWrong(wrongQ) === true);
+ok('a partly right answer is a mistake too', api.mbIsWrong(partialQ) === true);
+ok('a correct answer is not', api.mbIsWrong(rightQ) === false);
+ok('a BLANK is never a mistake', api.mbIsWrong(blankQ2) === false);
+ok('an answer to a typed question was never on a paper', api.mbIsWrong(askQ) === false);
+
+/* The same question scanned twice is ONE mistake. */
+ok('the key folds the wording',
+   api.mbKeyOf({ question: 'What is  2 + 2?' }) === api.mbKeyOf({ question: 'What is 2+2?' }));
+ok('two different questions are two mistakes',
+   api.mbKeyOf(wrongQ) !== api.mbKeyOf(partialQ));
+api.mistakes = [{ id: 'm1', key: api.mbKeyOf(wrongQ) }];
+ok('a question already in the book is not filed twice', api.mbHasKey(api.mbKeyOf(wrongQ)) === true);
+ok('…and one that is not is', api.mbHasKey(api.mbKeyOf(partialQ)) === false);
+api.mistakes = [];
+
+/* The rectangle round the figure. Wrong in either direction it is silent: too
+   loose and the mistake keeps a crop of a neighbouring question, too tight and
+   a question that needs its diagram loses it. */
+ok('a good rectangle is taken', api._mbBoxOk([100, 100, 500, 600]) === true);
+ok('no rectangle at all is fine', api._mbBoxOk(undefined) === false && api._mbBoxOk(null) === false);
+ok('a malformed rectangle is refused', api._mbBoxOk([1, 2, 3]) === false && api._mbBoxOk('1,2,3,4') === false);
+ok('a rectangle off the page is refused', api._mbBoxOk([0, 0, 1200, 500]) === false);
+ok('a minute rectangle is refused', api._mbBoxOk([100, 100, 110, 110]) === false);
+ok('a rectangle that is the WHOLE page is refused — that selection failed',
+   api._mbBoxOk([10, 10, 990, 990]) === false);
+ok('a full-width band that is not full-height is kept — a wide figure is a figure',
+   api._mbBoxOk([300, 5, 620, 995]) === true);
+ok('the box is normalised the moment it arrives, not at crop time',
+   /box: _mbBoxOk\(r\.diagramBox\) \? r\.diagramBox\.map\(Number\) : null/.test(html));
+ok('the prompt asks for the rectangle only where there IS a figure',
+   /OMIT "diagramBox" entirely for a question that is only words/.test(html));
+ok('the rectangle uses the same 0–1000 convention the portal’s readers use',
+   /\[ymin, xmin, ymax, xmax\], four integers from 0 to 1000/.test(html));
+
+/* The page a crop is cut from. The page numbers count only the pictures that
+   were SENT, so a picture that could not be opened must not shift them. */
+api.shots = [{ data: 'a', url: 'a' }, { data: '', url: '' }, { data: 'c', url: 'c' }];
+ok('page 2 is the second picture actually sent, not the second in the list',
+   api._mbShotForPage(2) && api._mbShotForPage(2).data === 'c');
+ok('a page that is not there returns nothing rather than the wrong page',
+   api._mbShotForPage(9) === null && api._mbShotForPage(0) === null);
+ok('a stitched question crops from the page its rectangle was drawn on',
+   /_mbShotForPage\(it\.boxPage \|\| it\.page\)/.test(html));
+api.shots = [];
+
+/* A crop that fails must cost the DIAGRAM and never the mistake. */
+ok('the document is written even when the picture could not be kept',
+   /catch \(e\) \{ console\.warn\('mistake picture upload failed', e\); imgNote = /.test(html));
+ok('…and the card says the diagram is missing rather than just losing it',
+   /imgNote/.test(html) && /the diagram could not be kept/.test(html));
+ok('a Storage that is not there is survivable', /if \(!storage \|\| !dataUrl\) return '';/.test(html));
+
+/* The worksheet. */
+const mk = (n, extra) => Object.assign({
+  id: 'm' + n, key: 'k' + n, at: '2026-08-20T00:00:00.000Z', subject: 'science', level: 'P5',
+  number: String(n), question: 'Q' + n, options: [], option: '', type: 'open',
+  answer: 'A' + n, explanation: 'because', studentAnswer: 'wrong thing', verdict: 'wrong',
+  marks: '', feedback: 'look at the units', img: 'https://x/i' + n + '.jpg', imgNote: ''
+}, extra || {});
+const picked = [mk(1), mk(2)];
+const pdoc = api._mbPaperDoc(picked);
+ok('the paper belongs to the account that made it', pdoc.owner === 'admin1');
+ok('the questions are numbered from 1 on the new sheet', pdoc.items[0].n === 1 && pdoc.items[1].n === 2);
+/* Unlike a question sent to a vetting list, the child's own answer TRAVELS —
+   this paper is coming back to the child it belongs to, not going into a bank
+   thirty other children practise from. */
+ok('the student’s own answer travels with their own paper',
+   pdoc.items[0].studentAnswer === 'wrong thing' && pdoc.items[0].feedback === 'look at the units');
+ok('the photographed crop travels', pdoc.items[0].img === 'https://x/i1.jpg');
+ok('the cleaned-up picture starts empty — the viewer makes it', pdoc.items[0].cleanImg === '');
+ok('the cleaned-up version is what opens first', pdoc.mode === 'clean');
+ok('the paper says where it came from', pdoc.source === api.VET_SOURCE && pdoc.source === 'scan');
+ok('a paper expires', (() => {
+  const days = (Date.parse(pdoc.expiresAt) - Date.parse(pdoc.createdAt)) / 86400000;
+  return Math.round(days) === api.MB_PAPER_DAYS;
+})());
+ok('the title names the paper rather than being blank',
+   /P5 Science/.test(api._mbPaperTitle(picked)));
+ok('a paper with no subject or level still gets a title',
+   api._mbPaperTitle([mk(1, { subject: '', level: '' })].map(m => m)).length > 0);
+
+/* The link. It has to be absolute to survive an email, and relative in the
+   source or it stops working the day the centre moves to its own domain. */
+const url = api._mbPaperUrl('abc123');
+ok('the link is absolute', /^https:\/\//.test(url));
+ok('the link points at the Portal’s standalone page',
+   url === 'https://polymathlc.github.io/cer/mistakes.html?p=abc123');
+ok('the path in the source is RELATIVE, so a new domain needs no edit',
+   api.MB_VIEWER_PATH === '../cer/mistakes.html' && !/https?:\/\/polymathlc\.github\.io/.test(html));
+ok('the id is escaped into the link', /encodeURIComponent\(id\)/.test(html));
+
+/* The email. Written in the shape the Firebase extension reads — and never
+   announced as sent when it could not even be queued. */
+const mail = api._mbMailDoc('kid@example.com', url, picked);
+ok('the mail document is the extension’s shape',
+   Array.isArray(mail.to) && mail.to[0] === 'kid@example.com' &&
+   typeof mail.message.subject === 'string' && typeof mail.message.text === 'string' &&
+   typeof mail.message.html === 'string');
+ok('the email carries the link', mail.message.text.includes(url) && mail.message.html.includes(url));
+ok('the mail collection is the extension’s', api.MB_MAIL_COL === 'mail');
+ok('a queue that failed is reported, never claimed as sent',
+   /catch \(e\) \{ console\.warn\('mail queue failed', e\); \}/.test(html) &&
+   /The email could not be sent from this device/.test(html));
+ok('the link is ALWAYS on screen, whatever happened to the email',
+   /function mbShowLink[\s\S]{0,1200}mbCopyLink\(\)/.test(html));
+
+/* It is the student's own, and it says so. */
+ok('the book is filed once the paper has been read',
+   /await mbFileRun\(run\);/.test(html) &&
+   html.indexOf('await mbFileRun(run);') > html.indexOf('async function runScan'));
+ok('how many went in is said out loud',
+   /added to your mistake book/.test(html));
+ok('an account change drops the last account’s book',
+   /mbForget\(\);/.test(html) && /stopTeachingNotes\(\);[\s\S]{0,200}mbForget\(\);/.test(html));
+ok('the chip is only ever drawn on a card that IS a mistake',
+   /function mbCardChipHtml[\s\S]{0,200}!mbIsWrong\(it\)/.test(html));
+ok('the chip never prints', /class="ansSend noPrint"/.test(html));
+ok('a worksheet is capped', api.MB_PAPER_MAX >= 5 && /n > MB_PAPER_MAX/.test(html));
 
 /* ---------- 📥 Sending a scanned question to a vetting list ----------
    Four portals, two question SHAPES, and one field — `source` — that decides
