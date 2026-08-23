@@ -582,6 +582,21 @@ step, and ship a change to the shape in both repos together**:
 - **The module is deferred, so it repaints the line when it loads.** The classic script paints it
   before either engine exists, and would otherwise leave "No AI is available at all" on a page
   where there plainly is.
+- **THE ENGINE CHOICE BELONGS TO THE CENTRE, not to a phone** (v1.14.0). `aiPreferredEngine` reads
+  `_aiSharedEngine` — fetched from the `aiEngineConfig` callable in `polymathlc/math/functions` —
+  and falls back to this device's own `aiEnginePref()` only until that answers. A device-local
+  choice was the bug wearing a feature's clothes: the teacher switched to ChatGPT on their own
+  phone, watched it work, and every student stayed on the capped Gemini. The toggle is the
+  **admin's** and the function checks that again; a write that FAILED is reported, because a
+  teacher told nothing would believe the whole centre had moved. It is a CALLABLE rather than a
+  document the clients read because the shared `firestore.rules` does not contain the Science
+  app's own rules — so a world-readable document would cost a hand-assembled rules deploy, and
+  the Admin SDK bypasses rules entirely.
+- **WHEN NOTHING ANSWERS, EVERY ROUTE IS NAMED** (`AI_ROUTE_LABEL`, the tail of `aiAskWith`). The
+  first error is kept as `cause`, but the message lists them all. Reporting one hides the rest: a
+  card reading "Gemini: your billing account has exceeded its monthly spending cap" and nothing
+  else sends the teacher to the Google console when the job is to deploy the ChatGPT function —
+  which is exactly what happened.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
 ## The screen: three buttons and two tabs (v1.2.0)

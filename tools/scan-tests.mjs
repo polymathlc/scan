@@ -701,7 +701,7 @@ ok('and the window itself refuses to open for anyone else',
    /if \(!it \|\| !isAdmin\(currentUser\)\) return;/.test(html));
 ok('an account change closes the window and repaints the cards',
    /if \(\$\('ansEditModal'\)\) \$\('ansEditModal'\)\.classList\.remove\('open'\);/.test(html) &&
-   /applyNotesVisibility\(\);[\s\S]{0,400}if \(_answers\.length\) renderAnswers\(\);/.test(html));
+   /applyNotesVisibility\(\);[\s\S]{0,900}if \(_answers\.length\) renderAnswers\(\);/.test(html));
 ok('the ✎ never prints — a printed key with a button on it is a button nobody can press',
    /class="ansEditBtn noPrint"/.test(html));
 ok('the mark picker is hidden on a question nobody attempted',
@@ -1705,7 +1705,31 @@ ok('a server route that is not switched on yet says exactly that',
    /The server backup is not switched on yet/.test(html) &&
    /OPENAI_API_KEY secret has not been set/.test(html));
 ok('…told apart from a refusal', /The server backup refused a moment ago/.test(html));
-ok('the reason each route refused is kept', /const _aiWhy = \{ gemini: '', openai: '', openaiKey: '' \};/.test(html));
+ok('the reason each route refused is kept',
+   /const _aiWhy = \{ gemini: '', openai: '', openaiKey: '', shared: '' \};/.test(html));
+/* The screenshot that prompted this said "Gemini: billing cap" and nothing
+   about ChatGPT never having been reachable — so the teacher was sent to the
+   Google console when the job was to deploy a function. */
+ok('when NOTHING answers, every route is named, not just the first',
+   /const why = order\.map\(e => AI_ROUTE_LABEL\[e\] \+ ': ' \+ \(_aiWhy\[e\] \|\| 'refused'\)\)\.join\(' · '\);/.test(html));
+ok('…and the first error is kept as the cause rather than thrown away',
+   /err\.cause = first;/.test(html));
+
+/* The engine choice is the CENTRE's. A device-local one is the bug wearing a
+   feature's clothes: the teacher switches on their own phone, watches it
+   work, and every student stays on the capped engine. */
+ok('the order follows the shared choice, not this browser\'s',
+   /const have = aiPreferredEngine\(\) === 'openai'/.test(html));
+ok('…which falls back to the device setting until the server answers',
+   /function aiPreferredEngine\(\) \{ return _aiSharedEngine \|\| aiEnginePref\(\); \}/.test(html));
+ok('the teacher\'s toggle writes it for everyone',
+   /window\.aiEngineSetShared\(v\)/.test(html) && /is now the first engine for everyone/.test(html));
+ok('…and a write that FAILED says so rather than letting them believe it moved',
+   /Saved on this device only — the aiEngineConfig function is not deployed yet/.test(html));
+ok('every signed-in device reads it', /window\.aiEngineLoadShared\(true\)/.test(html));
+ok('…and the page says whose setting is actually in force',
+   /This order is the centre-wide setting/.test(html) &&
+   /This order is THIS DEVICE/.test(html));
 ok('…and cleared by an answer', /_aiMarkUp\(engine\);\n      _aiWhy\[engine\] = '';/.test(html));
 ok('it names the engine that answered last', /The last answer came from/.test(html));
 /* The key field is the teacher's. A student's device runs this very same
