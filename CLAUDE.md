@@ -498,6 +498,114 @@ diagrams still in it.
   page break crops from the right sheet — the same rule `boxPage` carries for the crop.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## ✂️ The figure, and not the sentence above it (v1.19.0)
+
+`_mbInkLevel` / `_mbLumaHist` / `_mbInkProfile` / `_mbClearEdge` / `_mbRuleGroups` /
+`_mbTrimTextRows` / `_mbTightenRect` (in `index.html`, search `THE FIGURE, AND NOT THE
+SENTENCE ABOVE IT`).
+
+A model's rectangle round a figure is a guess made by eye, and the way it is wrong is
+always the same: it overshoots up or down and takes a line of the question's own WORDING
+with it. The worksheet then prints the figure with half a sentence stuck to its top edge
+and the tail of the next one under it, which is exactly what a scanned question looked
+like before this.
+
+- **THE OLD PAD MADE IT WORSE, and it is worth writing down why.** The margin was measured
+  on the PAGE — 3% of its width, 2.5% of its height — so on an ordinary phone photograph it
+  grew every rectangle by fifty or sixty pixels in every direction, a whole line of 9pt
+  print, whether or not the rectangle needed any help at all. A pad that size cannot be
+  tuned: it is either too small to rescue a clipped label or big enough to swallow a
+  sentence. The pad is measured on the BOX now (`MB_PAD_FRAC`, 1.5%) and is deliberately
+  tiny; the two jobs it was doing badly are done properly by the passes below.
+- **THE THRESHOLD IS MEASURED, NOT ASSUMED, and that is the one thing that could not be
+  ported as it stood.** `polymathlc/cer`'s `_expandRectToWhitespace` / `_trimEdgeTextLines`
+  read a SCREENSHOT, which is white at 255, so a fixed "darker than 190 is ink" works
+  there. This app reads a PHOTOGRAPH: the paper is grey, the light slopes across the sheet,
+  and a fixed line reads the whole page as ink — so the trimmer finds ONE band covering
+  everything and does nothing at all, on every photograph, with nothing on screen to say it
+  has stopped working. `_mbInkLevel` takes the paper's own white as the **98th percentile**
+  of the luma (the statistic the Portal's paper-clean pass already uses — the top 2% is
+  given away because a specular highlight off a glossy sheet is 255 and is not what the
+  page is made of) and ink is `MB_INK_RATIO` of it or darker.
+- **IT IS PIXEL WORK, NOT ANOTHER AI CALL.** The Portal asks a second vision call to tidy
+  each crop (`_aiRefineCrop`), which works and costs a call per figure on a run that is
+  already reading a whole paper. These are free, instant and deterministic — the same
+  picture always comes out the same way — and the Portal keeps its refine pass on top of
+  them.
+- **ONE READBACK, THREE PASSES.** The probe covers the box plus everywhere an edge is
+  allowed to move to, downscaled to `MB_ANALYSE_MAX_SIDE`, read once. ① every edge standing
+  on ink walks out until it stands on clear paper (generous sideways, because a label and
+  its leader line stick far out of the drawing they name; mean vertically, because what
+  sits above and below a figure is nearly always the wording). ② bands that are plainly
+  prose are cut off the top and the bottom. ③ whatever survives is pulled in to the first
+  and last row with any ink in it — the one move here that cannot be wrong, because it
+  removes measured empty paper and nothing else, and it is what the old pad was reaching
+  for and getting backwards.
+- **A BAND IS PROSE ON FIVE COUNTS, and the last two are what stop a table or a graph being
+  eaten a row at a time**: one line tall, spanning most of the width, not solid — and then
+  **no long stroke in it** (`MB_MAXRUN_FRAC`) and **made of many short pieces**
+  (`MB_RUNS_MIN`). Density alone cannot see an axis: a hairline right across a wide crop is
+  a fraction of a percent of the pixels in its row, so "not solid" passes it happily and the
+  trimmer takes the top off the table it was pointed at. A caption, an axis title and a
+  label are all narrow and survive on the width test.
+- **A FRAMED TABLE IS NOT TRIMMED AT ALL.** `MB_RULE_GROUPS` full-width rules in one crop is
+  a ruled table, whose every row is short, wide and full of letters — prose on every count
+  that reads a row on its own. **Four, not three**: an ordinary boxed diagram is a rule top,
+  a rule bottom and a divider across the middle, and at three the pass would stand down on
+  half the figures it was written to clean.
+- **A RUN OF CONSECUTIVE LINES goes together**, which is the case the Portal's version
+  cannot reach. Two lines of a question sit a few pixels apart, far less than the clear band
+  that separates the wording from the figure, so a trimmer that insists on clear paper after
+  the FIRST line finds none, stops, and leaves both lines on the picture. The cut is
+  remembered only at the end of a run that ended in a real gap, so a band with nothing but
+  figure after it is still never touched.
+- **IT FAILS SAFE, ALWAYS** — a crop too small to analyse, a canvas that will not read back,
+  a trim that would take more than `MB_TRIM_MAX` of the crop or leave less than
+  `MB_TRIM_KEEP` of it: every one of them hands back the rectangle it was given. A slightly
+  loose crop is a figure with a stray line over it; a confident wrong one is a figure with
+  its own labels cut off, and only one of those can be seen for what it is on the printed
+  page.
+- **THE WHOLE-QUESTION CROP IS NEVER TIGHTENED.** It is MEANT to hold the wording — that is
+  what it is for — so `whole` skips both passes.
+- Known limit, and it is deliberate: the page is not de-skewed. A sheet photographed more
+  than a couple of degrees off square smears every row profile into one band, which is
+  refused as prose (too tall) — so the pass does nothing rather than something wrong.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
+## 🔢 Four picture options are ONE picture (v1.19.0)
+
+`MB_UNION_SLACK` / `MB_UNION_MAX_AREA` / `_mbUnionBox` / `_mbCleanBlocks`'s `options` arm,
+and `role: 'options'` on the block that comes out.
+
+A multiple-choice question whose four choices are little DRAWINGS — four shapes, four
+graphs, four circuits — has options that cannot be written out. The rebuild was told to
+leave every option out on the grounds that the app already holds them as words; for a
+picture question it holds four empty strings, so what came back was a question with a
+diagram and four blank choices, printed and handed to a child with nothing to choose
+between.
+
+- **THEY TRAVEL AS ONE RECTANGLE.** Cut out separately, four options become four pictures
+  stacked down the page: the row they were printed in is gone, they are each a different
+  size, and they stop reading as a set of choices at all — a student answering "(3)" cannot
+  see which one (3) was. One rectangle keeps the paper's own layout, keeps the (1) (2) (3)
+  (4) labels attached to the pictures they name, and is one crop instead of four.
+- **AND IT IS NEVER TRIMMED.** The prose trimmer exists to take lines of text off a figure;
+  an options band is a row of pictures with a number printed under each of them, so pointed
+  at this it works perfectly and takes the choices off one line at a time. `role: 'options'`
+  is what says so, and `{ trim: false }` in `_mbBuildFigures` is the one place it is read.
+- **THE BLOCK IS AN ORDINARY `image` WEARING A ROLE**, and that is the whole contract with
+  the viewer (`polymathlc/cer`'s `mistakes.html`, v1.4.0, `hasPictureOptions`). A viewer
+  that has never heard of picture options draws it as a figure and prints the (empty) word
+  options under it — untidy, and the question is still answerable. A block of a TYPE nobody
+  knows would have been dropped on the floor instead, and the choices with it. **Ship a
+  change to the word in both repos together.**
+- **"One rectangle" is a rule a model can be ASKED to follow and cannot be MADE to**, so
+  several are merged rather than the first being kept — but only when they really do sit
+  together. Boxes in opposite corners union to most of the sheet, which is not a set of
+  options but a failed reading, and the caller is better off with nothing
+  (`MB_UNION_SLACK`, `MB_UNION_MAX_AREA`).
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## ✓✓ …and takes itself out again (v1.11.0)
 - **A book that only fills is a list of everything a student has ever got wrong**, which is a list
   nobody opens. What empties it is the thing the whole feature is for: doing the question again and
@@ -738,6 +846,19 @@ third company, a third account and a third cap.
   moment a picture failed to open.
 - The camera bar is **fixed to the viewport with `env(safe-area-inset-bottom)`** and belongs to the
   Snap tab alone: a shutter under the instructions is a button that does the wrong thing.
+- After touching **the crop** (`_mbBoxOk`, `_mbInkLevel`, `_mbLumaHist`, `_mbInkProfile`,
+  `_mbClearEdge`, `_mbRuleGroups`, `_mbTrimTextRows`, `_mbTightenRect`, `_mbCropBox`,
+  `_mbUnionBox`, `_mbCleanBlocks`'s options arm, `MB_BUILD_SYS`), run
+  **`node tools/scan-tests.mjs`**. Both directions fail silently and the worksheet prints
+  either way: too timid and every figure still carries the sentence above it, with nothing
+  on any screen to say the trimmer ran and did nothing; too eager and it is worse than the
+  bug it fixes — a table comes back with its top row gone, a graph loses its axis labels, a
+  caption is cut off the picture it names, and all three look like a perfectly successful
+  crop. The threshold is the silent one of all: a fixed ink level is right on a screenshot
+  and reads a whole PHOTOGRAPH as ink, so the pass finds one band and stands down on every
+  page this app will ever see. And `role: 'options'` is one word shared with a repository
+  this one cannot see — rename it and the picture still prints, with four empty brackets
+  back underneath it.
 - Run **`node tools/scan-tests.mjs`** after touching the screen — it pins the three controls, their
   order, the two tabs and the settings staying off the snap screen.
 

@@ -127,6 +127,11 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     mbIsWrong, mbIsRight, mbFindByKey, MB_CLEAR_WINS, MB_KEY_PREFIX,
     mbKeyOf, mbHasKey, _mbBoxOk, _mbShotForPage, _mbPaperUrl, _mbPaperTitle,
     _mbCleanBlocks, _mbBuildShots, MB_BUILD_SYS, MB_FIG_MAX, MB_BLOCK_MAX, MB_BLOCK_CHARS,
+    _mbInkLevel, _mbLumaHist, _mbInkProfile, _mbClearEdge, _mbTrimTextRows, _mbUnionBox,
+    _mbRuleGroups,
+    MB_INK_RATIO, MB_INK_FLOOR, MB_INK_CEIL, MB_TRIM_BANDS, MB_TRIM_MAX, MB_TRIM_KEEP,
+    MB_OPT_MAX, MB_UNION_SLACK, MB_UNION_MAX_AREA, MB_PAD_FRAC, MB_GROW_X, MB_GROW_Y,
+    MB_MAXRUN_FRAC, MB_RUNS_MIN, MB_RULE_FRAC, MB_RULE_GROUPS,
     _mbPaperDoc, _mbMailDoc, camAvailable,
     set mistakes(v) { _mistakes = v; },
     set shots(v) { _shots = v; },
@@ -1100,6 +1105,303 @@ ok('…and the worksheet', /blocks: m\.blocks \|\| \[\]/.test(html));
    a better worksheet at the price of worse marking. */
 ok('it is a separate call, not more work for the marking prompt',
    !/MB_BUILD_SYS/.test(api.SCAN_SYS) && /system: MB_BUILD_SYS/.test(html));
+
+
+/* =====================================================================
+   ✂️ THE FIGURE, AND NOT THE SENTENCE ABOVE IT
+   ---------------------------------------------------------------------
+   The rectangle a model draws round a figure is a guess made by eye, and the
+   way it is wrong is always the same: it overshoots and takes a line of the
+   question's own wording with it. Everything below fails SILENTLY — the
+   worksheet prints, the figure is there, and half a sentence is stuck to it
+   — so both directions are pinned here.
+
+   Too timid and the feature is decoration: every crop still carries the line
+   above it and nothing on any screen says the trimmer ran and did nothing.
+   Too eager and it is worse than the bug it fixes: a table comes back with
+   its top row gone, a graph loses its axis labels, a caption is cut off the
+   picture it names — and all three look like a perfectly successful crop.
+
+   The pages below are built as real RGBA pixels and run through the REAL
+   profile, so what is being tested is the whole chain — the threshold, the
+   rows, the bands — and not a hand-written array of numbers that happens to
+   agree with what the code expects.
+   ===================================================================== */
+
+/* A page as pixels. `paint(x, y)` returns true where the ink is. `white` is
+   what the paper itself measures — 255 for a screenshot, far less for a
+   photograph, which is the case the whole threshold exists for. */
+function page(w, h, paint, white, ink) {
+  const d = new Uint8ClampedArray(w * h * 4);
+  const bg = white == null ? 255 : white;
+  const fg = ink == null ? Math.round(bg * 0.18) : ink;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const v = paint(x, y) ? fg : bg;
+      d[i] = d[i + 1] = d[i + 2] = v;
+      d[i + 3] = 255;
+    }
+  }
+  return d;
+}
+/* A line of print: many short marks across the width, the way letters are. */
+function prose(y0, y1, x0, x1) {
+  return (x, y) => y >= y0 && y <= y1 && x >= x0 && x <= x1 && (x % 5) < 3;
+}
+/* A drawing: an outline, which is what a rule-and-stroke test has to see. */
+function boxDrawing(y0, y1, x0, x1) {
+  return (x, y) => (x >= x0 && x <= x1 && y >= y0 && y <= y1) &&
+    (x === x0 || x === x1 || y === y0 || y === y1 ||
+     (x > x0 + 20 && x < x1 - 20 && y === Math.round((y0 + y1) / 2)));
+}
+function anyOf() {
+  const fns = [].slice.call(arguments);
+  return (x, y) => fns.some(f => f(x, y));
+}
+function profileOf(data, w, h) {
+  const lv = api._mbLumaHist(data);
+  return api._mbInkProfile(data, w, h, api._mbInkLevel(lv.hist, lv.total));
+}
+
+/* ---- The threshold is MEASURED, not assumed ---- */
+/* The Science portal's passes read a SCREENSHOT, which is white at 255, so a
+   fixed "darker than 190" works there. This app reads a PHOTOGRAPH: the
+   paper is grey, and a fixed line reads the whole sheet as ink — so the
+   trimmer finds one band covering everything and does nothing at all, on
+   every photograph, with nothing on screen to say it has stopped working. */
+{
+  const white = new Array(256).fill(0); white[255] = 1000;
+  ok('a screenshot puts the ink line just under the portal\'s own 190',
+     Math.abs(api._mbInkLevel(white, 1000) - 189) <= 4);
+
+  const grey = new Array(256).fill(0); grey[186] = 1000;   // a photograph of the same page
+  const t = api._mbInkLevel(grey, 1000);
+  ok('a grey photograph moves the line DOWN with the paper', t < 150 && t > 100);
+  ok('…so print on grey paper is still read as ink', Math.round(186 * 0.18) < t);
+
+  /* The top 2% is given away on purpose: one specular highlight off a glossy
+     sheet is 255 and is not what the page is made of. */
+  const shiny = new Array(256).fill(0); shiny[186] = 980; shiny[255] = 20;
+  ok('a highlight does not drag the line back up to a screenshot\'s',
+     Math.abs(api._mbInkLevel(shiny, 1000) - t) <= 6);
+
+  ok('nothing to measure returns the ceiling rather than throwing',
+     api._mbInkLevel(null, 0) === api.MB_INK_CEIL);
+  const black = new Array(256).fill(0); black[3] = 1000;
+  ok('an all-but-black picture cannot push the line under the floor',
+     api._mbInkLevel(black, 1000) >= api.MB_INK_FLOOR);
+}
+
+/* ---- The profile knows a stroke from a word ---- */
+{
+  const W = 300, H = 30;
+  const words = profileOf(page(W, H, prose(10, 18, 20, 280)), W, H).rows[14];
+  const rule = profileOf(page(W, H, (x, y) => y >= 10 && y <= 12 && x >= 20 && x <= 280), W, H).rows[11];
+  ok('a line of print breaks into many short pieces', words.runs >= api.MB_RUNS_MIN);
+  ok('…none of them long', words.maxRun <= (words.maxX - words.minX + 1) * api.MB_MAXRUN_FRAC);
+  ok('a printed rule is ONE piece', rule.runs === 1);
+  ok('…and it is the whole width', rule.maxRun > (rule.maxX - rule.minX + 1) * api.MB_MAXRUN_FRAC);
+}
+
+/* ---- ① The edge walks out of the ink it was cutting through ---- */
+{
+  const counts = [5, 5, 5, 0, 0, 3, 3, 0];
+  ok('an edge standing on ink moves out until it stands on paper',
+     api._mbClearEdge(counts, 5, 1, 8, 0) === 7 && api._mbClearEdge(counts, 2, 1, 8, 0) === 3);
+  ok('an edge already on paper does not move', api._mbClearEdge(counts, 4, -1, -1, 0) === 4);
+  /* Never grow blindly: an edge that finds no paper inside its allowance
+     stays where it is. Moving it to the end of the allowance is the pad this
+     whole pass replaces. */
+  ok('an edge that never finds paper stays exactly where it was',
+     api._mbClearEdge([9, 9, 9, 9], 1, -1, -1, 0) === 1);
+  ok('nothing to walk is not a crash', api._mbClearEdge(null, 3, 1, 9, 0) === 3);
+}
+
+/* ---- ② A line of the question is taken off; the figure is not ---- */
+{
+  const W = 400, H = 300, pageH = 1000;
+  /* One line of wording, a clear band of paper, then a drawing. */
+  const d = page(W, H, anyOf(prose(6, 16, 10, 390), boxDrawing(60, 260, 60, 340)));
+  const cut = api._mbTrimTextRows(profileOf(d, W, H).rows, W, H, pageH);
+  ok('the line of wording above a figure is cut off', cut.top > 20 && cut.top <= 60);
+  ok('…and the figure itself is kept whole', cut.bot >= 260 && cut.top <= 60);
+
+  /* TWO lines, which is the case the portal\'s version cannot reach: the gap
+     between them is smaller than the gap that separates the wording from the
+     figure, so a trimmer that insists on paper after the FIRST line finds
+     none, stops, and leaves both lines on the picture. */
+  const d2 = page(W, H, anyOf(prose(4, 14, 10, 390), prose(20, 30, 10, 390), boxDrawing(70, 260, 60, 340)));
+  const cut2 = api._mbTrimTextRows(profileOf(d2, W, H).rows, W, H, pageH);
+  ok('a run of two lines goes together', cut2.top > 34 && cut2.top <= 70);
+
+  /* A line UNDER the figure — the other half of the complaint, and the one
+     the printed sheet shows as the next question\'s opening words. */
+  const d3 = page(W, H, anyOf(boxDrawing(20, 200, 60, 340), prose(280, 290, 10, 390)));
+  const cut3 = api._mbTrimTextRows(profileOf(d3, W, H).rows, W, H, pageH);
+  ok('a line of wording below a figure is cut off too', cut3.bot < 275 && cut3.bot >= 200);
+}
+
+/* ---- …and the four things that must never be cut ---- */
+{
+  const W = 400, H = 300, pageH = 1000;
+
+  /* A CAPTION is narrow, so it survives. "Diagram 1" under a figure is part
+     of the figure, and a crop that loses it is a picture nobody can cite. */
+  const cap = page(W, H, anyOf(boxDrawing(20, 200, 60, 340), prose(230, 240, 170, 240)));
+  const c1 = api._mbTrimTextRows(profileOf(cap, W, H).rows, W, H, pageH);
+  ok('a caption under the figure is kept', c1.bot >= 240);
+
+  /* A FRAMED TABLE is the figure, and every one of its rows reads as prose on
+     its own. Trimmed row by row it comes back as its own bottom two thirds —
+     the one wrong crop that looks completely convincing. */
+  const tbl = (x, y) => {
+    if (x < 20 || x > 380) return false;
+    if (y === 30 || y === 70 || y === 110 || y === 150 || y === 190) return true;  // the rules
+    if (y > 30 && y < 190 && (x % 5) < 3 && x > 30 && x < 370) return true;        // the cells
+    return false;
+  };
+  const rows = profileOf(page(W, H, tbl), W, H).rows;
+  ok('a framed table is recognised by its rules',
+     api._mbRuleGroups(rows, W, H, 0, H - 1) >= api.MB_RULE_GROUPS);
+  const c2 = api._mbTrimTextRows(rows, W, H, pageH);
+  ok('…so not one row of it is trimmed away', c2.top <= 30 && c2.bot >= 190);
+
+  /* A GRAPH AXIS is a long stroke, and density alone cannot see it: a
+     hairline right across a wide crop is a fraction of a percent of the
+     pixels in its row, so "not solid" passes it happily. */
+  const axis = page(W, H, (x, y) =>
+    (y >= 40 && y <= 42 && x >= 20 && x <= 380) ||          // the axis
+    (y > 45 && y < 250 && x > 60 && x < 340 && (x + y) % 40 === 0));
+  const c3 = api._mbTrimTextRows(profileOf(axis, W, H).rows, W, H, pageH);
+  ok('an axis line across the top of a figure is not read as a sentence', c3.top <= 45);
+
+  /* AND A PICTURE THAT IS ONLY A PICTURE COMES BACK UNTOUCHED. */
+  const only = page(W, H, boxDrawing(10, 290, 20, 380));
+  const c4 = api._mbTrimTextRows(profileOf(only, W, H).rows, W, H, pageH);
+  ok('a figure with no wording near it is not trimmed at all',
+     c4.top <= 10 && c4.bot >= 290);
+}
+
+/* ---- ③ The blank paper itself ---- */
+/* The one move here that cannot be wrong: it removes measured empty paper and
+   nothing else. It is what the old pad was reaching for and getting exactly
+   backwards — a rectangle drawn loose came back looser. */
+{
+  const W = 300, H = 200;
+  const d = page(W, H, boxDrawing(60, 140, 40, 260));
+  const cut = api._mbTrimTextRows(profileOf(d, W, H).rows, W, H, 1000);
+  ok('a loose rectangle is pulled in to the ink it holds',
+     cut.top >= 55 && cut.top <= 62 && cut.bot >= 138 && cut.bot <= 145);
+}
+
+/* ---- It fails SAFE, every time ---- */
+{
+  ok('a crop too small to analyse is handed straight back',
+     api._mbTrimTextRows([], 10, 10, 1000).top === 0);
+  const W = 400, H = 300;
+  /* Nothing but wording: trimming to fit would leave a sliver, so the caps
+     stand it down. A slightly loose crop is a figure with a stray line over
+     it; a confident wrong one is a figure with its labels cut off, and only
+     one of those can be seen for what it is on the printed page. */
+  const allText = page(W, H, anyOf(
+    prose(10, 20, 10, 390), prose(40, 50, 10, 390), prose(70, 80, 10, 390),
+    prose(100, 110, 10, 390), prose(130, 140, 10, 390), prose(160, 170, 10, 390)));
+  const c = api._mbTrimTextRows(profileOf(allText, W, H).rows, W, H, 1000);
+  ok('a crop that is nothing but wording keeps at least half of itself',
+     (c.bot - c.top + 1) >= H * api.MB_TRIM_KEEP);
+  ok('…and never trims more than its share off one side',
+     c.top <= H * api.MB_TRIM_MAX);
+}
+
+/* ---- The pad is measured on the BOX, never on the page ---- */
+/* The old margin was 3% of the page's width and 2.5% of its height, so on an
+   ordinary phone photograph it grew every rectangle by a whole line of 9pt
+   print in every direction, whether or not it needed any help — which is how
+   a pad meant to rescue a clipped label ended up swallowing a sentence. */
+ok('the breathing space is a fraction of the box, not of the page',
+   /var pad = Math\.max\(MB_PAD_MIN, Math\.round\(Math\.min\(r\.w, r\.h\) \* MB_PAD_FRAC\)\);/.test(html));
+ok('…and it is small', api.MB_PAD_FRAC <= 0.02);
+ok('the whole-question crop is never tightened — it is MEANT to hold the wording',
+   /if \(!whole\) r = _mbTightenRect\(img, W, H, r, opts\);/.test(html));
+ok('every pass hands the rectangle back untouched when anything goes wrong',
+   /catch \(e\) \{ console\.warn\('crop tighten skipped', e\); return r; \}/.test(html));
+
+/* =====================================================================
+   🔢 FOUR PICTURE OPTIONS ARE ONE PICTURE
+   ---------------------------------------------------------------------
+   A question whose four choices are little drawings has options that cannot
+   be written out — the app holds four empty strings for it — so what came
+   back was a question with a diagram and four blank choices, printed and
+   handed to a child with nothing to choose between.
+
+   Cut out separately they are worse than that: four pictures stacked down
+   the page, each a different size, the row they were printed in gone, and a
+   student answering "(3)" unable to see which one (3) was.
+   ===================================================================== */
+ok('the rebuild is told to leave WORDED options out, as it always was',
+   /LEAVE OUT the multiple-choice answer options WHEN THEY ARE WORDS OR NUMBERS/.test(api.MB_BUILD_SYS));
+ok('…and to send PICTURE options as one rectangle round all of them',
+   /ONE rectangle round ALL of the option pictures together/.test(api.MB_BUILD_SYS));
+ok('…never one per option, and it says why',
+   /NEVER one rectangle per option/.test(api.MB_BUILD_SYS)
+   && /stop reading as a set of choices/.test(api.MB_BUILD_SYS));
+ok('…keeping the (1) (2) (3) (4) labels with the pictures they name',
+   /including the \(1\) \(2\) \(3\) \(4\) \n?labels/.test(api.MB_BUILD_SYS.replace(/\s+/g, ' '))
+   || /including the \(1\) \(2\) \(3\) \(4\) labels/.test(api.MB_BUILD_SYS.replace(/\s+/g, ' ')));
+ok('…and a worded question gets no options block at all',
+   /a question whose options are words gets no options block/.test(api.MB_BUILD_SYS));
+
+/* The block reaches the worksheet as an ordinary `image` wearing a ROLE, so a
+   viewer that has never heard of picture options still draws it. A block of a
+   type nobody knows would be dropped on the floor instead — the picture gone,
+   and four empty brackets printed in its place. */
+{
+  const built = api._mbCleanBlocks({ blocks: [
+    { type: 'text', text: 'Which shape has four equal sides?' },
+    { type: 'options', page: 1, box_2d: [700, 60, 860, 940] }
+  ] });
+  ok('a picture-options block arrives as an image', built.length === 2 && built[1].type === 'image');
+  ok('…marked with the role that says what it is', built[1].role === 'options');
+  ok('…and printed LAST, after the block that asks the question',
+     built[0].type === 'text' && built[built.length - 1].role === 'options');
+}
+/* It is never trimmed. The trimmer above exists to take lines of text off a
+   figure, and an options band is a row of pictures with a number printed
+   under each of them — so pointed at this it works perfectly and takes the
+   choices off one line at a time. */
+ok('the options band is cropped with the prose trimmer switched off',
+   /var isOpts = b\.role === 'options';/.test(html)
+   && /_mbCropBox\(s\.shot\.url, b\.box, false, isOpts \? \{ trim: false \} : null\)/.test(html));
+
+/* "One rectangle" is a rule a model can be asked to follow and cannot be made
+   to. Four are answered by covering all four — but only when they really do
+   sit together. */
+ok('four option boxes in a row become one',
+   JSON.stringify(api._mbUnionBox([[700, 60, 800, 280], [700, 300, 800, 520],
+                                   [700, 540, 800, 760], [700, 780, 800, 940]]))
+   === JSON.stringify([700, 60, 800, 940]));
+ok('two in a 2×2 grid do too',
+   JSON.stringify(api._mbUnionBox([[600, 100, 700, 400], [600, 500, 700, 800],
+                                   [750, 100, 850, 400], [750, 500, 850, 800]]))
+   === JSON.stringify([600, 100, 850, 800]));
+/* Boxes in opposite corners union to most of the sheet, which is not a set of
+   options — it is a failed reading, and the caller is better off with
+   nothing than with a crop of the whole page called "the choices". */
+ok('boxes scattered across the page are refused',
+   api._mbUnionBox([[30, 30, 120, 140], [880, 850, 970, 960]]) === null);
+ok('…and so is a union that covers most of the page',
+   api._mbUnionBox([[20, 20, 500, 980], [520, 20, 980, 980]]) === null);
+ok('one box is its own union', JSON.stringify(api._mbUnionBox([[700, 60, 800, 280]])) === JSON.stringify([700, 60, 800, 280]));
+ok('nothing usable is null rather than a crash',
+   api._mbUnionBox(null) === null && api._mbUnionBox([]) === null && api._mbUnionBox([[1, 2]]) === null);
+
+/* The word list must not be printed as well: four empty brackets under the
+   picture that already carries the choices reads as a fault in the sheet.
+   That decision is the VIEWER's — `polymathlc/cer`'s mistakes.html — and
+   `role: 'options'` is the whole contract between the two repositories. */
+ok('the role is the one word the viewer reads',
+   /role: 'options'/.test(html));
 
 /* The page a crop is cut from. The page numbers count only the pictures that
    were SENT, so a picture that could not be opened must not shift them. */
