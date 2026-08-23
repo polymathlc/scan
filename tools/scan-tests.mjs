@@ -49,6 +49,21 @@ const vet = section(
   '/* =====================================================================\n   📥 SENDING A SCANNED QUESTION',
   '/* ================= Sign in ================= */');
 
+/* ⚙️ The two engines. This block lives in the MODULE at the foot of the file,
+   so it is loaded on its own with its own stubs — it must not depend on
+   Firebase, on fetch, or on anything else the classic script has.
+
+   Every way it goes wrong is silent and the app carries on looking exactly as
+   it did the day the spending cap was hit: an engine that stops being tried,
+   a "down" note that never clears so the backup becomes permanent, a
+   preference with no key behind it that refuses every call, or the wrong
+   error reported for a paper that failed on both. And the four slot NAMES are
+   the whole contract with the other four portals — rename one and this app is
+   signed out of a key it can plainly see. */
+const engine = section(
+  '\nconst AI_ENGINE_STORE = {',
+  '/* ===== end of the two-engine block ===== */');
+
 const prelude = `
 var currentUser = { uid: 'admin1', email: 'chungzhikai@gmail.com' };
 var LEVELS = ['P3','P4','P5','P6','S1'];
@@ -1452,6 +1467,223 @@ ok('every path writes through the ONE writer',
 ok('…and the by-subject split goes through it too',
    /async function _vetSendBySubject[\s\S]{0,700}await _vetSend\(g\.target, g\.items/.test(html));
 ok('…and the door is inside it', /async function _vetSend[\s\S]{0,320}!isAdmin\(currentUser\)\) return r;/.test(html));
+
+/* =====================================================================
+   ⚙️ TWO ENGINES, AND WHICHEVER ONE WILL ANSWER
+   The backup exists because of a failure that is not a bug in this app:
+   "[429] Your billing account has exceeded its monthly spending cap",
+   returned identically to every call on every device until the month turns
+   over. Everything pinned here is silent: the app carries on looking exactly
+   as it did that morning.
+   ===================================================================== */
+const eng = new Function(`
+var _store = {};
+var localStorage = {
+  getItem: function (k) { return (k in _store) ? _store[k] : null; },
+  setItem: function (k, v) { _store[k] = String(v); },
+  removeItem: function (k) { delete _store[k]; }
+};
+var window = {};
+var console = { warn: function () {} };
+` + engine + `
+return {
+  set store(v) { _store = v; },
+  get last() { return window.aiLastCall; },
+  AI_ENGINE_STORE, OPENAI_DEFAULT_MODEL, AI_DOWN_MS, OPENAI_URL, OPENAI_MAX_OUTPUT,
+  openAiKey, openAiModel, openAiReady, aiEnginePref,
+  aiEngineOrder, aiEngineIsDown, _openAiBody, _openAiText, aiAskWith
+};
+`)();
+
+const KEY = 'sk-test-not-a-real-key-0000';
+
+/* The four slot names are the WHOLE contract with the other four portals.
+   They are sibling folders on one GitHub Pages origin, so they already share
+   a localStorage; rename one to something tidier and this app is signed out
+   of a key it can plainly see, with nothing anywhere to say why. */
+ok('the engine slot is the shared one', eng.AI_ENGINE_STORE.engine === 'sq_ai_engine');
+ok('the key slot is the shared one', eng.AI_ENGINE_STORE.key === 'sq_openai_key');
+ok('the model slot is the shared one', eng.AI_ENGINE_STORE.model === 'sq_openai_model');
+ok('the image-model slot is the shared one', eng.AI_ENGINE_STORE.imageModel === 'sq_openai_image_model');
+ok('the backup model is the one the other apps use', eng.OPENAI_DEFAULT_MODEL === 'gpt-5.6-sol');
+
+eng.store = {};
+ok('no key saved is no backup', eng.openAiReady() === false);
+ok('…and the model still has a name', eng.openAiModel() === 'gpt-5.6-sol');
+eng.store = { sq_openai_key: '   ' };
+ok('whitespace is not a key', eng.openAiReady() === false);
+eng.store = { sq_openai_key: '  ' + KEY + '  ' };
+ok('a key is read from the shared slot, trimmed', eng.openAiKey() === KEY);
+eng.store = { sq_openai_key: KEY, sq_openai_model: 'gpt-5.7-sol' };
+ok('a model saved by another portal is honoured', eng.openAiModel() === 'gpt-5.7-sol');
+
+/* ---------- Which engine is tried first ---------- */
+eng.store = {};
+ok('with no key it is Gemini and nothing else',
+   eng.aiEngineOrder(true).join() === 'gemini');
+eng.store = { sq_openai_key: KEY };
+ok('with a key the backup is behind it',
+   eng.aiEngineOrder(true).join() === 'gemini,openai');
+eng.store = { sq_openai_key: KEY, sq_ai_engine: 'openai' };
+ok('preferring ChatGPT puts Gemini behind it, never off',
+   eng.aiEngineOrder(true).join() === 'openai,gemini');
+/* A PREFERENCE IS NOT AN ENGINE. Choosing ChatGPT with no key saved must
+   leave Gemini answering, not leave an app that refuses every call. */
+eng.store = { sq_ai_engine: 'openai' };
+ok('a preference with no key behind it is not an engine',
+   eng.aiEngineOrder(true).join() === 'gemini');
+eng.store = { sq_openai_key: KEY };
+ok('a capped Firebase project still answers through the backup',
+   eng.aiEngineOrder(false).join() === 'openai');
+eng.store = {};
+ok('nothing at all is an empty list', eng.aiEngineOrder(false).length === 0);
+
+/* ---------- The failover itself ---------- */
+function runner(script) {
+  const seen = [];
+  return {
+    seen,
+    run: function (e) {
+      seen.push(e);
+      if (script[e] instanceof Error) return Promise.reject(script[e]);
+      return Promise.resolve(script[e]);
+    }
+  };
+}
+const capped = new Error('[429] Your billing account has exceeded its monthly spending cap.');
+
+eng.store = { sq_openai_key: KEY };
+let r = runner({ gemini: capped, openai: 'the answer' });
+let out = await eng.aiAskWith('p', {}, ['gemini', 'openai'], r.run);
+ok('a capped Gemini falls through to ChatGPT', out === 'the answer');
+ok('…having tried Gemini first', r.seen.join() === 'gemini,openai');
+ok('…and the page can SAY which engine answered', eng.last.engine === 'openai');
+ok('…and that it fell back', eng.last.fellBack === true);
+ok('…and why', eng.last.error.indexOf('spending cap') >= 0);
+
+/* The refusal is remembered, or a twelve-page paper pays for the same failed
+   call on every batch before falling back on every batch. */
+ok('the engine that refused is skipped for a while', eng.aiEngineIsDown('gemini'));
+ok('…so the backup now leads', eng.aiEngineOrder(true).join() === 'openai,gemini');
+/* …but it is moved to the BACK, never off the list: a cap is lifted
+   eventually, and an app that refuses on a stale note is worse than one that
+   spends a call finding out. */
+ok('…and it is still on the list', eng.aiEngineOrder(true).indexOf('gemini') >= 0);
+ok('…and an engine with nothing beside it is still tried',
+   eng.aiEngineOrder(false).join() === 'openai');
+
+r = runner({ gemini: 'gemini is back' });
+out = await eng.aiAskWith('p', {}, ['gemini'], r.run);
+ok('an answer clears the mark', out === 'gemini is back' && !eng.aiEngineIsDown('gemini'));
+ok('…and an answer from the first engine did NOT fall back', eng.last.fellBack === false);
+
+/* Both directions. A ChatGPT key that has run out must fall back to Gemini
+   exactly as a capped Gemini falls back to ChatGPT. */
+r = runner({ openai: new Error('ChatGPT API error 429: quota'), gemini: 'gemini answered' });
+out = await eng.aiAskWith('p', {}, ['openai', 'gemini'], r.run);
+ok('a spent ChatGPT key falls back to Gemini', out === 'gemini answered');
+ok('…and says so', eng.last.engine === 'gemini' && eng.last.fellBack === true);
+
+/* When both refuse, the FIRST error is the one thrown: it names the real
+   problem, while the second is usually "no key saved on this device", which
+   is a true sentence about the wrong thing. */
+r = runner({ gemini: capped, openai: new Error('No ChatGPT key is saved on this device') });
+let threw = null;
+try { await eng.aiAskWith('p', {}, ['gemini', 'openai'], r.run); } catch (e) { threw = e; }
+ok('both refusing throws', !!threw);
+ok('…and it is the FIRST error, the one that names the problem',
+   threw && String(threw.message).indexOf('spending cap') >= 0);
+ok('…and no engine is claimed to have answered', eng.last.engine === '');
+ok('…and the reason is on the page', eng.last.error.indexOf('spending cap') >= 0);
+
+threw = null;
+try { await eng.aiAskWith('p', {}, [], () => Promise.resolve('x')); } catch (e) { threw = e; }
+ok('no engine at all is refused rather than hanging',
+   threw && /not configured/.test(String(threw.message)));
+
+/* ---------- The ChatGPT request ---------- */
+eng.store = { sq_openai_key: KEY };
+const body = eng._openAiBody('Read this page. Reply as JSON.', {
+  system: 'You are a marker.',
+  images: [{ mimeType: 'image/jpeg', data: 'AAAA' }, { mimeType: 'image/png', data: 'BBBB' }],
+  json: true, maxOutputTokens: 4096, temperature: 0.3
+}, 'gpt-5.6-sol');
+ok('the system prompt leads — it is where the grounding goes',
+   body.messages[0].role === 'system' && body.messages[0].content === 'You are a marker.');
+ok('the prompt is the user message', body.messages[1].role === 'user' &&
+   body.messages[1].content[0].text.indexOf('Read this page') === 0);
+/* The whole scan is a vision call. An engine that quietly dropped the pages
+   would answer fluently about nothing at all. */
+const imgs = body.messages[1].content.filter(c => c.type === 'image_url');
+ok('every page is attached', imgs.length === 2);
+ok('…as a data url the API can read',
+   imgs[0].image_url.url === 'data:image/jpeg;base64,AAAA' &&
+   imgs[1].image_url.url === 'data:image/png;base64,BBBB');
+ok('…at full detail, because the whole read rests on the small print',
+   imgs[0].image_url.detail === 'high');
+ok('strict JSON mode is asked for', body.response_format && body.response_format.type === 'json_object');
+/* A gpt-5 model runs only at its own default temperature; sending one is a
+   400, which is not a worse answer — it is no answer at all. */
+ok('no temperature is sent to a gpt-5 model', body.temperature === undefined);
+ok('…but one is sent to a model that takes it',
+   eng._openAiBody('p', { temperature: 0.3 }, 'gpt-4.1').temperature === 0.3);
+ok('the budget is floored so a short answer is not truncated',
+   eng._openAiBody('p', { maxOutputTokens: 200 }, 'm').max_completion_tokens === 1024);
+ok('…and capped, because an over-large budget is a 400',
+   eng._openAiBody('p', { maxOutputTokens: 1e9 }, 'm').max_completion_tokens === eng.OPENAI_MAX_OUTPUT);
+ok('a page with no pictures sends none',
+   eng._openAiBody('p', {}, 'm').messages[0].content.length === 1);
+/* Strict JSON mode is REFUSED unless the word appears in the messages, so a
+   prompt that never says it would 400 rather than answer. */
+const jb = eng._openAiBody('Read the page.', { json: true }, 'm');
+ok('a JSON call that never says JSON is told to',
+   JSON.stringify(jb.messages[0].content).toLowerCase().indexOf('json') >= 0);
+
+ok('a reply is read out of the message',
+   eng._openAiText({ choices: [{ message: { content: '  hello  ' } }] }) === 'hello');
+let bad = false;
+try { eng._openAiText({ choices: [] }); } catch (e) { bad = true; }
+ok('a reply in an unexpected shape THROWS rather than answering emptily', bad);
+bad = false;
+try { eng._openAiText({ choices: [{ message: { content: '   ' } }] }); } catch (e) { bad = true; }
+ok('…and so does an empty one, which would read as a page with no questions', bad);
+
+/* ---------- The one door, and the secret ---------- */
+/* This is a public static site served to every student's browser, so a key
+   committed here is a key handed to the whole school. */
+ok('no ChatGPT key is anywhere in the file', !/\bsk-[A-Za-z0-9_-]{20,}/.test(html));
+ok('the key is read from the browser, never from the page',
+   /localStorage\.getItem\(k\)/.test(html) && !/sq_openai_key['"]\s*[,:]\s*['"]sk-/.test(html));
+/* ONE door. Every call site in the app already goes through window.askGemini,
+   which is why all of them gained the backup at once; a second route past it
+   is a call that still dies on the cap with nothing saying why. */
+ok('every engine call goes through the one dispatcher',
+   (html.match(/askOpenAI\(/g) || []).length === 2 &&
+   (html.match(/askGeminiDirect\(/g) || []).length === 2);
+ok('…and it is what askGemini calls',
+   /window\.askGemini = function askGemini[\s\S]{0,200}aiAskWith\(prompt, opts, aiEngineOrder\(!!geminiModel\), _aiRun\)/.test(html));
+ok('the app is ready when EITHER engine can answer',
+   /window\.aiReady = \(\) => !!geminiModel \|\| openAiReady\(\);/.test(html));
+
+/* The page SAYS which engine answered. An app quietly running on its backup —
+   or quietly running on one engine with no backup at all — looks exactly like
+   one that is fine, until the morning the cap is hit. */
+ok('the How tab has a line for it', /id="howEngines"/.test(html) && /function renderEngineLine\(/.test(html));
+ok('…repainted when a run finishes', /renderGroundingLine\(\);\n  renderEngineLine\(\);/.test(html));
+ok('…and when the How tab is opened',
+   /if \(_tab === 'how'\) \{ renderGroundingLine\(\); renderEngineLine\(\); \}/.test(html));
+ok('it says when there is no backup at all', /there is no backup on this device/.test(html));
+ok('it names the engine that answered last', /The last answer came from/.test(html));
+/* The key field is the teacher's. A student's device runs this very same
+   scan, and a secret has no business on it. */
+ok('the key field is admin-gated', /function applyAiVisibility[\s\S]{0,400}isAdmin\(currentUser\)/.test(html));
+ok('…and the handlers ask again rather than trusting a hidden field',
+   /function aiSaveKey\(\) \{\n  if \(!isAdmin\(currentUser\)\) return;/.test(html) &&
+   /function aiClearKey\(\) \{\n  if \(!isAdmin\(currentUser\)\) return;/.test(html));
+ok('…and it is hidden, never cleared — that would empty the box on every load',
+   /if \(el\) el\.classList\.toggle\('hidden', !admin\);/.test(html));
+ok('the visibility is applied when the account changes',
+   /applyVetVisibility\(\);\n  applyAiVisibility\(\);/.test(html));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);
