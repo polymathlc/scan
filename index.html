@@ -1223,7 +1223,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.16.0';
+var APP_VERSION = 'v1.17.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2292,6 +2292,14 @@ var SCAN_SUBJECT_FIELD_RULE =
    words crops a rectangle of somebody else's question and files it under
    this one, which looks exactly like a working crop. */
 var SCAN_BOX_RULE =
+  '"questionBox" is the rectangle round THE WHOLE QUESTION exactly as it is printed — its number, all of its ' +
+  'wording, every option, any figure or table that belongs to it, and the ruled space left for the answer. It is ' +
+  'given as [ymin, xmin, ymax, xmax], four integers from 0 to 1000 measured on the whole page the question is ' +
+  'printed on: 0,0 is the page\'s top-left corner and 1000,1000 its bottom-right. Draw it tight to the printed ' +
+  'question and leave the NEIGHBOURING questions, the page header and footer, and anything that is not the paper ' +
+  'at all — a hand, a desk, a shadow — outside it. This is what the student is given back to try again, so it ' +
+  'matters more than any other rectangle: include the whole question and nothing of the next one. OMIT it only ' +
+  'when you genuinely cannot tell where the question begins and ends. ' +
   '"diagramBox" is ONLY for a question that cannot be understood without a picture — a diagram, a graph, a ' +
   'figure, an experimental set-up, a map, a number line or a data table printed with the question. Draw the ' +
   'rectangle round THAT picture and give it as [ymin, xmin, ymax, xmax], four integers from 0 to 1000 measured ' +
@@ -2313,7 +2321,7 @@ var SCAN_SYS =
   '"marks":"2/3 when the paper prints a mark allocation, otherwise an empty string",' +
   '"feedback":"what to say to the student about what they wrote, or an empty string",' +
   '"subject":"science | math | english | chinese",' +
-  '"diagramBox":[ymin,xmin,ymax,xmax]}]}. ' +
+  '"questionBox":[ymin,xmin,ymax,xmax],"diagramBox":[ymin,xmin,ymax,xmax]}]}. ' +
   'Rules: one entry for every question actually PRINTED on the ' +
   'attached pictures, in the order they appear, keeping the paper\'s own numbering in "number" ("16", "3a"). ' +
   'ONE ENTRY PER LETTERED PART: a question printed as 8(a) and 8(b) is TWO entries, numbered "8(a)" and "8(b)", ' +
@@ -3095,8 +3103,12 @@ function _scanNewItem(r, batchStart, batchLen) {
   return {
     kind: 'page',
     subject: _scanSubject(r),
-    // The rectangle round this question's figure, on ITS page — normalised the
-    // moment it arrives, so an invented or malformed box never reaches a crop.
+    // Two rectangles, both on THIS question's page and both normalised the
+    // moment they arrive, so an invented or malformed one never reaches a
+    // crop. `qbox` is the whole question — what the student is handed back —
+    // and `box` is the figure alone, which is what was kept before and is
+    // still the fallback when the question could not be boxed.
+    qbox: _mbBoxOk(r.questionBox, true) ? r.questionBox.map(Number) : null,
     box: _mbBoxOk(r.diagramBox) ? r.diagramBox.map(Number) : null,
     number: _scanStr(r.number, 16),
     page: batchStart + page,          // 1-based across the whole run
@@ -3139,6 +3151,10 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
       // A question stitched across a batch boundary takes its figure from
       // whichever half could draw a rectangle round one.
       if (it.box && !prev.box) { prev.box = it.box; prev.boxPage = it.page; }
+      // A question that ran over the page: the second half's rectangle is
+      // measured on THAT page, so the page it belongs to travels with it or
+      // the crop comes off the wrong sheet.
+      if (it.qbox && !prev.qbox) { prev.qbox = it.qbox; prev.qboxPage = it.page; }
       if (it.subject && !prev.subject) prev.subject = it.subject;
       // The student may have written their answer on either half of a question
       // that runs over the page, so the marking is merged rather than
@@ -4582,6 +4598,10 @@ var MB_KEY_PREFIX = 60;             // the fallback match — see `mbFindByKey`
 var MB_PAPER_MAX = 30;              // questions on one worksheet
 var MB_PAPER_DAYS = 365;            // a paper is swept a year after it is made
 var MB_CROP_MAX_SIDE = 1400;
+/* A whole question is READ, not just looked at, so it keeps more pixels than a
+   figure does: the wording is often 9pt, and print that survives a glance at
+   1400px does not survive being answered from. */
+var MB_QCROP_MAX_SIDE = 2000;
 
 var _mistakes = [];                 // newest first
 var _mbSel = {};                    // id -> true, the ticked rows
@@ -4668,16 +4688,22 @@ function mbForget() { _mistakes = []; _mbSel = {}; _mbLoaded = false; renderMbBa
    missing, malformed, minute or very nearly the whole page is a selection
    that failed, and a failed selection returns nothing rather than a crop of
    the wrong half of the paper. */
-function _mbBoxOk(box) {
+function _mbBoxOk(box, whole) {
   if (!Array.isArray(box) || box.length !== 4) return false;
   var n = box.map(Number);
   if (!n.every(function (v) { return isFinite(v) && v >= 0 && v <= 1000; })) return false;
-  if (n[2] - n[0] < 25 || n[3] - n[1] < 25) return false;                     // too small to be a figure
-  if ((n[2] - n[0]) / 1000 > 0.94 && (n[3] - n[1]) / 1000 > 0.94) return false; // ≈ the whole page
+  if (n[2] - n[0] < 25 || n[3] - n[1] < 25) return false;                     // too small to be anything
+  /* A FIGURE that fills the page is a selection that failed — nothing was
+     picked out. A whole QUESTION that fills the page is perfectly ordinary:
+     an open-ended question with a big diagram and six ruled lines really is
+     the whole sheet, and refusing it would throw away exactly the questions
+     worth trying again. So the test is skipped for a question box, which is
+     what `whole` says. */
+  if (!whole && (n[2] - n[0]) / 1000 > 0.94 && (n[3] - n[1]) / 1000 > 0.94) return false;
   return true;
 }
-async function _mbCropBox(dataUrl, box) {
-  if (!_mbBoxOk(box)) return '';
+async function _mbCropBox(dataUrl, box, whole) {
+  if (!_mbBoxOk(box, whole)) return '';
   var n = box.map(Number);
   var img = await _loadImageEl(dataUrl);
   var W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
@@ -4688,7 +4714,7 @@ async function _mbCropBox(dataUrl, box) {
   var w = Math.min(W - x, (n[3] - n[1]) / 1000 * W + mx * 2);
   var h = Math.min(H - y, (n[2] - n[0]) / 1000 * H + my * 2);
   if (w < 24 || h < 24) return '';
-  var s = Math.min(1, MB_CROP_MAX_SIDE / Math.max(w, h));
+  var s = Math.min(1, (whole ? MB_QCROP_MAX_SIDE : MB_CROP_MAX_SIDE) / Math.max(w, h));
   var c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(w * s));
   c.height = Math.max(1, Math.round(h * s));
@@ -4708,15 +4734,44 @@ function _mbShotForPage(page) {
   var i = Number(page) - 1;
   return (i >= 0 && i < sent.length) ? sent[i] : null;
 }
+/* WHAT IS KEPT IS THE QUESTION ITSELF, not a description of it.
+   ---------------------------------------------------------------------
+   A question rebuilt from a transcription is only ever as good as the OCR,
+   and a maths or science question is layout as much as words: a table, a
+   number line, ruled working space, four options laid out in a grid. Retyping
+   that is where a re-do stops being the same question. So the picture the
+   student gets back is THE PRINTED QUESTION, cut out of their own photograph
+   — number, wording, options, figure and answer space — and the transcription
+   goes back to being what it always honestly was: what the marking was done
+   against, and what fills the answer key.
+
+   THE FIGURE CROP IS STILL THE FALLBACK. A question box the model would not
+   draw, or drew badly enough to fail `_mbBoxOk`, leaves the old behaviour
+   exactly as it was rather than leaving the card with no picture at all —
+   which is the one outcome worse than a figure without its wording.
+
+   `kind` travels with the crop because the two are shown COMPLETELY
+   differently: a question picture IS the question and the wording must not be
+   printed above it as well, while a figure sits beside wording that is doing
+   the asking. A picture filed as the wrong one of those reads, on paper, as
+   the question asked twice or as a diagram with nothing to do. */
 async function _mbCropFor(it) {
   try {
-    // `boxPage` is set only when the rectangle came from the SECOND half of a
-    // question that ran over the page: the box is measured on that page, so
-    // cropping it out of the first one takes a rectangle of the wrong sheet.
+    // `qboxPage` / `boxPage` are set only when the rectangle came from the
+    // SECOND half of a question that ran over the page: the box is measured on
+    // that page, so cropping it out of the first takes the wrong sheet.
+    if (it.qbox) {
+      var qShot = _mbShotForPage(it.qboxPage || it.page);
+      if (qShot && qShot.url) {
+        var whole = await _mbCropBox(qShot.url, it.qbox, true);
+        if (whole) return { url: whole, kind: 'question' };
+      }
+    }
     var shot = _mbShotForPage(it.boxPage || it.page);
-    if (!shot || !shot.url) return '';
-    return await _mbCropBox(shot.url, it.box);
-  } catch (e) { console.warn('mistake crop failed', e); return ''; }
+    if (!shot || !shot.url) return null;
+    var fig = await _mbCropBox(shot.url, it.box);
+    return fig ? { url: fig, kind: 'figure' } : null;
+  } catch (e) { console.warn('mistake crop failed', e); return null; }
 }
 async function _mbUpload(dataUrl, id) {
   if (!storage || !dataUrl) return '';
@@ -4734,11 +4789,16 @@ async function mbSaveOne(it) {
   var key = mbKeyOf(it);
   if (!key || mbHasKey(key)) return null;
   var id = 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
-  var img = '', imgNote = '';
+  var img = '', imgNote = '', shot = '';
   var crop = await _mbCropFor(it);
-  if (crop) {
-    try { img = await _mbUpload(crop, id); }
-    catch (e) { console.warn('mistake picture upload failed', e); imgNote = 'the diagram could not be kept'; }
+  if (crop && crop.url) {
+    try { img = await _mbUpload(crop.url, id); shot = crop.kind; }
+    catch (e) {
+      console.warn('mistake picture upload failed', e);
+      imgNote = crop.kind === 'question'
+        ? 'the picture of the question could not be kept — the wording below is what was read off the paper'
+        : 'the diagram could not be kept';
+    }
   }
   var doc = {
     key: key,
@@ -4759,6 +4819,10 @@ async function mbSaveOne(it) {
     marks: String(it.marks || ''),
     feedback: _scanStr(it.feedback, 1200),
     img: img,
+    // 'question' — the picture IS the question, wording and all — or 'figure',
+    // which is a diagram belonging to wording printed beside it. The worksheet
+    // lays the two out completely differently, so it can never be guessed.
+    shot: shot,
     imgNote: imgNote,
     streak: 0                 // right MB_CLEAR_WINS times in a row and it leaves
   };
@@ -5130,6 +5194,7 @@ function _mbPaperDoc(items) {
         verdict: m.verdict || '',
         feedback: m.feedback || '',
         img: m.img || '',        // the crop as photographed
+        shot: m.shot || 'figure',// 'question' (the whole thing) or just its figure
         cleanImg: ''             // filled in by the viewer, once, when it cleans it
       };
     })

@@ -420,13 +420,36 @@ step, and ship a change to the shape in both repos together**:
 - **`mbIsWrong` is the ONE test**, and it re-states the blank rule: a blank was never attempted, so
   it is not a mistake; a correct answer is not; an answer to a typed question was never on a paper.
 - **`mbKeyOf` folds the wording**, so a paper photographed twice is one mistake rather than two.
+- **WHAT IS KEPT IS THE WHOLE QUESTION, CUT OUT OF THE STUDENT'S OWN PHOTOGRAPH** (v1.17.0). A
+  question rebuilt from a transcription is only ever as good as the OCR, and a maths or science
+  question is its LAYOUT as much as its words — a table, a number line, ruled working space, four
+  options in a grid. Retyping that is where a re-do stops being the same question. So
+  `SCAN_BOX_RULE` asks for **`questionBox`** round the whole printed question — number, wording,
+  options, figure and answer space — and that crop is what the student gets back to answer on.
+  The transcription goes back to being what it always honestly was: what the marking was done
+  against, and what fills the answer key.
 - **THE PICTURE IS CROPPED AT THE MOMENT IT IS FILED**, because that is the only moment the
-  photograph is still in the tab. `SCAN_BOX_RULE` asks the model for `diagramBox` —
-  `[ymin,xmin,ymax,xmax]` as integers 0–1000, the same convention the Learning Portal's rapid
-  question adder uses — and **`_mbBoxOk` is the one test** that refuses a box that is malformed, off
-  the page, minute, or so nearly the whole page that the selection plainly failed. **A wrong
-  rectangle is worse than none**: it keeps somebody else's question and looks like a working crop.
-  The prompt says to OMIT it for a question that is only words.
+  photograph is still in the tab. Both rectangles are `[ymin,xmin,ymax,xmax]` as integers 0–1000,
+  the same convention the Learning Portal's rapid question adder uses.
+- **`_mbBoxOk(box, whole)` is the ONE test, and `whole` is the whole difference.** A FIGURE that
+  fills the page is a selection that failed — nothing was picked out — so it is refused. A whole
+  QUESTION that fills the page is perfectly ordinary: an open-ended question with a big diagram and
+  six ruled lines really is the whole sheet, and refusing it would throw away exactly the questions
+  worth trying again. Everything else — malformed, off the page, minute — is refused either way,
+  because **a wrong rectangle is worse than none**: it keeps somebody else's question and looks
+  like a working crop.
+- **`diagramBox` IS STILL THE FALLBACK.** A question box the model would not draw, or drew badly
+  enough to fail the test, leaves the old behaviour exactly as it was rather than leaving the card
+  with no picture at all — which is the one outcome worse than a figure without its wording. The
+  prompt still says to OMIT `diagramBox` for a question that is only words.
+- **`shot` (`'question'` / `'figure'`) TRAVELS WITH THE CROP**, onto the mistake and onto the
+  worksheet, because the two are laid out completely differently at the other end: a question
+  picture IS the question and its wording must not be printed above it as well, while a figure sits
+  beside wording that is doing the asking. A picture filed as the wrong one of those reads, on
+  paper, as the question asked twice or as a diagram with nothing to do — and it cannot be guessed
+  later. An old paper carries no flag and is read as `'figure'`, which is exactly what it holds.
+- **A whole question keeps more pixels than a figure** (`MB_QCROP_MAX_SIDE`): it is READ, not
+  glanced at, and 9pt print that survives a look at 1400px does not survive being answered from.
 - **A crop that fails costs the DIAGRAM and never the mistake.** The document is written last, the
   picture is only ever an extra on it, and `imgNote` puts the gap on the card rather than leaving a
   question that quietly lost its figure. Storage being absent is survivable in the same way.
@@ -739,7 +762,8 @@ third company, a third account and a third cap.
   `askKimiDirect`, `window.kimiListModels`, `window.aiSaveKimiKey`, `kimiModelHint`,
   `kimiSave`, `kimiClear`, `kimiLoadModels`,
   `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
-  `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`,
+  `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`, `_mbCropFor`,
+  `MB_QCROP_MAX_SIDE`,
   `_mbShotForPage`, `mbIsWrong`, `mbIsRight`, `mbKeyOf`, `mbFindByKey`, `MB_CLEAR_WINS`,
   `MB_KEY_PREFIX`, `mbNoteWin`, `mbNoteMiss`, `_mbRunNews`, `mbRunToast`, `mbCardChipHtml`,
   `mbSaveOne`, `mbFileRun`, `_mbPaperDoc`,
@@ -776,7 +800,10 @@ third company, a third account and a third cap.
   because it is the only thing this app keeps, and the way it goes wrong is the way the whole family
   has gone wrong before: `users/{uid}/mistakes` is the SCIENCE app's own log under this same uid, so
   a book named `mistakes` here merges two apps' data with nothing throwing on either screen. A box
-  that is not really round a figure keeps somebody else's question and looks like a working crop,
+  that is not really round a question keeps somebody else's question and looks like a working crop,
+  a `shot` flag that goes missing prints the question twice or prints a diagram with nothing asking
+  anything, and the whole-page test applied to a question box throws away every big open-ended
+  question there is —
   and an email announced as sent by a queue that refused the write is a worksheet nobody ever
   receives. The clearing is the other half of that: a streak that stops resetting turns "twice in a
   row" into "twice ever" and empties the book of questions the child still cannot do, and a matcher

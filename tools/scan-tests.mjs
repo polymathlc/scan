@@ -952,6 +952,42 @@ ok('a full-width band that is not full-height is kept — a wide figure is a fig
    api._mbBoxOk([300, 5, 620, 995]) === true);
 ok('the box is normalised the moment it arrives, not at crop time',
    /box: _mbBoxOk\(r\.diagramBox\) \? r\.diagramBox\.map\(Number\) : null/.test(html));
+
+/* ---- The WHOLE QUESTION, cut out of the student's own photograph ----
+   A question rebuilt from a transcription is only as good as the OCR, and a
+   maths or science question is layout as much as words. So what the student
+   gets back is the printed question itself. Every way this goes wrong is
+   silent on the page: the wrong rectangle keeps a neighbouring question, a
+   question filed as a figure prints its wording twice, and a figure filed as
+   a question prints a diagram with nothing asking anything. */
+ok('a whole question MAY fill the page — an OEQ with a big diagram really does',
+   api._mbBoxOk([10, 10, 990, 990], true) === true);
+ok('…while the same rectangle is still refused for a FIGURE',
+   api._mbBoxOk([10, 10, 990, 990]) === false);
+ok('a question box is still checked for shape and size',
+   api._mbBoxOk([1, 2, 3], true) === false && api._mbBoxOk([100, 100, 110, 110], true) === false
+   && api._mbBoxOk([0, 0, 1200, 500], true) === false);
+ok('the question rectangle is normalised on arrival too, and as a WHOLE box',
+   /qbox: _mbBoxOk\(r\.questionBox, true\) \? r\.questionBox\.map\(Number\) : null/.test(html));
+ok('the prompt asks for the whole question — number, wording, options and answer space',
+   /round THE WHOLE QUESTION exactly as it is printed/.test(html)
+   && /every option, any figure or table that belongs to it, and the ruled space left for the answer/.test(html));
+ok('…and tells it to leave the neighbours and the desk outside',
+   /leave the NEIGHBOURING questions[\s\S]{0,140}a hand, a desk, a shadow — outside it/.test(html));
+ok('the crop PREFERS the whole question and falls back to the figure',
+   /if \(whole\) return \{ url: whole, kind: 'question' \};/.test(html)
+   && /return fig \? \{ url: fig, kind: 'figure' \} : null;/.test(html));
+ok('a stitched question crops its QUESTION box from the page it was drawn on',
+   /_mbShotForPage\(it\.qboxPage \|\| it\.page\)/.test(html)
+   && /if \(it\.qbox && !prev\.qbox\) \{ prev\.qbox = it\.qbox; prev\.qboxPage = it\.page; \}/.test(html));
+/* WHICH of the two a picture is cannot be guessed later: the worksheet lays
+   them out completely differently. */
+ok('which kind of picture it is travels with it, onto the mistake…',
+   /shot: shot,/.test(html));
+ok('…and onto the worksheet, defaulting to the figure an old paper really holds',
+   /shot: m\.shot \|\| 'figure'/.test(html));
+ok('a whole question keeps more pixels than a figure — it is read, not glanced at',
+   /whole \? MB_QCROP_MAX_SIDE : MB_CROP_MAX_SIDE/.test(html));
 ok('the prompt asks for the rectangle only where there IS a figure',
    /OMIT "diagramBox" entirely for a question that is only words/.test(html));
 ok('the rectangle uses the same 0–1000 convention the portal’s readers use',
@@ -970,7 +1006,7 @@ api.shots = [];
 
 /* A crop that fails must cost the DIAGRAM and never the mistake. */
 ok('the document is written even when the picture could not be kept',
-   /catch \(e\) \{ console\.warn\('mistake picture upload failed', e\); imgNote = /.test(html));
+   /catch \(e\) \{\s*\n\s*console\.warn\('mistake picture upload failed', e\);\s*\n\s*imgNote =/.test(html));
 ok('…and the card says the diagram is missing rather than just losing it',
    /imgNote/.test(html) && /the diagram could not be kept/.test(html));
 ok('a Storage that is not there is survivable', /if \(!storage \|\| !dataUrl\) return '';/.test(html));
