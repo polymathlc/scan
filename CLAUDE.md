@@ -500,7 +500,7 @@ step, and ship a change to the shape in both repos together**:
   says so, the email cannot be queued and says so.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
-## ⚙️ Two engines, and whichever one will answer (v1.12.0)
+## ⚙️ Two engines, and whichever one will answer (v1.12.0, key moved to the server in v1.13.0)
 - **The way this app dies is not a bug in it.** Every card on every page came back
   `AI: Error … [429] Your billing account has exceeded its monthly spending cap` — the same
   answer to every call, on every device, until the month turns over. One engine is one thing
@@ -512,12 +512,33 @@ step, and ship a change to the shape in both repos together**:
   gained the backup at once and not one of them had to be told. `aiAskWith(prompt, opts, order,
   run)` is the failover loop and `_aiRun` is the dispatcher; a second route past them is a call
   that still dies on the cap with nothing on screen saying why.
-- **THE KEY IS NEVER IN THIS FILE.** This is a public static site served to every student's
-  browser, so a key committed here is a key handed to the whole school — the harness fails on an
-  `sk-`-shaped string anywhere in `index.html`. It lives in the admin's own `localStorage`, which
-  also means the honest limit: **the backup works on the DEVICE the key was entered on.** A
-  student's phone has no key and still meets the cap. There is no backend here to hold one behind,
-  and putting it in Firestore is the same as committing it.
+- **THERE ARE THREE ROUTES, NOT TWO, AND THE ORDER IS THE DESIGN** (v1.13.0): Gemini, then
+  **ChatGPT on the SERVER**, then ChatGPT on a key pasted into this one browser.
+- **THE KEY LIVES ON THE SERVER, and that is what makes the backup real.** v1.12.0 shipped it in
+  `localStorage`, which rescued the teacher's laptop and no student's phone — the half of the
+  school that matters. `askOpenAiServer` now calls the **`askOpenAi` Cloud Function** in
+  `polymathlc/math/functions`, which holds the key as a Firebase secret (`OPENAI_API_KEY`) and
+  enforces the sign-in, the model, the size caps and the daily quota. A browser never sees the key
+  and cannot read it back. **It needs one deploy to work** — `firebase functions:secrets:set
+  OPENAI_API_KEY` and then the functions deploy — and until then the call comes back
+  `failed-precondition` and the How tab says so **in those words**, rather than reporting it as an
+  AI error the teacher would go looking for in the wrong place.
+- **THE KEY IS NEVER IN THIS FILE, and that is WHY the server holds it.** This is a public static
+  site served to every student's browser, so a key committed here is a key handed to the whole
+  school and spendable without limit by any of them — the harness fails on an `sk-`-shaped string
+  anywhere in `index.html`.
+- **A key in `localStorage` is the THIRD route, not the first.** It is what the other four portals
+  already do, so a key pasted into any of them on this device is picked up here — and it is what
+  keeps the backup working before the function is deployed, or if it ever stops answering. Its
+  honest limit is the one device it was typed into, which is the limit the server route exists to
+  remove. The field on the How tab says all of that rather than presenting itself as the fix.
+- **`openai` is ALWAYS in the order.** Whether the function is deployed is not something a page can
+  know without asking; asking wrongly costs one call, and the down-marking below then stops it
+  being paid for again on every batch. `aiReady()` is therefore simply `true` — an app that asked
+  "is Gemini up" would refuse every button on a capped project that can in fact answer.
+- **`_aiWhy` keeps what each route last said.** "Nobody has deployed the function yet", "the key was
+  rejected" and "the account is out of credit" are three different problems with three different
+  fixes, and an app that reports all three as *AI error* sends the teacher to the wrong one.
 - **`AI_ENGINE_STORE` is the SHARED slot table** — `sq_ai_engine` / `sq_openai_key` /
   `sq_openai_model` / `sq_openai_image_model`, the very names `polymathlc/cer`, `math`, `english`
   and `chinese` already use. All five apps are sibling folders on ONE GitHub Pages origin, so they
@@ -548,13 +569,16 @@ step, and ship a change to the shape in both repos together**:
   to guess at.
 - **`aiReady()` is true when EITHER engine can answer**, or a capped project with a key saved would
   still show "AI is not available" on every button.
-- **The page SAYS which engine answered** (`renderEngineLine`, on the How tab). An app quietly
-  running on its backup — or quietly running on one engine with no backup at all — looks exactly
-  like one that is fine, right up to the morning the cap is hit. The **line** is for everybody; the
-  **key field** is the teacher's alone (`applyAiVisibility`, plus a second check inside `aiSaveKey`
-  / `aiClearKey`, because hiding a field is not a lock), and it is hidden and never CLEARED — the
-  same rule the vetting setting carries, since this runs once before sign-in resolves and again
-  after it.
+- **The page SAYS which route answered** (`renderEngineLine`, on the How tab), and it reports only
+  what it KNOWS: the routes in the order they will be tried, and what each said the last time it
+  refused. A "the backup is fine" that was never tested is the sentence this feature exists to stop
+  anyone believing. The **line** is for everybody; the **key field** is the teacher's alone
+  (`applyAiVisibility`, plus a second check inside `aiSaveKey` / `aiClearKey`, because hiding a
+  field is not a lock), and it is hidden and never CLEARED — the same rule the vetting setting
+  carries, since this runs once before sign-in resolves and again after it.
+- **The callable rides the COMPAT app** (`firebase-functions-compat.js`), because that is the app
+  holding the signed-in user; the modular app beside it carries App Check but no session, and the
+  function refuses a caller it cannot name.
 - **The module is deferred, so it repaints the line when it loads.** The classic script paints it
   before either engine exists, and would otherwise leave "No AI is available at all" on a page
   where there plainly is.
@@ -642,8 +666,8 @@ step, and ship a change to the shape in both repos together**:
   `_reportPrompt`, `_reportNew`, `_reportRefs`, `reportAsText`, `runReport`,
   `AI_ENGINE_STORE`, `OPENAI_DEFAULT_MODEL`, `AI_DOWN_MS`, `openAiKey`, `openAiModel`,
   `openAiReady`, `aiEnginePref`, `aiEngineOrder`, `aiEngineIsDown`, `_openAiBody`, `_openAiText`,
-  `askOpenAI`, `aiAskWith`, `_aiRun`, `renderEngineLine`, `applyAiVisibility`, `aiSaveKey`,
-  `aiClearKey`, `aiSetPrefer`,
+  `askOpenAI`, `askOpenAiServer`, `_aiWhy`, `aiAskWith`, `_aiRun`, `renderEngineLine`,
+  `applyAiVisibility`, `aiSaveKey`, `aiClearKey`, `aiSetPrefer`,
   `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
   `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`,
   `_mbShotForPage`, `mbIsWrong`, `mbIsRight`, `mbKeyOf`, `mbFindByKey`, `MB_CLEAR_WINS`,
@@ -688,9 +712,11 @@ step, and ship a change to the shape in both repos together**:
   row" into "twice ever" and empties the book of questions the child still cannot do, and a matcher
   that guesses between two similar questions deletes the wrong one — both on a screen that looks
   exactly like the feature working.
-- After touching **the two engines** (`AI_ENGINE_STORE`, `OPENAI_DEFAULT_MODEL`, `aiEngineOrder`,
-  `aiAskWith`, `_aiRun`, `_openAiBody`, `_openAiText`, `askOpenAI`, `AI_DOWN_MS`, `window.aiReady`,
-  `window.askGemini`), run **`node tools/scan-tests.mjs`**. Every failure here is silent and the
+- After touching **the engines** (`AI_ENGINE_STORE`, `OPENAI_DEFAULT_MODEL`, `aiEngineOrder`,
+  `aiAskWith`, `_aiRun`, `_openAiBody`, `_openAiText`, `askOpenAI`, `askOpenAiServer`, `_aiWhy`,
+  `AI_DOWN_MS`, `window.aiReady`, `window.askGemini`) — **or the `askOpenAi` function in
+  `polymathlc/math/functions`, which is the other half of it** — run
+  **`node tools/scan-tests.mjs`**. Every failure here is silent and the
   app looks exactly as it did the morning the spending cap was hit. A slot name that drifts from
   the other four portals signs this app out of a key it can plainly see and reports it as "no
   backup on this device". A preference with no key behind it refuses every call. A "down" note
@@ -698,7 +724,9 @@ step, and ship a change to the shape in both repos together**:
   of to the back leaves the app dead once the cap has been lifted. The second error reported
   instead of the first tells the teacher "no ChatGPT key is saved" about a paper that actually hit
   a billing cap. And a body that drops the images, or sends a `temperature` to a gpt-5 model, is a
-  400 — not a worse answer, no answer at all.
+  400 — not a worse answer, no answer at all. And the `openai` route dropping out of the order is
+  the whole feature quietly reverting to v1.12.0: the teacher's laptop keeps working, so nothing
+  looks wrong, and every student is back on a capped project with no backup at all.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.
