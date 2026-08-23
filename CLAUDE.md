@@ -434,6 +434,39 @@ step, and ship a change to the shape in both repos together**:
   running over the page keeps a rectangle of the wrong sheet.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## ✓✓ …and takes itself out again (v1.11.0)
+- **A book that only fills is a list of everything a student has ever got wrong**, which is a list
+  nobody opens. What empties it is the thing the whole feature is for: doing the question again and
+  getting it right — `MB_CLEAR_WINS` (2) times **in a row**.
+- **THE LOOP CLOSES BY PHOTOGRAPHING THE WORKSHEET BACK IN.** That is the only place this app can
+  honestly learn the answer is now right: the sheet is printed and done on paper, scanned like any
+  other paper, marked like any other paper, and `mbFileRun` reads the verdicts that came out. There
+  is no second marker and no "I got it right" button — a book emptied by a student ticking their
+  own work empties itself the day before the exam. The printed sheet SAYS to scan it back
+  (`cer/mistakes.html`), because a loop nobody knows about is a loop nobody closes.
+- **"In a row" is the whole rule, and the RESET is the half that carries it.** `mbNoteWin` moves the
+  streak on and clears at 2; `mbNoteMiss` puts it straight back to 0 for anything attempted and not
+  fully right — **`partial` included**, because that is an attempt that was not right. Without the
+  reset this is "right twice ever", which a student reaches by accident on a question they still
+  cannot do.
+- **A BLANK changes nothing, either way.** The pass skips an unmarked answer before it ever looks
+  the question up, so skipping a question on the re-do cannot wipe a streak that was earned. It is
+  the same rule the marking, the report and the filing are all built on.
+- **`mbFileRun` is ONE pass and the ONE place a run changes the book** — what was got wrong goes in,
+  what was got right moves towards coming out, what was attempted and missed starts again. `seen`
+  is the guard that makes one attempt one attempt: a question photographed on two pages, or a page
+  shot twice, would otherwise clear in a single sitting.
+- **`mbFindByKey` is the ONE matcher, and its two failures are NOT symmetrical.** Failing to match
+  leaves a mistake in the book a moment longer, which costs nothing; matching the WRONG one deletes
+  a question the student still cannot do, on somebody else's right answer, with nothing anywhere
+  saying so. So it is the exact folded key first, and a `MB_KEY_PREFIX` (60) prefix only when it is
+  **unique** — two entries that both match means no match at all, never a guess between them.
+- **It SAYS what it did**, because a question that vanishes with nothing on screen is what makes a
+  student stop trusting the book: the toast names what cleared and what is one away, the card wears
+  the count (*right 1 of 2*) — and `_mbRunNews` is what lets a CLEARED question still report itself
+  from a card whose entry is no longer there to look up.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## 📤 The worksheet, and the link that reaches it (v1.10.0)
 - The chosen mistakes are written as ONE `scanPapers` document and the student is sent a link. **The
   page at the other end is NOT in this repository**: it is `mistakes.html` in the Science Learning
@@ -549,7 +582,9 @@ step, and ship a change to the shape in both repos together**:
   `_reportPrompt`, `_reportNew`, `_reportRefs`, `reportAsText`, `runReport`,
   `camAvailable`, `camOpen`, `camClose`, `camSnap`, `camCancel`, `camRenderStrip`,
   `MB_COL`, `MB_PAPER_COL`, `MB_IMG_PATH`, `SCAN_BOX_RULE`, `_mbBoxOk`, `_mbCropBox`,
-  `_mbShotForPage`, `mbIsWrong`, `mbKeyOf`, `mbSaveOne`, `mbFileRun`, `_mbPaperDoc`,
+  `_mbShotForPage`, `mbIsWrong`, `mbIsRight`, `mbKeyOf`, `mbFindByKey`, `MB_CLEAR_WINS`,
+  `MB_KEY_PREFIX`, `mbNoteWin`, `mbNoteMiss`, `_mbRunNews`, `mbRunToast`, `mbCardChipHtml`,
+  `mbSaveOne`, `mbFileRun`, `_mbPaperDoc`,
   `_mbMailDoc`, `_mbPaperUrl`, `MB_VIEWER_PATH`),
   run
   **`node tools/scan-tests.mjs`**. It loads the REAL sections out of `index.html` and runs them
@@ -585,7 +620,10 @@ step, and ship a change to the shape in both repos together**:
   a book named `mistakes` here merges two apps' data with nothing throwing on either screen. A box
   that is not really round a figure keeps somebody else's question and looks like a working crop,
   and an email announced as sent by a queue that refused the write is a worksheet nobody ever
-  receives.
+  receives. The clearing is the other half of that: a streak that stops resetting turns "twice in a
+  row" into "twice ever" and empties the book of questions the child still cannot do, and a matcher
+  that guesses between two similar questions deletes the wrong one — both on a screen that looks
+  exactly like the feature working.
 - **The Gemini model is `AI_MODEL` and its thinking floor is `AI_THINK_MIN`, and the two move
   TOGETHER.** Every model has its own thinking scale, and a level it does not know is a
   **400 INVALID_ARGUMENT on every AI call in the app** — not a worse answer, no answer at all.

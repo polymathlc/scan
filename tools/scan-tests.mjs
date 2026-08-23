@@ -105,7 +105,8 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     set report(v) { _report = v; },
     get report() { return _report; },
     MB_COL, MB_PAPER_COL, MB_IMG_PATH, MB_PAPER_MAX, MB_PAPER_DAYS, MB_VIEWER_PATH, MB_MAIL_COL,
-    mbIsWrong, mbKeyOf, mbHasKey, _mbBoxOk, _mbShotForPage, _mbPaperUrl, _mbPaperTitle,
+    mbIsWrong, mbIsRight, mbFindByKey, MB_CLEAR_WINS, MB_KEY_PREFIX,
+    mbKeyOf, mbHasKey, _mbBoxOk, _mbShotForPage, _mbPaperUrl, _mbPaperTitle,
     _mbPaperDoc, _mbMailDoc, camAvailable,
     set mistakes(v) { _mistakes = v; },
     set shots(v) { _shots = v; },
@@ -1018,13 +1019,85 @@ ok('the book is filed once the paper has been read',
    /await mbFileRun\(run\);/.test(html) &&
    html.indexOf('await mbFileRun(run);') > html.indexOf('async function runScan'));
 ok('how many went in is said out loud',
-   /added to your mistake book/.test(html));
+   /new mistake' \+ \(added === 1 \? '' : 's'\) \+ ' kept/.test(html));
 ok('an account change drops the last account’s book',
    /mbForget\(\);/.test(html) && /stopTeachingNotes\(\);[\s\S]{0,200}mbForget\(\);/.test(html));
-ok('the chip is only ever drawn on a card that IS a mistake',
-   /function mbCardChipHtml[\s\S]{0,200}!mbIsWrong\(it\)/.test(html));
+ok('the chip is never drawn on a blank, and never on a typed answer',
+   /function mbCardChipHtml[\s\S]{0,260}it\.kind !== 'page'/.test(html) &&
+   /function mbCardChipHtml[\s\S]{0,1400}if \(!mbIsWrong\(it\)\) return '';/.test(html));
 ok('the chip never prints', /class="ansSend noPrint"/.test(html));
 ok('a worksheet is capped', api.MB_PAPER_MAX >= 5 && /n > MB_PAPER_MAX/.test(html));
+
+/* ---------- ✓✓ Clearing a question out of the book ----------
+   The book fills itself, so it has to empty itself, and the loop closes by
+   photographing the finished worksheet back in. Everything here is silent
+   when it goes wrong: a streak that does not reset is "right twice EVER",
+   which empties the book of questions the student still cannot do; a match
+   that is too eager deletes the wrong question on somebody else's right
+   answer; and a blank that resets a streak quietly punishes skipping one. */
+ok('two in a row is the rule, and it is a named constant', api.MB_CLEAR_WINS === 2);
+ok('a fully correct answer is a win', api.mbIsRight(rightQ) === true);
+ok('PARTLY right is not a win — it is an attempt that was not right',
+   api.mbIsRight(partialQ) === false && api.mbIsWrong(partialQ) === true);
+ok('a blank is neither', api.mbIsRight(blankQ2) === false && api.mbIsWrong(blankQ2) === false);
+ok('an answer to a typed question is neither', api.mbIsRight(askQ) === false);
+ok('a new mistake starts with no streak', /streak: 0 {17}\/\/ right MB_CLEAR_WINS times/.test(html));
+
+/* The reset is what makes it "in a row" rather than "twice ever". */
+ok('a right answer moves the streak on',
+   /var streak = \(Number\(entry\.streak\) \| \| 0\) \+ 1;|var streak = \(Number\(entry\.streak\) \|\| 0\) \+ 1;/.test(html));
+ok('the second one CLEARS it', /if \(streak >= MB_CLEAR_WINS\) \{[\s\S]{0,240}\.delete\(\)/.test(html));
+ok('an attempted miss puts the streak back to nought',
+   /async function mbNoteMiss[\s\S]{0,400}update\(\{ streak: 0/.test(html));
+ok('…and a miss on a question with no streak writes nothing at all',
+   /if \(!\(Number\(entry\.streak\) \|\| 0\)\) return '';/.test(html));
+/* A blank must reach neither branch: the pass skips an unmarked answer before
+   it ever looks the question up. */
+ok('a blank never touches the streak',
+   /if \(!it \|\| it\.kind !== 'page' \|\| !it\.marked\) continue; {3}\/\/ a blank changes nothing/.test(html));
+/* One attempt is one attempt, however many times the page was photographed. */
+ok('the same question twice on one paper is scored ONCE',
+   /if \(!key \|\| seen\[key\]\) continue;\s*\n\s*seen\[key\] = 1;/.test(html));
+ok('there is ONE pass over the run, not one per outcome',
+   (html.match(/async function mbFileRun\(/g) || []).length === 1 &&
+   /async function mbFileRun[\s\S]{0,1800}else if \(mbIsWrong\(it\)\) \{\s*\n\s*if \(await mbSaveOne\(it\)\)/.test(html));
+
+/* Matching the re-done question back to the one in the book. Failing to match
+   costs nothing; matching the WRONG one destroys a mistake the student still
+   has, so the fallback must be unique or it must not fire. */
+const longA = 'a beaker of water is heated over a bunsen burner until it boils and steam rises from the surface';
+const longB = 'a beaker of water is heated over a bunsen burner until it boils and bubbles form at the bottom';
+api.mistakes = [
+  { id: 'x1', key: api.mbKeyOf({ question: longA }) },
+  { id: 'x2', key: api.mbKeyOf({ question: 'what is 2 + 2' }) }
+];
+ok('an exact key matches', api.mbFindByKey(api.mbKeyOf({ question: 'What is 2 + 2?' })).id === 'x2');
+ok('a re-read that lost a word still matches on a long unique prefix',
+   (api.mbFindByKey(api.mbKeyOf({ question: longA + ' quickly' })) || {}).id === 'x1');
+ok('nothing at all matches nothing', api.mbFindByKey('') === null && api.mbFindByKey(null) === null);
+ok('a SHORT key never matches on the prefix — it is not evidence',
+   api.mbFindByKey('what is 2') === null);
+api.mistakes = [
+  { id: 'y1', key: api.mbKeyOf({ question: longA }) },
+  { id: 'y2', key: api.mbKeyOf({ question: longB }) }
+];
+ok('two questions sharing the prefix match NEITHER, rather than one of them',
+   api.mbFindByKey(api.mbKeyOf({ question: longA.slice(0, 80) + ' something else' })) === null);
+ok('…but an exact key still wins even when a prefix is shared',
+   api.mbFindByKey(api.mbKeyOf({ question: longB })).id === 'y2');
+api.mistakes = [];
+
+/* It has to SAY what it did — a question that vanishes with nothing on screen
+   is the one outcome that makes a student distrust the book. */
+ok('the run says what it cleared', /cleared — right/.test(html) && /times in a row/.test(html));
+ok('a question one away from clearing says so', /one more right answer from clearing/.test(html));
+ok('the card can report a question that is no longer there to look up',
+   /var _mbRunNews = \{\};/.test(html) &&
+   /if \(news === 'cleared'\)/.test(html));
+ok('the card counts the streak out for the student', /Right ' \+[\s\S]{0,60}' of ' \+ MB_CLEAR_WINS/.test(html));
+ok('a reset says the streak went back, rather than nothing', /Back to the start/.test(html));
+ok('the book row shows progress only once there IS progress',
+   /if \(streak > 0\) \{/.test(html) && /right ' \+ streak \+ ' of ' \+ MB_CLEAR_WINS \+ ' in a row/.test(html));
 
 /* ---------- 📥 Sending a scanned question to a vetting list ----------
    Four portals, two question SHAPES, and one field — `source` — that decides
