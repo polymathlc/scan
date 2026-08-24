@@ -823,6 +823,50 @@ third company, a third account and a third cap.
 - The key is the teacher's alone and device-local, exactly as ChatGPT's is:
   this is a public static site served to every student's browser.
 
+## 🔑 Signing in is a POPUP, and never a redirect (v1.19.1)
+
+`signIn` / `_authWhy` / the one `auth.getRedirectResult()` (in `index.html`, search
+`SIGNING IN IS A POPUP`).
+
+Google sign-in stopped working, and it stopped in the quietest way there is: a hop to the
+Google screen, a hop back, and a page still signed out with nothing on it to say why.
+
+- **The redirect fallback was the bug.** This app is served from `polymathlc.github.io`
+  and its `authDomain` is `mathgen--app.firebaseapp.com` — two different origins — so
+  `signInWithRedirect` has to write the half-finished sign-in down on one and read it back
+  on the other. Safari's tracking prevention and Chrome's storage partitioning both now
+  refuse that, so what was written before the trip to Google is unreadable on the way back.
+  When it says anything at all it says `auth/missing-initial-state`, which is a sentence
+  nobody can act on.
+- **THE FALLBACK FIRED EXACTLY WHERE IT FAILS.** It was reached on
+  `auth/popup-blocked` — a phone — which is both the likeliest place for a popup to be
+  blocked and the likeliest place for partitioned storage to break the redirect. So the
+  one route offered to the device most likely to need it was the one route that could not
+  work.
+- **The other four portals had already worked this out.** `polymathlc/cer`, `math`,
+  `english` and `chinese` all call `signInWithPopup` with an explicit
+  `browserPopupRedirectResolver` and NONE of them falls back to a redirect; their comment
+  names this failure in these very words. This app was the only one still doing it. The
+  compat SDK's `signInWithPopup` already carries that resolver, so a popup is all this
+  file needs.
+- **A blocked popup is TOLD to the user**, because allowing pop-ups is a thing they can do.
+  Sending them silently round a redirect that cannot work is not a fallback, it is the
+  failure wearing a fallback's clothes.
+- **`_authWhy` is the ONE place a Firebase code becomes something a person can act on**,
+  and every message names the fix rather than the internal state. `auth/unauthorized-domain`
+  is the other half of "I cannot log in" and the only one that is a CONSOLE setting rather
+  than a browser one, so it names itself, the console page and the domain being refused —
+  otherwise the teacher goes looking in the browser for an hour.
+- **The old redirect is still collected once on load.** A device that went round it before
+  this change can still come back carrying its error, and reading it turns "signed out for
+  no reason" into a sentence. It costs nothing on a device that never did.
+- **`prompt: 'select_account'`** — a device already signed into several Google accounts
+  silently choosing the wrong one is its own kind of "I cannot log in".
+- **This app is NOT an installable PWA** (no manifest, no service worker), so the one case
+  that genuinely needs a redirect does not arise here. `polymathlc/anskey` keeps a redirect
+  for exactly that case and only in standalone mode — do not "fix" it to match this.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -846,6 +890,12 @@ third company, a third account and a third cap.
   moment a picture failed to open.
 - The camera bar is **fixed to the viewport with `env(safe-area-inset-bottom)`** and belongs to the
   Snap tab alone: a shutter under the instructions is a button that does the wrong thing.
+- After touching **the sign-in** (`signIn`, `_authWhy`, `auth.getRedirectResult`), run
+  **`node tools/scan-tests.mjs`**. A student who cannot get past the sign-in screen has no
+  app at all, and this failed silently: the redirect went to Google, came back, and left
+  the page signed out with nothing said. Re-adding `signInWithRedirect` as a "fallback"
+  restores exactly that, on the phones most likely to hit it — which is why the harness
+  pins its absence rather than merely pinning that a popup is used.
 - After touching **the crop** (`_mbBoxOk`, `_mbInkLevel`, `_mbLumaHist`, `_mbInkProfile`,
   `_mbClearEdge`, `_mbRuleGroups`, `_mbTrimTextRows`, `_mbTightenRect`, `_mbCropBox`,
   `_mbUnionBox`, `_mbCleanBlocks`'s options arm, `MB_BUILD_SYS`), run

@@ -64,9 +64,20 @@ const vet = section(
    error reported for a paper that failed on both. And the four slot NAMES are
    the whole contract with the other four portals — rename one and this app is
    signed out of a key it can plainly see. */
+/* 🔑 Signing in. Every failure here is the whole app: a student who cannot get
+   past the sign-in screen has no app at all, and the way it broke was silent —
+   a hop to Google, a hop back, and a page still signed out with nothing said. */
+const auth = section(
+  '/* ================= Sign in ================= */',
+  '/* ================= Wiring ================= */');
+
 const engine = section(
   '\nconst AI_ENGINE_STORE = {',
   '/* ===== end of the two-engine block ===== */');
+
+/* Only the helper is loaded: the rest of that section paints the DOM and
+   attaches a listener at module scope, which a harness has no page for. */
+const authFns = auth.slice(auth.indexOf('function _authWhy('), auth.indexOf('function signIn('));
 
 const prelude = `
 var currentUser = { uid: 'admin1', email: 'chungzhikai@gmail.com' };
@@ -94,7 +105,7 @@ var document = { getElementById: () => null, createElement: () => ({ getContext:
    the 🎤 is only shown where the browser really has the Web Speech API. */
 var window = {};
 var localStorage = { getItem: () => null, setItem: () => {} };
-var location = { href: 'https://polymathlc.github.io/scan/' };
+var location = { href: 'https://polymathlc.github.io/scan/', hostname: 'polymathlc.github.io' };
 var navigator = {};
 var storage = null;
 var db = { collection: () => ({ doc: () => ({
@@ -104,7 +115,7 @@ var db = { collection: () => ({ doc: () => ({
 }) }) };
 `;
 
-const api = new Function(prelude + json + grounding + scan + report + book + vet + `
+const api = new Function(prelude + json + grounding + scan + report + book + vet + authFns + `
   return {
     set notes(v) { teachingNotes = v; },
     set style(v) { aiStyle = v; },
@@ -140,6 +151,7 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     _scanSubject, itemSubject, itemTarget, _vetGroupBySubject,
     _textUsesAlgebra, _itemAsksAlgebra, _itemUsesAlgebra, _applyAlgebraFix,
     SCAN_ALGEBRA_FIX_CALLS, SCAN_ALGEBRA_FIX_MAX, SCAN_NO_ALGEBRA_RULE,
+    _authWhy,
     set user(v) { currentUser = v; }
   };
 `)();
@@ -1106,6 +1118,62 @@ ok('…and the worksheet', /blocks: m\.blocks \|\| \[\]/.test(html));
 ok('it is a separate call, not more work for the marking prompt',
    !/MB_BUILD_SYS/.test(api.SCAN_SYS) && /system: MB_BUILD_SYS/.test(html));
 
+
+/* =====================================================================
+   🔑 SIGNING IN
+   ---------------------------------------------------------------------
+   A student who cannot get past the sign-in screen has no app at all, and
+   this broke in the quietest way there is: a hop to the Google screen, a hop
+   back, and a page still signed out with nothing on it to say why.
+
+   The cause was the REDIRECT fallback. This app is served from
+   polymathlc.github.io and its authDomain is mathgen--app.firebaseapp.com, so
+   a redirect has to write the half-finished sign-in on one origin and read it
+   back on the other — which Safari's tracking prevention and Chrome's storage
+   partitioning both now refuse. The other four portals had already worked
+   that out and say so in their own source; this app was the only one still
+   falling back to it, and it fell back in exactly the place it fails: a
+   phone, where a popup is likeliest to be blocked in the first place.
+   ===================================================================== */
+ok('sign-in is a popup', /auth\.signInWithPopup\(provider\)/.test(html));
+/* THE ONE THAT MUST NEVER COME BACK. A redirect on this origin pair cannot
+   hand the session back, so re-adding it as a "fallback" restores a button
+   that sends a student round a loop and returns them signed out. */
+ok('…and there is no redirect fallback anywhere in the file',
+   !/auth\.signInWithRedirect\s*\(/.test(html));
+ok('the account is asked for rather than assumed',
+   /provider\.setCustomParameters\(\{ prompt: 'select_account' \}\)/.test(html));
+/* Closing the window is not a failure and must not raise a toast; every other
+   code must, or the button looks like it did nothing at all. */
+ok('closing the window is silent, and so is a double tap',
+   /auth\/popup-closed-by-user' \|\| e\.code === 'auth\/cancelled-popup-request'/.test(html));
+ok('a redirect this app no longer starts is still collected once, for the devices left on it',
+   /auth\.getRedirectResult\(\)\.catch\(/.test(html));
+
+/* Every message names something a person can DO. The raw Firebase strings name
+   internal state, which is why "could not sign in: missing initial state" sent
+   nobody anywhere. */
+ok('a blocked popup says to allow pop-ups',
+   /allow pop-ups/i.test(api._authWhy({ code: 'auth/popup-blocked' })));
+/* The other half of "I cannot log in", and the only one that is a console
+   setting rather than a browser one — so it has to name itself, and the
+   domain, or the teacher goes looking in the browser. */
+{
+  const m = api._authWhy({ code: 'auth/unauthorized-domain' });
+  ok('an unauthorised domain names the console setting', /authorised domains/i.test(m));
+  ok('…and the domain being refused', /polymathlc\.github\.io/.test(m));
+}
+ok('a dead network says so rather than blaming the sign-in',
+   /connection/i.test(api._authWhy({ code: 'auth/network-request-failed' })));
+ok('an in-app browser is named as the thing to leave',
+   /in-app browser/i.test(api._authWhy({ code: 'auth/operation-not-supported-in-this-environment' })));
+ok('the redirect’s own error becomes an instruction',
+   /Tap Sign in again/.test(api._authWhy({ code: 'auth/missing-initial-state' })));
+/* An unknown code must still say SOMETHING — a silent catch is the failure
+   this whole section exists to end. */
+ok('a code nobody has seen still produces a message',
+   /Could not sign in/.test(api._authWhy({ code: 'auth/whatever', message: 'x' }))
+   && /Could not sign in/.test(api._authWhy(null)));
 
 /* =====================================================================
    ✂️ THE FIGURE, AND NOT THE SENTENCE ABOVE IT

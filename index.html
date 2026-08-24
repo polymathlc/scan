@@ -1223,7 +1223,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.19.0';
+var APP_VERSION = 'v1.19.1';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -6418,20 +6418,86 @@ function renderAuth() {
   if (_answers.length) renderAnswers();
 }
 
+/* =====================================================================
+   🔑 SIGNING IN IS A POPUP, AND NEVER A REDIRECT
+   ---------------------------------------------------------------------
+   This app is served from `polymathlc.github.io` and its Firebase
+   `authDomain` is `mathgen--app.firebaseapp.com`. Those are two different
+   origins, so `signInWithRedirect` has to write the half-finished sign-in
+   down on one of them and read it back on the other — and every current
+   browser has closed that door. Safari's tracking prevention and Chrome's
+   storage partitioning both make what was written before the trip to Google
+   unreadable when the user comes back, and what the student SEES is a hop to
+   the Google screen, a hop back, and a page still signed out. When it says
+   anything at all it says `auth/missing-initial-state`, which is a sentence
+   nobody can act on.
+
+   THE OTHER FOUR PORTALS ALREADY REFUSE TO USE IT and say so in these very
+   words (`polymathlc/cer`, `math`, `english`, `chinese` — search
+   `browserPopupRedirectResolver`). This app was the only one still falling
+   back to it, and the fallback fired in exactly the place it fails: a phone,
+   where a popup is likeliest to be blocked. So the fallback is gone. The
+   compat SDK's `signInWithPopup` already carries the popup resolver those
+   four pass explicitly, so a popup is all that is needed here.
+
+   A BLOCKED POPUP IS TOLD TO THE USER, because that is a thing they can do
+   something about. Sending them silently round a redirect that cannot work
+   is not a fallback, it is the failure wearing a fallback's clothes.
+
+   AND THE OLD REDIRECT IS STILL COLLECTED, once, on load. A device that went
+   round it before this change can still come back carrying its result or its
+   error, and reading it is what turns "signed out for no reason" into a
+   sentence. It costs nothing on a device that never did.
+   ===================================================================== */
+
+/* One place a Firebase auth code becomes something a person can act on. The
+   raw messages name internal state; these name the fix. */
+function _authWhy(e) {
+  var code = (e && e.code) || '';
+  if (code === 'auth/popup-blocked') {
+    return 'Your browser blocked the sign-in window. Allow pop-ups for this site and tap Sign in again.';
+  }
+  if (code === 'auth/unauthorized-domain') {
+    // The other half of "I cannot log in", and the only one that is a console
+    // setting rather than a browser one — so it has to name itself.
+    return 'This address is not on the Firebase project\'s authorised domains list, so Google sign-in is refused. ' +
+           'Add ' + ((location && location.hostname) || 'this site') + ' under Authentication → Settings → Authorised domains.';
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'Could not reach Google to sign in — check the connection and try again.';
+  }
+  if (code === 'auth/operation-not-supported-in-this-environment') {
+    return 'This browser will not open the Google sign-in window. Try Chrome or Safari rather than an in-app browser.';
+  }
+  if (code === 'auth/missing-initial-state') {
+    // What the redirect this app no longer uses used to leave behind.
+    return 'The sign-in did not come back cleanly. Tap Sign in again — it opens a window this time rather than leaving the page.';
+  }
+  return 'Could not sign in: ' + ((e && e.message) || e || 'unknown error');
+}
+
 function signIn() {
   var provider = new firebase.auth.GoogleAuthProvider();
+  // A student's device may already be signed into several Google accounts, and
+  // the wrong one silently chosen is its own kind of "I cannot log in".
+  provider.setCustomParameters({ prompt: 'select_account' });
   auth.signInWithPopup(provider).catch(function (e) {
-    // A popup blocked on a phone is the commonest failure — fall back rather
-    // than leaving a button that does nothing.
-    if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
-      auth.signInWithRedirect(provider);
-      return;
-    }
-    if (e && e.code === 'auth/popup-closed-by-user') return;
-    toast('Could not sign in: ' + ((e && e.message) || e), 5000);
+    // Closing the window, or tapping the button twice, is not a failure.
+    if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+    toast(_authWhy(e), 6000);
+    console.warn('sign-in failed', e);
   });
 }
 function signOut() { auth.signOut(); }
+
+/* The tail of a redirect this app no longer starts. It resolves to a null user
+   on every ordinary load, so the only thing it can do is turn a device left
+   stranded by the old code into a message. */
+auth.getRedirectResult().catch(function (e) {
+  if (!e || !e.code) return;
+  console.warn('redirect sign-in did not complete', e);
+  toast(_authWhy(e), 6000);
+});
 
 auth.onAuthStateChanged(function (user) {
   currentUser = user || null;
