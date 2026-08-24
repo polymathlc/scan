@@ -943,9 +943,10 @@
         <!-- Admin only: a student's device runs this same scan, and nothing it
              reads belongs in a question bank. Shown and hidden by
              applyVetVisibility, never by this markup alone. It sits under the
-             Subject picker because that picker is what forces a whole paper
-             into one list — there is deliberately no second control here that
-             could disagree with it. -->
+             Subject picker because that picker is what the ANSWERS are held to
+             and what a question the model could not place falls back to —
+             which list each question is filed in is read off the question
+             itself, so there is deliberately no second control here. -->
         <div class="field hidden" id="scanAutoVetField">
           <label for="scanAutoVet">📥 File every question read <span class="hint">(teacher only)</span></label>
           <select id="scanAutoVet">
@@ -1223,7 +1224,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.20.0';
+var APP_VERSION = 'v1.21.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -6270,28 +6271,44 @@ function _vetMathDoc(it) {
 }
 
 /* ---- WHICH LIST A QUESTION BELONGS IN ----
-   `itemSubject` is the ONE place that is decided, and everything else — the
-   label on the card's button, the window, the automatic filing and the batch
-   split — reads it. Two answers to that question is how a maths question ends
-   up in the science list.
+   `itemSubjectWhy` is the ONE place that is decided, and everything else —
+   the label on the card's button, the window, the automatic filing, the batch
+   split and the no-algebra check — reads it through `itemSubject`. Two
+   answers to that question is how a maths question ends up in the science
+   list.
 
-   THE TEACHER'S OWN SUBJECT PICKER OUTRANKS THE MODEL. They are holding the
-   paper: a pile they have declared is Mathematics is Mathematics, whatever a
-   single question happens to look like to a model reading a photograph. That
-   is also the way to force a whole paper into one list — one control, the one
-   that already exists and that already sharpens the answers, rather than a
-   second control free to disagree with it.
+   THE QUESTION'S OWN SUBJECT DECIDES, and the Settings picker is the fallback
+   behind it. That is the opposite way round from how this shipped, and the
+   reversal was asked for by name: a maths question was coming up as "Send to
+   Science vetting" because the picker happened to be set to Science, and the
+   subject a question IS does not change according to what somebody chose on
+   another tab before photographing it. The model is asked for the subject per
+   QUESTION, off the question itself (SCAN_SUBJECT_FIELD_RULE) — so a mixed
+   pile files itself correctly whatever the picker says, and a paper that is
+   all one subject reaches the same list it always did.
 
-   On "Any subject" the model's per-QUESTION read decides, which is what lets a
-   photographed pile of mixed papers file itself correctly.
+   THE PICKER STILL DOES ITS REAL JOB, which was never routing: it is what
+   `scanSubjectRule()` reads to hold the ANSWERS to one subject's standard,
+   and it is what a question the model could not place falls back to. Setting
+   it is still the way to say "this whole pile is maths"; it is no longer a
+   way to overrule what a question plainly is.
 
    Neither available → '' , and NOTHING is filed on a blank. A question whose
    subject could not be told waits for a hand and is reported; guessing it is
-   precisely the mistake this routing exists to prevent. */
-function itemSubject(it) {
-  if (wsMeta.subject && SUBJECT_OK[wsMeta.subject]) return wsMeta.subject;
-  return (it && SUBJECT_OK[it.subject]) ? it.subject : '';
+   precisely the mistake this routing exists to prevent.
+
+   `from` is not decoration: the picker says WHY a destination is being
+   offered, and "what this question reads as" and "the subject you set" are
+   very different claims to put in front of somebody about to file a question
+   in another app. */
+function itemSubjectWhy(it) {
+  var own = (it && SUBJECT_OK[it.subject]) ? it.subject : '';
+  if (own) return { key: own, from: 'question' };
+  var set = (wsMeta.subject && SUBJECT_OK[wsMeta.subject]) ? wsMeta.subject : '';
+  if (set) return { key: set, from: 'setting' };
+  return { key: '', from: '' };
 }
+function itemSubject(it) { return itemSubjectWhy(it).key; }
 function itemTarget(it) { return vetTarget(itemSubject(it)); }
 
 /* Split a run into one batch per destination list, keeping the ones that
@@ -6342,7 +6359,8 @@ function renderVetPick() {
   var whole = !!(_vetPending && _vetPending.idx == null);
   /* The subject this press is about: one card's own, or nothing on a whole
      paper, where every question is routed separately. */
-  var suggest = whole ? '' : itemSubject(items[0]);
+  var why = whole ? { key: '', from: '' } : itemSubjectWhy(items[0]);
+  var suggest = why.key, suggestFrom = why.from;
   var head = '';
   if (whole) {
     /* Filing each question in its OWN app is the headline for a paper, because
@@ -6378,7 +6396,9 @@ function renderVetPick() {
       '<span class="vetTargetName">' + escHtml(t.label) + '</span>' +
       '<span class="vetTargetSub">' + escHtml(already ? 'Already in this vetting list' : t.sub) + '</span>' +
       (t.key === suggest && !already
-        ? '<span class="vetSuggest">' + escHtml(wsMeta.subject ? 'the subject you set' : 'what this question reads as') + '</span>'
+        ? '<span class="vetSuggest">' + escHtml(suggestFrom === 'setting'
+            ? 'the subject you set — this question did not say'
+            : 'what this question reads as') + '</span>'
         : '') +
       '</button>';
   }).join('');
@@ -6393,9 +6413,13 @@ function vetOpen(idx) {
     $('vetWhat').textContent = 'All ' + items.length + ' question' + (items.length === 1 ? '' : 's') +
       ' read from this paper. Each one can go to the app for its own subject, or they can all go to one list.';
   } else {
-    var t = itemTarget(items[0]);
+    var w = itemSubjectWhy(items[0]);
+    var t = vetTarget(w.key);
     $('vetWhat').textContent = t
-      ? 'This question reads as ' + t.short + '. It will be added to that app\u2019s vetting list.'
+      ? (w.from === 'setting'
+          ? 'This question did not say what subject it is, so it falls back to the ' + t.short +
+            ' paper you set. It will be added to that app\u2019s vetting list.'
+          : 'This question reads as ' + t.short + '. It will be added to that app\u2019s vetting list.')
       : 'The subject of this question could not be told — choose the list it belongs in.';
   }
   _vetBusy = false;
@@ -6518,9 +6542,9 @@ async function vetChoose(key) {
 
    EACH QUESTION GOES TO ITS OWN APP. There is no "file everything in the
    science list" setting, deliberately: routing every question the same way is
-   exactly how a maths question reaches the science bank. A whole paper is
-   forced into one list by naming it in the SUBJECT picker instead — one
-   control, the one that already exists, and `itemSubject` reads it.
+   exactly how a maths question reaches the science bank. Each one is filed by
+   what the question itself reads as (`itemSubjectWhy`), with the SUBJECT
+   picker standing in behind it for a question that did not say.
 
    A question whose subject could not be told is NOT filed. It stays on the
    card with its 📥 and is counted in the toast.
