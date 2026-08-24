@@ -150,7 +150,7 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     set shots(v) { _shots = v; },
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
-    _scanSubject, itemSubject, itemTarget, _vetGroupBySubject,
+    _scanSubject, itemSubject, itemSubjectWhy, itemTarget, _vetGroupBySubject,
     _textUsesAlgebra, _itemAsksAlgebra, _itemUsesAlgebra, _applyAlgebraFix,
     SCAN_ALGEBRA_FIX_CALLS, SCAN_ALGEBRA_FIX_MAX, SCAN_NO_ALGEBRA_RULE,
     _authWhy,
@@ -1909,20 +1909,47 @@ ok('a subject that is not one of the four is DROPPED, never mapped to a near one
 ok('nothing said is nothing known',
    api._scanSubject({}) === '' && api._scanSubject({ subject: '   ' }) === '');
 
-/* The picker outranks the model — the teacher is holding the paper. */
+/* THE QUESTION'S OWN SUBJECT DECIDES, and the picker is only the fallback
+   behind it. This is the reversal asked for by name: a maths question was
+   coming up as "Send to Science vetting" because the Settings picker happened
+   to be set to Science, and the subject a question IS does not change
+   according to what somebody chose on another tab before photographing it. */
+api.meta = { level: 'P5', subject: 'science' };
+ok('a maths question on a paper set to Science still goes to the MATHS list',
+   api.itemSubject(mathQ) === 'math' && api.itemTarget(mathQ).key === 'math');
+ok('…and the button on its card says so',
+   /Send to Maths vetting/.test(api._vetCardFootHtml(mathQ, 0)));
+ok('…and it says the question is what decided, not the picker',
+   api.itemSubjectWhy(mathQ).from === 'question');
+/* The picker has NOT stopped mattering — it is what a question the model
+   could not place falls back to, so a paper that is all one subject still
+   files itself in one list. */
 api.meta = { level: 'P5', subject: 'math' };
-ok('a paper the teacher has named goes to that app whatever a question looks like',
-   api.itemSubject(sciQ) === 'math' && api.itemTarget(sciQ).key === 'math');
-/* …and on "Any subject" the question itself decides, which is what lets a
+ok('a question that could not name its own subject falls back to the picker',
+   api.itemSubject(mystery) === 'math' && api.itemTarget(mystery).key === 'math');
+ok('…and the picker SAYS that is what happened, rather than claiming the question read as maths',
+   api.itemSubjectWhy(mystery).from === 'setting');
+/* …and with no picker set the question still decides, which is what lets a
    mixed pile file itself correctly. */
 api.meta = { level: 'P5', subject: '' };
 ok('on Any subject each question is routed by what IT asks',
    api.itemSubject(mathQ) === 'math' && api.itemSubject(sciQ) === 'science');
 ok('a maths question never resolves to the science list',
    api.itemTarget(mathQ).col === 'mathVetting' && api.itemTarget(sciQ).col === 'vetting');
-/* The one that matters most: nothing is filed on a guess. */
-ok('a question whose subject could not be told has NO destination',
-   api.itemSubject(mystery) === '' && api.itemTarget(mystery) === null);
+/* The one that matters most: with nothing to go on, nothing is filed. A guess
+   is precisely the mistake this routing exists to prevent. */
+ok('a question whose subject could not be told, on a paper that named none, has NO destination',
+   api.itemSubject(mystery) === '' && api.itemTarget(mystery) === null &&
+   api.itemSubjectWhy(mystery).from === '');
+
+/* The no-algebra check reads the same one place, so it follows the question
+   too: a maths question photographed on a pile set to Science is now held to
+   the no-algebra rule it was previously exempt from. */
+api.meta = { level: 'P5', subject: 'science' };
+ok('a maths question on a Science-set paper is still held to the no-algebra rule',
+   api._itemUsesAlgebra({ subject: 'math', question: 'Ken has some sweets.',
+                          answer: 'Let x be the number. 3x + 5 = 20', explanation: '' }) === true);
+api.meta = { level: 'P5', subject: '' };
 
 /* The split a whole paper is sent as. */
 api.meta = { level: 'P5', subject: '' };
@@ -1956,9 +1983,9 @@ api.meta = { level: 'P5', subject: 'science' };
    about it has to be SAID: questions filed somewhere the teacher was not told
    about are questions nobody ever goes and vets. */
 /* Two states and no more. A "file everything in the science list" option is
-   exactly how a maths question reaches the science bank, so forcing a whole
-   paper into one app is done by naming it in the SUBJECT picker — the one
-   control `itemSubject` already reads. */
+   exactly how a maths question reaches the science bank, so each question is
+   filed by what it reads as, with the SUBJECT picker standing in behind it
+   for one that did not say. */
 ok('the setting is Off or by-subject, and nothing else',
    /<option value="">Off/.test(html) && /<option value="auto">/.test(html) &&
    !/<option value="science"/.test(html));

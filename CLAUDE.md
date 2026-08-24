@@ -214,13 +214,26 @@ step, and ship a change to the shape in both repos together**:
     list — mapping the words a model reaches for ("Maths", "华文") and **dropping anything that is
     not one of the four rather than bending it to a near one**. A pile photographed in one go is
     very often more than one subject, and that is the case a per-paper answer cannot serve.
-  - **The teacher's own Subject picker OUTRANKS the model.** They are holding the paper: a pile they
-    have declared is Mathematics is Mathematics, whatever a single question looks like to a model
-    reading a photograph. That is also **the way to force a whole paper into one list** — one
-    control, the one that already exists and already sharpens the answers, rather than a second
-    control free to disagree with it. There is deliberately no "always file in the science list"
-    setting: routing every question the same way is the fault this section exists to prevent.
-  - **Nothing is filed on a guess.** No picker and no usable read → `''`, no destination, and the
+  - **THE QUESTION'S OWN SUBJECT DECIDES, and the Settings picker is the fallback behind it**
+    (v1.21.0). That is the opposite way round from how this shipped, and the reversal was asked
+    for by name: a maths question was coming up as *"Send to Science vetting"* because the picker
+    happened to be set to Science, and **the subject a question IS does not change according to
+    what somebody chose on another tab before photographing it**. `itemSubjectWhy` is the ONE
+    place it is decided, and it returns **`from`** as well as the key — "what this question reads
+    as" and "the subject you set" are very different claims to put in front of somebody about to
+    file a question in another app, so the picker and the confirm sentence each say which of the
+    two they mean.
+  - **The picker still does its REAL job, which was never routing.** It is what
+    `scanSubjectRule()` reads to hold the ANSWERS to one subject's standard, and it is what a
+    question the model could not place falls back to — so a paper that is all one subject still
+    files itself in one list. Setting it is still how you say "this whole pile is maths"; it is no
+    longer a way to overrule what a question plainly is. There is deliberately no "always file in
+    the science list" setting: routing every question the same way is the fault this section
+    exists to prevent.
+  - **`_itemIsMathish` reads the same one place**, so the no-algebra rule follows the question too:
+    a maths question photographed on a pile set to Science is now held to it instead of being
+    exempt from it.
+  - **Nothing is filed on a guess.** No usable read and no picker → `''`, no destination, and the
     question stays on its card with its 📥 and is COUNTED in the toast. A batch that quietly filed
     fifteen of twenty reads exactly like one that filed all twenty.
   - **The button on the card names the list before it is pressed** ("📥 Send to Maths vetting"), and
