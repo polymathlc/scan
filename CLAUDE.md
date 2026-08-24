@@ -1022,7 +1022,88 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   is not printed on.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 📗 The learning list, and 💬 Ask Mr Chung (v1.22.0)
+
+`MB_LIST_MISTAKE` / `MB_LIST_LEARNING` / `mbListOf` / `mbIsLearning` / `mbInList`
+/ `mbCardLearnClick` / `mbSetTab` (search `TWO LISTS, ONE MACHINE`), and
+`ASK_WA_NUMBER` / `mbAskText` / `mbAskWaUrl` / `mbAskRoute` / `_askCleanPixels`
+/ `mbAskChung` (search `ASK MR CHUNG`).
+
+### Two lists, one collection
+
+- **EVERY question can be kept now, not just the ones that went wrong.**
+  `mbCardChipHtml` used to `return ''` unless `mbIsWrong(it)`, so a question
+  answered correctly and a question left blank had no button at all — the only
+  way into the book was to get something wrong. Both now offer 📕 **and** 📗.
+- **They are ONE collection with a `list` field, not two collections**, and
+  that is not tidiness: `firestore.rules` lives in `polymathlc/math` and is
+  shared with the whole family, so a new subcollection **fails closed** — reads
+  empty, writes denied, nothing on screen saying why — until somebody does a
+  whole-project rules deploy. A field on a document this app already writes
+  needs none. An entry with **no** `list` reads as a mistake, which is every
+  entry written before this shipped.
+- **THE LEARNING LIST NEVER EMPTIES ITSELF, and that is the whole difference
+  between the two.** A student put the question there knowing they could
+  already do it, so clearing it on a right answer would delete the list the
+  moment it started working. `mbNoteWin` returns early for a learning entry,
+  `mbNoteMiss` does too, `mbFileRun` skips it entirely — and
+  **`mbCardChipHtml`'s streak chip is gated on it as well**, or a learning
+  entry answered correctly is told *"2 more and it clears"* about a list that
+  never clears. That last one is the easy one to miss; the harness pins it.
+- **The automatic filing still only ever writes to the MISTAKE book**
+  (`mbSaveOne(it, MB_LIST_MISTAKE)`). Nothing reaches the learning list except
+  a student pressing 📗.
+- **Switching tab CLEARS the ticks** (`mbSetTab`), and `mbSelectedIds` is
+  scoped to the tab on show. Those ids drive one worksheet and one Remove
+  button, and a tick left behind on a row nobody can see is how the wrong
+  question gets deleted — the vetting list's own rule.
+
+### 💬 Ask Mr Chung
+
+- **WHAT A WEB PAGE CAN AND CANNOT DO HERE decides the whole design.** A page
+  **cannot** put a file into a WhatsApp message: `wa.me/<number>?text=` carries
+  text and nothing else, and there is no API, URL or trick that attaches an
+  image to it. What a page **can** do is `navigator.share({ files })`, which
+  hands the picture and the message to the phone's own share sheet with
+  WhatsApp one tap away and the image really attached. **The tap is the
+  browser's price, not something the app forgot to do** — do not "fix" this by
+  reaching for an attachment parameter that does not exist.
+- **`mbAskRoute` is the ONE place that choice is made**, so the button can say
+  which of the two it is about to do before it is pressed. Every device that
+  cannot share files still gets the question through: `wa.me` with the message
+  and a **link** to the picture in Storage.
+- **The message names WHO is asking.** A picture arriving from an unknown
+  number with "could you help me" is a message the teacher cannot act on, so
+  the student's name, level, subject and the question's number go in the text.
+  Nothing else about them travels — not their marks, not the report, not the
+  rest of the paper.
+- **Nothing is sent in the background.** The button opens the share sheet or
+  the chat; the student presses send. A share they cancelled (`AbortError`) is
+  not reported as a failure.
+- **The clean-up is DETERMINISTIC and free — no AI call.** It is the
+  white-point clamp a scanner driver does, on the same statistic `_mbInkLevel`
+  already reads: the paper's own white as the 98th percentile of the luma,
+  with everything within `ASK_CLEAN_DEPTH` of it and low in chroma snapped to
+  pure white. **All-or-nothing**, like the Portal's paper clean — half-cleaning
+  a picture is worse than leaving it alone, and a photograph of an experiment
+  (bright, no line work) is exactly where flattening the highlights destroys
+  what is being asked about. Every refusal hands the picture back untouched, and
+  so does a tainted canvas.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## House rules
+- After touching **the learning list or Ask Mr Chung** (`MB_LIST_*`,
+  `mbListOf`, `mbIsLearning`, `mbInList`, `mbSetTab`, `mbSelectedIds`,
+  `mbCardChipHtml`, `mbCardLearnClick`, `mbNoteWin`/`mbNoteMiss`'s learning
+  guards, `ASK_WA_NUMBER`, `mbAskText`, `mbAskWaUrl`, `mbAskRoute`,
+  `_askCleanPixels`), run `node tools/scan-tests.mjs`. Every failure is silent.
+  A learning entry that starts clearing itself deletes the list the moment it
+  begins working — and the streak CHIP is the half that is easy to miss, since
+  it promises a clearing that never comes. A tick that survives a tab switch
+  deletes a question the student cannot see. A message that stops naming who is
+  asking reaches the teacher as a picture from an unknown number. And the
+  clean-up going from all-or-nothing to half-applied flattens a photograph of
+  an experiment into a white plate while looking perfectly clean.
 - After touching **the marking repair pass** (`SCAN_MARK_FIX_*`,
   `_markFixPass`, `_applyMarkFix`, `_itemNeedsMarking`, `_markFixBatchItems`,
   `_markFixPrompt`, `hasWriting` in `SCAN_SYS` / `SCAN_MARK_RULE` /

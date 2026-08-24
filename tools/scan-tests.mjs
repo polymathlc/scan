@@ -138,6 +138,13 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     get report() { return _report; },
     MB_COL, MB_PAPER_COL, MB_IMG_PATH, MB_PAPER_MAX, MB_PAPER_DAYS, MB_VIEWER_PATH, MB_MAIL_COL,
     mbIsWrong, mbIsRight, mbFindByKey, MB_CLEAR_WINS, MB_KEY_PREFIX,
+    mbListOf, mbIsLearning, mbInList, mbCardChipHtml, mbSelectedIds, mbPickAll, mbSetTab,
+    MB_LIST_MISTAKE, MB_LIST_LEARNING,
+    mbAskText, mbAskWaUrl, mbAskRoute, _askCleanPixels, ASK_WA_NUMBER,
+    set mistakes(v) { _mistakes = v; },
+    get mistakes() { return _mistakes; },
+    get tab() { return _mbTab; },
+    set sel(v) { _mbSel = v; },
     mbKeyOf, mbHasKey, _mbBoxOk, _mbShotForPage, _mbPaperUrl, _mbPaperTitle,
     _mbCleanBlocks, _mbBuildShots, MB_BUILD_SYS, MB_FIG_MAX, MB_BLOCK_MAX, MB_BLOCK_CHARS,
     _mbInkLevel, _mbLumaHist, _mbInkProfile, _mbClearEdge, _mbTrimTextRows, _mbUnionBox,
@@ -1553,9 +1560,9 @@ ok('how many went in is said out loud',
    /new mistake' \+ \(added === 1 \? '' : 's'\) \+ ' kept/.test(html));
 ok('an account change drops the last account’s book',
    /mbForget\(\);/.test(html) && /stopTeachingNotes\(\);[\s\S]{0,200}mbForget\(\);/.test(html));
-ok('the chip is never drawn on a blank, and never on a typed answer',
+ok('the chip is never drawn on a typed answer, or while a run is still going',
    /function mbCardChipHtml[\s\S]{0,260}it\.kind !== 'page'/.test(html) &&
-   /function mbCardChipHtml[\s\S]{0,1400}if \(!mbIsWrong\(it\)\) return '';/.test(html));
+   /function mbCardChipHtml\(it\) \{\n  if \(!mbAvailable\(\) \|\| _scanning/.test(html));
 ok('the chip never prints', /class="ansSend noPrint"/.test(html));
 ok('a worksheet is capped', api.MB_PAPER_MAX >= 5 && /n > MB_PAPER_MAX/.test(html));
 
@@ -1591,7 +1598,7 @@ ok('the same question twice on one paper is scored ONCE',
    /if \(!key \|\| seen\[key\]\) continue;\s*\n\s*seen\[key\] = 1;/.test(html));
 ok('there is ONE pass over the run, not one per outcome',
    (html.match(/async function mbFileRun\(/g) || []).length === 1 &&
-   /async function mbFileRun[\s\S]{0,1800}else if \(mbIsWrong\(it\)\) \{\s*\n\s*if \(await mbSaveOne\(it\)\)/.test(html));
+   /async function mbFileRun[\s\S]{0,2200}else if \(mbIsWrong\(it\)\) \{\s*\n\s*if \(await mbSaveOne\(it, MB_LIST_MISTAKE\)\)/.test(html));
 
 /* Matching the re-done question back to the one in the book. Failing to match
    costs nothing; matching the WRONG one destroys a mistake the student still
@@ -2502,6 +2509,171 @@ ok('a correct one is not', api.mbIsWrong({ kind: 'page', marked: true, verdict: 
 ok('a blank is not a mistake', api.mbIsWrong({ kind: 'page', marked: false, verdict: '' }) === false);
 ok('the book is filled automatically at the end of every run, not on a button',
    /await mbFileRun\(run\);/.test(html));
+
+/* =====================================================================
+   📗 THE LEARNING LIST, and 💬 ASK MR CHUNG
+   ---------------------------------------------------------------------
+   Two lists in one collection, told apart by a field, because the shared
+   firestore.rules would fail a new subcollection CLOSED — reads empty, writes
+   denied, nothing on screen saying why. And a button that hands the question
+   to WhatsApp, where the only failure that matters is silent: a picture that
+   does not travel, or a message that does not say who is asking.
+   ===================================================================== */
+/* ---------- 📗 The learning list ---------- */
+ok('an entry with no list at all reads as a mistake — every entry written before this',
+   api.mbListOf({}) === api.MB_LIST_MISTAKE && api.mbIsLearning({}) === false);
+ok('a learning entry says so', api.mbIsLearning({ list: 'learning' }) === true);
+ok('anything else is a mistake, never a third list',
+   api.mbListOf({ list: 'nonsense' }) === api.MB_LIST_MISTAKE);
+ok('the two lists live in ONE collection, so no rules deploy is needed',
+   api.MB_COL === 'scanMistakes' && !/collection\('scanLearning'\)/.test(html));
+ok('a saved entry carries its list', /list: list,/.test(html) &&
+   /list = \(list === MB_LIST_LEARNING\) \? MB_LIST_LEARNING : MB_LIST_MISTAKE;/.test(html));
+
+/* The rule that makes the learning list a different thing from the mistake
+   book, and the one that is easiest to lose: it must NEVER empty itself. A
+   student put the question there knowing they could already do it, so
+   clearing it on a right answer deletes the list the moment it starts
+   working. */
+ok('a learning entry is never cleared by getting it right',
+   /async function mbNoteWin[\s\S]{0,420}if \(mbIsLearning\(entry\)\) return '';/.test(html));
+ok('…and keeps no streak to reset either',
+   /async function mbNoteMiss[\s\S]{0,200}if \(mbIsLearning\(entry\)\) return '';/.test(html));
+ok('…and a run does not REPORT it as moving towards clearing',
+   /if \(mbIsLearning\(entry\)\) \{ \/\* nothing to do \*\/ \}/.test(html));
+ok('the automatic filing still only ever writes to the MISTAKE book',
+   /mbSaveOne\(it, MB_LIST_MISTAKE\)/.test(html) &&
+   !/mbSaveOne\(it, MB_LIST_LEARNING\)/.test(html));
+
+/* EVERY question can now be kept, which is the whole point — until now the
+   only way into the book was to get something wrong. */
+api.user = { uid: 'u1', email: 'a@b.c' };
+api.mistakes = [];
+{
+  const correct = { kind: 'page', marked: true, verdict: 'correct', question: 'A question they got right' };
+  const blank   = { kind: 'page', marked: false, verdict: '', question: 'A question left blank' };
+  const wrong   = { kind: 'page', marked: true, verdict: 'wrong', question: 'A question they got wrong' };
+  [correct, blank, wrong].forEach(q => {
+    const h = api.mbCardChipHtml(q);
+    ok('a ' + (q.verdict || 'blank') + ' question offers BOTH lists',
+       /📕 Add to mistake book/.test(h) && /📗 Add to learning list/.test(h));
+  });
+  ok('a typed answer offers neither — it was never on a paper',
+     api.mbCardChipHtml({ kind: 'ask', question: 'x' }) === '');
+}
+/* Already in one list: it says WHICH, and offers no second copy. */
+{
+  const q = { kind: 'page', marked: true, verdict: 'correct', question: 'Kept to practise' };
+  api.mistakes = [{ id: 'x1', key: api.mbKeyOf(q), list: 'learning', streak: 0 }];
+  const h = api.mbCardChipHtml(q);
+  ok('a question already in the learning list says so, and offers no second copy',
+     /📗 In your learning list/.test(h) && !/Add to/.test(h));
+  /* …while a MISTAKE-book question answered correctly gets the streak chip
+     instead, because that list really does clear itself. The two must not be
+     swapped: telling a learning entry "2 more and it clears" is a promise it
+     never keeps. */
+  api.mistakes = [{ id: 'x1', key: api.mbKeyOf(q), list: 'mistake', streak: 0 }];
+  ok('…while a mistake-book question answered right is told how close it is to clearing',
+     /2 more and it clears/.test(api.mbCardChipHtml(q)));
+  api.mistakes = [{ id: 'x1', key: api.mbKeyOf(q), list: 'learning', streak: 0 }];
+  ok('…and a learning entry answered right is NOT — that list never clears',
+     !/more and it clears/.test(api.mbCardChipHtml(q)));
+  const blankQ = { kind: 'page', marked: false, verdict: '', question: 'Left blank, kept anyway' };
+  api.mistakes = [{ id: 'x2', key: api.mbKeyOf(blankQ), list: 'mistake', streak: 0 }];
+  ok('…and one sitting in the mistake book, not just answered, says which list it is in',
+     /📕 In your mistake book/.test(api.mbCardChipHtml(blankQ)));
+}
+
+/* The ticks drive one worksheet and one Remove button, so a row the student
+   cannot see must never be in them — the vetting list's own rule. */
+{
+  api.mistakes = [
+    { id: 'm1', list: 'mistake',  question: 'a' },
+    { id: 'm2', list: 'learning', question: 'b' },
+    { id: 'm3', list: 'mistake',  question: 'c' }
+  ];
+  ok('each tab shows only its own list',
+     api.mbInList('mistake').length === 2 && api.mbInList('learning').length === 1);
+  api.sel = { m1: true, m2: true, m3: true };
+  api.mbSetTab('mistake');
+  ok('switching tab clears the ticks rather than carrying them across',
+     api.mbSelectedIds().length === 0 && api.tab === 'mistake');
+  api.sel = { m1: true, m2: true };
+  ok('…and the ticks that ARE read are scoped to the tab on show',
+     api.mbSelectedIds().join() === 'm1');
+}
+
+/* ---------- 💬 Ask Mr Chung ---------- */
+ok('the number is the one asked for, in full international form',
+   api.ASK_WA_NUMBER === '6590223314');
+ok('…and it is a constant, not typed into the url',
+   /'https:\/\/wa\.me\/' \+ ASK_WA_NUMBER \+ '\?text='/.test(html));
+{
+  const m = { id: 'a1', level: 'p5', subject: 'math', number: '10(a)',
+              question: 'Express the total number of seashells in terms of x.' };
+  const t = api.mbAskText(m);
+  ok('the message asks the question it was written to ask', /could you help me with this question please/.test(t));
+  /* A picture arriving from an unknown number with "could you help me" is a
+     message the teacher cannot act on. */
+  ok('…and says WHO is asking', /a@b\.c|It is /.test(t));
+  ok('…and which question, so it can be found on the paper', /10\(a\)/.test(t));
+  const url = api.mbAskWaUrl(t);
+  ok('the url is a wa.me chat with the text already in it',
+     url.indexOf('https://wa.me/6590223314?text=') === 0 &&
+     decodeURIComponent(url.split('?text=')[1]).indexOf('Dear Mr Chung') === 0);
+  ok('a very long message is cut rather than making a url nothing will open',
+     api.mbAskWaUrl('x'.repeat(5000)).length < 5000);
+}
+/* The honest limit, written down: a page cannot attach a file to a wa.me
+   link, so the share sheet is the only route that really carries the picture
+   — and every device that cannot do it still gets the question through. */
+ok('the route is decided in ONE place, so the button can say which it is',
+   (html.match(/function mbAskRoute\(/g) || []).length === 1);
+ok('a device with no file sharing still sends the question, with a link to the picture',
+   /window\.open\(mbAskWaUrl\(text \+ \(m\.img \? '\\n' \+ m\.img : ''\)\)/.test(html));
+ok('a share the student cancelled is not reported as a failure',
+   /e\.name === 'AbortError'/.test(html));
+ok('the button is on every row of BOTH lists', /mbAskChung\(/.test(html) &&
+   /💬 Ask Mr Chung/.test(html));
+
+/* The clean-up is deterministic and all-or-nothing: half-cleaning a picture
+   is worse than leaving it alone, and a photograph of an experiment is the
+   case where flattening the highlights destroys what is being asked about. */
+{
+  const px = (n, f) => { const a = new Uint8ClampedArray(n * 4); for (let i = 0; i < n; i++) f(a, i * 4, i); return a; };
+  /* A photographed page: grey paper at ~205 with a bit of dark ink. */
+  const page = px(1000, (a, o, i) => {
+    const ink = i % 100 < 2;                     // 2% ink
+    a[o] = a[o + 1] = a[o + 2] = ink ? 40 : 200 + (i % 7);
+    a[o + 3] = 255;
+  });
+  ok('a photographed page is cleaned', api._askCleanPixels(page) === true);
+  ok('…and its background really goes to pure white',
+     page[20] === 255 && page[21] === 255 && page[22] === 255);   // pixel 5 is background
+  ok('…and the ink is left alone', page[0] === 40);               // pixel 0 is ink
+  /* A dark photograph is not a page and must be handed back untouched. */
+  const dark = px(1000, (a, o) => { a[o] = a[o + 1] = a[o + 2] = 60; a[o + 3] = 255; });
+  ok('a dark photograph is refused rather than half-cleaned', api._askCleanPixels(dark) === false);
+  /* No line work at all — a photo of an experiment, not a worksheet. */
+  const blank = px(1000, (a, o) => { a[o] = a[o + 1] = a[o + 2] = 250; a[o + 3] = 255; });
+  ok('a picture with nothing written on it is refused', api._askCleanPixels(blank) === false);
+  /* A pale wash of REAL colour is part of the drawing, never paper. */
+  const blue = px(1000, (a, o, i) => {
+    const ink = i % 100 < 2;
+    if (ink) { a[o] = a[o + 1] = a[o + 2] = 40; }
+    else { a[o] = 190; a[o + 1] = 205; a[o + 2] = 245; }   // pale blue water
+    a[o + 3] = 255;
+  });
+  api._askCleanPixels(blue);
+  ok('a pale wash of real colour survives — it is the drawing, not the page',
+     !(blue[0] === 255 && blue[1] === 255 && blue[2] === 255));
+}
+ok('a hole stays a hole', /if \(px\[i \+ 3\] < 60\) continue; {26}\/\/ a hole stays a hole/.test(html));
+ok('the clean-up is plain code, never an AI call',
+   !/askGemini[\s\S]{0,40}_askClean/.test(html) &&
+   /function _askCleanPixels[\s\S]{0,1600}return true;\n\}/.test(html));
+api.mistakes = [];
+api.user = null;
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);
