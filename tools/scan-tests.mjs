@@ -126,6 +126,8 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     _parseAIJson, _scanNewItem, _scanFoldRows, _scanStr, _scanPrompt, scanSubjectRule,
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
     _ansEditApply, _ansEditNote, _ansTrim, _ansNoteTitle, _ansOptionFrom,
+    _applyMarkFix, _itemNeedsMarking, _markFixBatchItems, _markFixPrompt,
+    SCAN_MARK_FIX_SYS, SCAN_MARK_FIX_CALLS, SCAN_MARK_FIX_MAX,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
     _reportMarkStr, reportScore, reportEligible, _reportPrompt, _reportNew, _reportRefs,
@@ -2330,6 +2332,149 @@ ok('…and it is hidden, never cleared — that would empty the box on every loa
    /if \(el\) el\.classList\.toggle\('hidden', !admin\);/.test(html));
 ok('the visibility is applied when the account changes',
    /applyVetVisibility\(\);\n  applyAiVisibility\(\);/.test(html));
+
+/* =====================================================================
+   ✍️ THE MARKING REPAIR PASS
+   ---------------------------------------------------------------------
+   Everything in this app hangs off ONE field: `marked` is `!!studentAnswer`,
+   and `marked` is what puts the verdict on the card, what the tally counts,
+   what the report is written from and what `mbFileRun` files in the mistake
+   book. So a question answered without transcribing what the student wrote
+   is not "missing its feedback" — it is never marked, never reported and
+   never kept, on a card that looks completely finished. It showed up on
+   maths first because a maths answer is faint pencil working rather than a
+   word in a blank.
+
+   Every failure here is silent in BOTH directions and the app carries on: too
+   timid and the marking simply never happens, which is the bug; too eager and
+   a repair call is paid for on every blank worksheet sent up to be answered,
+   which is the commonest use this app has.
+   ===================================================================== */
+/* ---------- The marking repair pass ---------- */
+
+/* The trigger. `hasWriting` is the model saying it can SEE handwriting, which
+   is a different claim from having read it — and the gap between the two is
+   the whole bug. */
+ok('a question with writing on it and nothing transcribed needs repair',
+   api._itemNeedsMarking({ kind: 'page', wrote: true, marked: false }) === true);
+ok('a question that really is blank NEVER does — a blank worksheet must stay one call',
+   api._itemNeedsMarking({ kind: 'page', wrote: false, marked: false }) === false);
+ok('…and a missing hasWriting reads as no writing rather than as a reason to spend',
+   api._markFields({ studentAnswer: '' }).wrote === false &&
+   api._itemNeedsMarking(Object.assign({ kind: 'page' }, api._markFields({ studentAnswer: '' }))) === false);
+ok('a properly marked question does not', 
+   api._itemNeedsMarking({ kind: 'page', wrote: true, marked: true, verdict: 'wrong' }) === false);
+/* The second half, and the easy one to miss: `_markFields` deliberately lets
+   a transcribed answer through with NO verdict, and `mbIsWrong`/`mbIsRight`
+   both want one — so it is filed in the mistake book by nothing at all. */
+ok('a written answer with no verdict needs repair — nothing files it in the book',
+   api._itemNeedsMarking({ kind: 'page', wrote: true, marked: true, verdict: '' }) === true &&
+   api.mbIsWrong({ kind: 'page', marked: true, verdict: '' }) === false &&
+   api.mbIsRight({ kind: 'page', marked: true, verdict: '' }) === false);
+ok('an answer to a typed question is never repaired — it had no page',
+   api._itemNeedsMarking({ kind: 'ask', wrote: true, marked: false }) === false);
+
+/* `hasWriting` has to survive the fold, or a question stitched across a batch
+   boundary loses the one signal that would have rescued it. */
+ok('hasWriting is read off the reply', api._markFields({ hasWriting: true, studentAnswer: '' }).wrote === true);
+{
+  const into = [];
+  api._scanFoldRows([{ number: '8', question: 'A question that runs on', answer: '5', hasWriting: false }], 0, 1, into);
+  api._scanFoldRows([{ continuation: true, question: 'and finishes here', answer: '5', hasWriting: true }], 1, 1, into);
+  ok('…and writing seen on EITHER half of a stitched question counts',
+     into.length === 1 && into[0].wrote === true);
+}
+
+/* The pages the repair call attaches are the batch's own, so an item from an
+   earlier batch must never be carried into it — it would be marked against a
+   page it is not printed on. */
+{
+  const all = [
+    { kind: 'page', page: 1, question: 'earlier batch' },
+    { kind: 'page', page: 4, question: 'this batch' },
+    { kind: 'page', page: 6, question: 'this batch too' },
+    { kind: 'page', page: 7, question: 'a later batch' },
+    { kind: 'ask', page: 0, question: 'typed, no page at all' }
+  ];
+  const mine = api._markFixBatchItems(all, 3, 3);   // pages 4, 5, 6
+  ok('only the questions printed on THIS batch go into the repair call',
+     mine.length === 2 && mine[0].page === 4 && mine[1].page === 6);
+}
+
+/* It may only ever ADD marking, and that is structural rather than something
+   the prompt asks for. */
+{
+  const it = { kind: 'page', wrote: true, marked: false, question: 'Q', answer: '7x + 12',
+               explanation: 'the working', verdict: '', marks: '', feedback: '', studentAnswer: '' };
+  const need = [true];
+  api._applyMarkFix([it], [{ i: 0, studentAnswer: '6x + 12', verdict: 'wrong', marks: '0/2', feedback: 'Check the 17.' }], need);
+  ok('a repair marks the question', it.marked === true && it.verdict === 'wrong' && it.studentAnswer === '6x + 12');
+  ok('…and cannot touch the question, the answer or the explanation',
+     it.question === 'Q' && it.answer === '7x + 12' && it.explanation === 'the working');
+  ok('…and what it marked wrong is what the mistake book then keeps', api.mbIsWrong(it) === true);
+}
+{
+  const it = { kind: 'page', wrote: true, marked: false, studentAnswer: '', verdict: '', marks: '', feedback: '' };
+  api._applyMarkFix([it], [{ i: 0, studentAnswer: '', verdict: 'wrong', feedback: 'no' }], [true]);
+  ok('a repair that agrees the question is untouched can never mark it wrong',
+     it.marked === false && it.verdict === '');
+}
+/* A second opinion is not a better one: a verdict that already worked must
+   not change under the student for no reason they can see. */
+{
+  const good = { kind: 'page', wrote: true, marked: true, verdict: 'correct', studentAnswer: '42', feedback: 'Well done.' };
+  api._applyMarkFix([good], [{ i: 0, studentAnswer: '4.2', verdict: 'wrong', feedback: 'no' }], [false]);
+  ok('a question that was already marked properly is left exactly as it was',
+     good.verdict === 'correct' && good.studentAnswer === '42');
+}
+{
+  const it = { kind: 'page', wrote: true, marked: false, studentAnswer: '', verdict: '', marks: '', feedback: '' };
+  api._applyMarkFix([it], [{ i: 9, studentAnswer: 'x', verdict: 'wrong' }], [true]);
+  ok('a row naming a question that is not in the batch is dropped, never applied to another',
+     it.marked === false);
+}
+
+/* The repair is told the answer is already settled: a call that re-answered
+   the paper would contradict the card it is being merged into. */
+ok('the repair prompt hands the correct answer over and says not to change it',
+   /do not change it/.test(api._markFixPrompt([{ number: '10(a)', question: 'Q', answer: '7x + 12', options: [] }])));
+ok('…and the system prompt forbids re-answering and asks for pencil',
+   /do not re-answer anything/.test(api.SCAN_MARK_FIX_SYS) &&
+   /LOOK FOR PENCIL/.test(api.SCAN_MARK_FIX_SYS));
+ok('…and refuses to mark a question nobody attempted',
+   /a cross on a question nobody attempted is the worst thing you can do here/.test(api.SCAN_MARK_FIX_SYS));
+
+/* Rationed per RUN, spent BEFORE the call, refilled in one place. Left
+   unbounded this is the loop that spends a term's tokens on one paper. */
+ok('the ration is bounded', api.SCAN_MARK_FIX_CALLS > 0 && api.SCAN_MARK_FIX_CALLS <= 3 && api.SCAN_MARK_FIX_MAX > 0);
+ok('…spent BEFORE the call, so a failure cannot buy another try',
+   /var need = mine\.map\(_itemNeedsMarking\);[\s\S]{0,180}_markFixLeft--;[\s\S]{0,600}await window\.askGemini\(_markFixPrompt/.test(html));
+ok('…and refilled once per run, beside the algebra one',
+   /_markFixLeft = SCAN_MARK_FIX_CALLS;/.test(html) &&
+   html.match(/_markFixLeft = SCAN_MARK_FIX_CALLS;/g).length === 2);
+ok('a reply that arrives after a newer run has started is dropped',
+   /if \(run !== _scanRun\) return;                \/\/ a newer run owns the answers now[\s\S]{0,300}_applyMarkFix/.test(html));
+/* It runs BEFORE the algebra rewrite, so feedback it has just written is
+   rewritten free of algebra too. */
+ok('the repair runs before the algebra rewrite',
+   html.indexOf('await _markFixPass(run, batch, start') < html.indexOf('await _algebraPass(run, _answers, Math.min(start'));
+
+/* The prompt has to ASK for the field, or the trigger can never fire. */
+ok('the reading prompt asks for hasWriting per question', /"hasWriting":true/.test(api.SCAN_SYS));
+ok('…and says it is about the paper, not about what it managed to read',
+   /EVEN IF you ' \+\s*'cannot read it/.test(html) || /EVEN IF you/.test(api.SCAN_MARK_RULE));
+ok('…and the maths standard says where a maths answer physically is',
+   /PENCIL WORKING in the working/.test(api.SCAN_SUBJECT_RULE.math) &&
+   /never report it as blank/.test(api.SCAN_SUBJECT_RULE.math));
+
+/* And the whole point of fixing the marking: the mistake book fills itself
+   from it. Wrong AND partial, automatically, on every run. */
+ok('a wrong answer is kept', api.mbIsWrong({ kind: 'page', marked: true, verdict: 'wrong' }) === true);
+ok('a PARTLY right answer is kept too', api.mbIsWrong({ kind: 'page', marked: true, verdict: 'partial' }) === true);
+ok('a correct one is not', api.mbIsWrong({ kind: 'page', marked: true, verdict: 'correct' }) === false);
+ok('a blank is not a mistake', api.mbIsWrong({ kind: 'page', marked: false, verdict: '' }) === false);
+ok('the book is filled automatically at the end of every run, not on a button',
+   /await mbFileRun\(run\);/.test(html));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

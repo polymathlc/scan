@@ -948,7 +948,80 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
 - **`_scanRun` is bumped on every run**, so a reply that arrives after the teacher has started again
   is dropped instead of landing among the new answers.
 
+## ✍️ What the student actually WROTE — the marking repair pass (v1.20.0)
+
+`SCAN_MARK_FIX_CALLS` / `SCAN_MARK_FIX_MAX` / `SCAN_MARK_FIX_SYS` /
+`_markFixPrompt` / `_applyMarkFix` / `_markFixBatchItems` / `_itemNeedsMarking`
+/ `_markFixPass` (search `WHAT THE STUDENT ACTUALLY WROTE`), plus
+`"hasWriting"` in `SCAN_SYS`, `SCAN_MARK_RULE` and `_markFields`.
+
+- **EVERYTHING IN THIS APP HANGS OFF ONE FIELD.** `_markFields` sets
+  `marked = !!studentAnswer`, and `marked` is what puts the verdict chip on the
+  card, what `markTally` counts, what `reportScore` is computed from and what
+  `mbFileRun` files in the mistake book. So a question the model answered
+  **without transcribing what the student wrote** is not "missing its
+  feedback": it was never marked, never reported and never kept — on a card
+  that looks completely finished, because the answer and the working are both
+  on it. **The two reported symptoms — "maths is not marked" and "wrong answers
+  are not going into the mistake list" — are ONE bug**, and fixing the first
+  fixes the second for free.
+- **It showed up on MATHS first for a reason.** A science or English answer is
+  written in pen on a ruled line and an MCQ is a bold tick; a maths answer is
+  faint grey pencil working in the working space with a number on the answer
+  line, rubbed out and written over, on a photograph. That is far easier to
+  read straight past — so `SCAN_SUBJECT_RULE.math` now says where a maths
+  answer physically IS, and that a page of sums with pencil on it has been
+  attempted however faint.
+- **ASKING IS NOT THE SAME AS READING, and separating the two is the trick.**
+  The reading call is asked, per question, whether there is ANY handwriting on
+  it (`hasWriting`) — a judgement about the PAPER, not about what it managed to
+  transcribe. A question that says yes and still comes back with an empty
+  `studentAnswer` is the model contradicting itself, and **that** is the
+  trigger. Nothing else spends a call: **a blank worksheet sent up to be
+  answered is the commonest use this app has and must stay a one-call read**,
+  so a paper with no writing on it never reaches the repair at all. A missing
+  `hasWriting` reads as "no writing", which is the side that spends nothing.
+- **The second half of the trigger is the easy one to miss.** `_markFields`
+  deliberately lets a transcribed answer through with **no verdict** ("half a
+  mark is better than silently dropping the student's work"), and `mbIsWrong` /
+  `mbIsRight` both want a verdict — so such a question is filed in the mistake
+  book by **nothing at all**, exactly as an untranscribed one is.
+  `_itemNeedsMarking` covers both.
+- **IT MAY ONLY EVER ADD MARKING, and that is STRUCTURAL** rather than
+  something the prompt asks for: `_applyMarkFix` writes the four marking fields
+  and nothing else, so a repair that misread the paper can cost the marking and
+  never the answer the student is reading. A blank still cannot be marked wrong
+  — the repaired fields go through `_markFields` like every other route.
+- **And only on the questions that NEEDED it** (`need`). The call is shown the
+  whole batch, because the pages are attached anyway and the surrounding
+  questions make the numbering read straight — but a question that came back
+  properly marked the first time is left exactly as it was. A second opinion is
+  not a better one, and a verdict that changes under the student for no reason
+  they can see is worse than the one it replaced.
+- **THE RATION IS PER RUN**, like the algebra rewrite's: `SCAN_MARK_FIX_CALLS`
+  (2) in total, spent **BEFORE** the call so a failure cannot buy another try,
+  refilled **once** in `runScan` and nowhere else. Left unbounded this is the
+  loop that quietly spends a term's tokens on one stubborn paper.
+- **It runs BEFORE `_algebraPass`**, so feedback the repair has just written is
+  rewritten free of algebra too.
+- **The pages it attaches are the batch's own** (`_markFixBatchItems`). An item
+  from an earlier batch carried into the call would be marked against a page it
+  is not printed on.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## House rules
+- After touching **the marking repair pass** (`SCAN_MARK_FIX_*`,
+  `_markFixPass`, `_applyMarkFix`, `_itemNeedsMarking`, `_markFixBatchItems`,
+  `_markFixPrompt`, `hasWriting` in `SCAN_SYS` / `SCAN_MARK_RULE` /
+  `_markFields`), run `node tools/scan-tests.mjs`. Both directions are silent
+  and the app carries on looking finished either way. Too timid and the
+  marking simply never happens — which is not a card missing its feedback, it
+  is a question that is never marked, never in the report and never in the
+  mistake book, because all three read `marked`. Too eager and a second vision
+  call is paid for on every blank worksheet sent up to be answered, which is
+  the commonest use this app has. And a repair that is allowed to overwrite a
+  verdict that already worked changes a mark under the student for no reason
+  they can see.
 - After touching **the grounding, the live notebook, the scan run or the vetting door**
   (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
   `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,

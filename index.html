@@ -1223,7 +1223,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.19.1';
+var APP_VERSION = 'v1.20.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2250,6 +2250,14 @@ var SCAN_MARK_RULE =
   'ALWAYS work the correct answer out YOURSELF FIRST, from the printed question alone, before you so much as ' +
   'weigh what is written there: a written answer is never evidence of anything and is often wrong — that is ' +
   'usually why the paper is being scanned. Only then compare the two. ' +
+  '"hasWriting" is TRUE when there is ANY handwriting of the student\'s on that question — a number, a word, ' +
+  'working in pencil, a crossing out, a circled or ticked option, a line drawn on a diagram — EVEN IF you ' +
+  'cannot read it or cannot tell what it is meant to be, and FALSE only where the question is genuinely ' +
+  'untouched. Answer it from the paper, not from whether you managed to transcribe anything. ' +
+  'LOOK FOR PENCIL. Most written work on these papers is faint grey pencil, often rubbed out and written ' +
+  'over, and it is easy to read straight past on a photograph — working in the working space, a number on ' +
+  'the answer line, a figure written into a table or a blank, a unit added after it. That IS the student\'s ' +
+  'answer and it has to be transcribed. ' +
   'Where the student HAS answered: "studentAnswer" is what they wrote, transcribed as it stands (say "unclear" ' +
   'where the handwriting genuinely cannot be read); "verdict" is exactly one of "correct", "partial" or "wrong" ' +
   '— "partial" for an answer that is right as far as it goes but is missing a required step, unit, keyword or ' +
@@ -2316,7 +2324,8 @@ var SCAN_SYS =
   'the question is still blank you ANSWER it. Reply with STRICT JSON only, no markdown, exactly ' +
   'this shape: {"questions":[{"continuation":false,"number":"16","page":1,"type":"mcq","question":"the printed ' +
   'wording","options":[{"label":"1","text":"…"}],"option":"2","answer":"(2) the option\'s wording",' +
-  '"explanation":"why this is the answer","studentAnswer":"what the student wrote, or an empty string",' +
+  '"explanation":"why this is the answer","hasWriting":true,' +
+  '"studentAnswer":"what the student wrote, or an empty string",' +
   '"verdict":"correct | partial | wrong, or an empty string when nothing was written",' +
   '"marks":"2/3 when the paper prints a mark allocation, otherwise an empty string",' +
   '"feedback":"what to say to the student about what they wrote, or an empty string",' +
@@ -2428,9 +2437,12 @@ var SCAN_SUBJECT_RULE = {
   math: 'Mathematics: give the working line by line with the numbers substituted in, and the final answer WITH its ' +
     'unit; a model or bar-model approach is described in words. Check the arithmetic back against the numbers ' +
     'printed on the page. ' + SCAN_NO_ALGEBRA_RULE +
-    'When marking, follow the student\'s own working and say which line it went wrong on: a ' +
-    'right method with one slip is "partial", and a right number with no working on a "show your working" ' +
-    'question is "partial" too.',
+    'When marking, a maths answer is almost never a word in a blank: it is PENCIL WORKING in the working ' +
+    'space and a number on the answer line, and BOTH count as the student having answered — transcribe the ' +
+    'final answer into "studentAnswer" and say in "feedback" which line the working went wrong on. A page ' +
+    'of sums with pencil on it has been attempted, however faint: never report it as blank. ' +
+    'A right method with one slip is "partial", and a right number with no working on a "show your ' +
+    'working" question is "partial" too.',
   english: 'English: comprehension answers are full sentences in the student\'s own words, lifting from the passage ' +
     'only where the question asks for evidence. For grammar, vocabulary, cloze, editing and synthesis give the ' +
     'exact word or form that belongs in the blank and name the rule behind it in the explanation. For a ' +
@@ -2939,6 +2951,12 @@ function _markFields(r) {
   var marked = !!studentAnswer;
   return {
     marked: marked,
+    // `wrote` is the model saying it can SEE handwriting on this question,
+    // which is a different claim from having managed to read it — and the
+    // difference between the two is exactly the failure the repair pass
+    // below exists to catch. It is only ever `true` when the model said so:
+    // a missing field reads as "no writing", which spends nothing.
+    wrote: (r && r.hasWriting) === true,
     studentAnswer: studentAnswer,
     // A written answer the model could not bring itself to judge still shows
     // as marked, with no verdict chip — half a mark is better than silently
@@ -3066,6 +3084,7 @@ function _askNewItem(r) {
     answer: answer,
     explanation: explanation,
     marked: mk.marked,
+    wrote: mk.wrote,
     studentAnswer: mk.studentAnswer,
     verdict: mk.verdict,
     marks: mk.marks,
@@ -3120,6 +3139,7 @@ function _scanNewItem(r, batchStart, batchLen) {
     answer: answer,
     explanation: _scanStr(r.explanation, 2400),
     marked: mk.marked,
+    wrote: mk.wrote,
     studentAnswer: mk.studentAnswer,
     verdict: mk.verdict,
     marks: mk.marks,
@@ -3160,6 +3180,7 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
       // that runs over the page, so the marking is merged rather than
       // replaced — but this half is the one that could see the whole question,
       // so where it judged anything, its judgement stands.
+      if (it.wrote) prev.wrote = true;
       if (it.marked) {
         prev.marked = true;
         if (it.studentAnswer) prev.studentAnswer = it.studentAnswer;
@@ -3274,6 +3295,170 @@ async function _algebraPass(run, all, done, total) {
   all.forEach(function (it) { it.algebra = _itemUsesAlgebra(it); });
 }
 
+/* =====================================================================
+   ✍️ WHAT THE STUDENT ACTUALLY WROTE — the marking repair pass
+   ---------------------------------------------------------------------
+   EVERYTHING IN THIS APP HANGS OFF ONE FIELD. `_markFields` sets
+   `marked = !!studentAnswer`, and `marked` is what puts the verdict chip on
+   the card, what the tally counts, what the report is written from and what
+   `mbFileRun` files in the mistake book. So a question the model answered
+   without transcribing what the student wrote is not "missing its feedback":
+   it is a question that was never marked, never reported and never kept —
+   and the card looks perfectly finished, because the answer and the working
+   are both on it. That is the bug this pass exists for, and it showed up on
+   MATHS first for a reason: a science or English answer is written in pen on
+   a ruled line, while a maths answer is faint pencil working in a working
+   space with a number on the answer line, which is far easier to read past.
+
+   ASKING IS NOT THE SAME AS READING, and separating the two is the whole
+   trick. The first call is told to say, per question, whether there is ANY
+   handwriting on it (`hasWriting`) — a judgement about the paper, not about
+   what it managed to transcribe. A question that says yes and still came
+   back with an empty `studentAnswer` is the model contradicting itself, and
+   THAT is the trigger. Nothing else spends a call: a blank worksheet sent up
+   to be answered is the commonest use of this app and it must stay a
+   one-call read, so a paper with no writing on it never reaches this at all.
+
+   IT IS RATIONED, and the ration is per RUN, exactly like the algebra
+   rewrite's: `SCAN_MARK_FIX_CALLS` in total, spent BEFORE the call so a
+   failure cannot buy another try, refilled once in `runScan` and nowhere
+   else. Left unbounded this is the loop that quietly spends a term's tokens
+   on one stubborn paper.
+
+   IT MAY ONLY EVER ADD MARKING, and that is STRUCTURAL rather than something
+   the prompt asks for: `_applyMarkFix` writes the four marking fields and
+   nothing else, so a second pass can never rewrite a question, an answer or
+   an explanation that has already been worked out and shown. A blank still
+   cannot be marked wrong, because the repaired fields go through
+   `_markFields` like every other route and `marked` is still `!!studentAnswer`.
+
+   WHILE THE CALL IS BEING PAID FOR, IT ASKS ABOUT THE WHOLE BATCH rather
+   than only the questions that tripped it: the pictures are already attached
+   and the pages are already being looked at, so one missed question rescues
+   every other question on its own pages for nothing.
+   ===================================================================== */
+var SCAN_MARK_FIX_CALLS = 2;     // repair calls a whole run may spend
+var SCAN_MARK_FIX_MAX = 14;      // questions carried in one of them
+var _markFixLeft = SCAN_MARK_FIX_CALLS;
+
+var SCAN_MARK_FIX_SYS =
+  'You are an experienced Singapore tuition teacher looking at photographs of a worksheet or exam paper that a ' +
+  'student has already written on. Your ONLY job is to read THEIR handwriting and mark it. The correct answers ' +
+  'have already been worked out and are given to you below — do not change them, do not re-answer anything, and ' +
+  'do not comment on any question the student has left alone.\n' +
+  'LOOK FOR PENCIL. Most of it is faint grey pencil, often rubbed out and written over: working in the working ' +
+  'space, a number on the answer line, a figure written into a table or a blank, a circled or ticked option, a ' +
+  'line drawn on a diagram. Read through a grey background, a shadow and a page curve. ' +
+  'Where the handwriting genuinely cannot be read, say "unclear" rather than inventing something.\n' +
+  'Reply with STRICT JSON only, no markdown, exactly this shape: ' +
+  '{"marks":[{"i":0,"studentAnswer":"what THEY wrote, transcribed as it stands, or an empty string if the ' +
+  'question really is untouched","verdict":"correct | partial | wrong, or an empty string when nothing was ' +
+  'written","marks":"2/3 when the paper prints a mark allocation for it, otherwise an empty string",' +
+  '"feedback":"1 to 3 sentences spoken TO THE STUDENT — what they got right, exactly where it went wrong and ' +
+  'what to do instead"}]}. ' +
+  'One entry per question given to you, "i" being the number printed against it. ' +
+  '"partial" is an answer that is right as far as it goes but is missing a required step, unit, keyword or one ' +
+  'part of a two-part question. Compare what they wrote against the correct answer given to you, never against ' +
+  'your own fresh attempt. Never be unkind; never be vague. ' +
+  'A question they really did leave blank comes back with all four fields empty — a cross on a question nobody ' +
+  'attempted is the worst thing you can do here. ' +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+function _markFixPrompt(items) {
+  return 'These ' + items.length + ' question' + (items.length === 1 ? ' is' : 's are') +
+    ' printed on the attached page' + (items.length === 1 ? '' : 's') +
+    '. For each one, read what the student has written on the paper and mark it.\n\n' +
+    items.map(function (it, i) {
+      return '#' + i + (it.number ? '  (printed as ' + _scanStr(it.number, 16) + ')' : '') +
+        '\nQUESTION: ' + _scanStr(it.question, 1200) +
+        (it.options && it.options.length
+          ? '\nOPTIONS: ' + it.options.map(function (o) { return '(' + o.label + ') ' + o.text; }).join('  ')
+          : '') +
+        '\nCORRECT ANSWER (already worked out — do not change it): ' + _scanStr(it.answer, 700);
+    }).join('\n\n');
+}
+
+/* Marking fields ONLY. Nothing here can reach the question, the answer or the
+   explanation, so a repair call that misunderstood the paper can cost the
+   marking and never the answer the student is reading.
+
+   AND ONLY ON THE QUESTIONS THAT NEEDED IT. The call is shown the whole
+   batch, because the pages are attached anyway and the surrounding questions
+   are what make the numbering read straight — but a question that came back
+   properly marked the first time is left exactly as it was. A second opinion
+   is not a better one, and silently flipping a verdict that already worked is
+   a mark the student saw change under them for no reason they can see. */
+function _applyMarkFix(items, rows, need) {
+  var fixed = 0;
+  (rows || []).forEach(function (r) {
+    var i = parseInt(r && r.i, 10);
+    if (!(i >= 0 && i < items.length)) return;
+    if (!need[i]) return;
+    var it = items[i];
+    var mk = _markFields(r);
+    if (!mk.marked) return;              // it agrees the question is untouched
+    it.marked = true;
+    it.studentAnswer = mk.studentAnswer;
+    it.verdict = mk.verdict;
+    it.marks = mk.marks;
+    it.feedback = mk.feedback;
+    fixed++;
+  });
+  return fixed;
+}
+
+/* The questions this batch's pictures actually show. The repair call attaches
+   THESE pages, so an item from an earlier batch must never be carried into it
+   — it would be marked against a page it is not printed on. */
+function _markFixBatchItems(all, batchStart, batchLen) {
+  return (all || []).filter(function (it) {
+    return it && it.kind === 'page' && it.page > batchStart && it.page <= batchStart + batchLen;
+  });
+}
+/* Writing the model can see and has not turned into a mark. Both halves
+   matter and the second is easy to miss: `_markFields` deliberately lets a
+   transcribed answer through with NO verdict ("half a mark is better than
+   silently dropping the student's work"), and such a question is filed in the
+   mistake book by nothing — `mbIsWrong` and `mbIsRight` both want a verdict —
+   so it falls out of the book exactly as an untranscribed one does. */
+function _itemNeedsMarking(it) {
+  return !!(it && it.kind === 'page' && it.wrote && (!it.marked || !it.verdict));
+}
+
+async function _markFixPass(run, batch, batchStart, all, done, total) {
+  if (_markFixLeft <= 0) return;
+  var mine = _markFixBatchItems(all, batchStart, batch.length);
+  if (!mine.some(_itemNeedsMarking)) return;     // nothing said it had writing on it
+  mine = mine.slice(0, SCAN_MARK_FIX_MAX);
+  var need = mine.map(_itemNeedsMarking);
+  if (!need.some(Boolean)) return;   // the ones that tripped it fell off the cap
+  _markFixLeft--;
+  scanProgress(done, total, '✍️ Reading what the student wrote on ' + mine.length +
+    ' question' + (mine.length === 1 ? '' : 's') + '…');
+  try {
+    var raw = await window.askGemini(_markFixPrompt(mine), {
+      // Grounded like every other call here — 'scan' carries the teacher's own
+      // marking standard, which is what these verdicts are held to.
+      system: SCAN_MARK_FIX_SYS + aiGrounding('scan'),
+      maxOutputTokens: 12000,
+      effort: 'high',
+      thinkingLevel: 'high',
+      temperature: 0.2,
+      json: true,
+      images: batch.map(function (s) { return { mimeType: s.mimeType, data: s.data }; })
+    });
+    if (run !== _scanRun) return;                // a newer run owns the answers now
+    var parsed = _parseAIJson(raw);
+    var rows = Array.isArray(parsed) ? parsed
+      : ((parsed && Array.isArray(parsed.marks)) ? parsed.marks : []);
+    _applyMarkFix(mine, rows, need);
+  } catch (err) {
+    // A failed repair must never sink the run: the answers are already on the
+    // cards and are worth having with or without the marking beside them.
+    console.warn('marking repair failed', err);
+  }
+}
+
 /* ---- The pages, batch by batch ----
    Unchanged by the ask except that the ask goes in the prompt: it may narrow
    the run to one question, or add nothing but context, and either way the
@@ -3327,8 +3512,14 @@ async function _runPages(run, shots, ask, detail, failedPages) {
     if (run !== _scanRun) return;
 
     var madeOn = _scanFoldRows(rows, start, batch.length, _answers);
-    // Before a word of this batch reaches the screen: anything that reached
-    // its answer by algebra is rewritten, while the run's ration lasts.
+    // A question the model says was WRITTEN ON and still came back with
+    // nothing transcribed is read again, while the run's ration lasts — it
+    // would otherwise be a question that is never marked, never reported and
+    // never kept in the mistake book, on a card that looks finished.
+    await _markFixPass(run, batch, start, _answers, Math.min(start + batch.length, total), total);
+    if (run !== _scanRun) return;
+    // Then anything that reached its answer by algebra is rewritten — after
+    // the repair, so feedback the repair has just written goes through it too.
     await _algebraPass(run, _answers, Math.min(start + batch.length, total), total);
     if (run !== _scanRun) return;
     batch.forEach(function (s, k) {
@@ -3402,6 +3593,7 @@ async function runScan() {
   var run = ++_scanRun;
   _scanning = true;
   _algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS;   // a fresh ration, once, per run
+  _markFixLeft = SCAN_MARK_FIX_CALLS;         // and the same for the marking repair
   _answers = [];
   _report = null;                 // last paper's report must never outlive its paper
   _askedFor = ask;
