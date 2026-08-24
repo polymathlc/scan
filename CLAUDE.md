@@ -1080,15 +1080,42 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
 - **Nothing is sent in the background.** The button opens the share sheet or
   the chat; the student presses send. A share they cancelled (`AbortError`) is
   not reported as a failure.
-- **The clean-up is DETERMINISTIC and free — no AI call.** It is the
-  white-point clamp a scanner driver does, on the same statistic `_mbInkLevel`
-  already reads: the paper's own white as the 98th percentile of the luma,
-  with everything within `ASK_CLEAN_DEPTH` of it and low in chroma snapped to
-  pure white. **All-or-nothing**, like the Portal's paper clean — half-cleaning
-  a picture is worse than leaving it alone, and a photograph of an experiment
-  (bright, no line work) is exactly where flattening the highlights destroys
-  what is being asked about. Every refusal hands the picture back untouched, and
-  so does a tainted canvas.
+- **CROP ONLY. DO NOT CLEAN** (v1.24.0). The crop goes as it came off the
+  photograph and IN COLOUR. Cleaning a scanned page is not reliably an
+  improvement, and it went wrong in the one way that matters: the clamp reads
+  "near the paper's white" as paper, and **a student's own pencil working is
+  near the paper's white**. A page at 205 with pencil at 175 had every stroke
+  of that working snapped to pure white while the printed text, being far
+  darker, came through untouched — so the picture that reached the teacher was
+  the question with the child's work rubbed off it, which is the one thing he
+  needed to see.
+  - **`_askHasWorking` is the switch**, and it is already on the entry: a
+    question that was MARKED is a question the student wrote on. With nothing
+    written there is no clean at all (`_askClean(url, false)` hands the url
+    straight back).
+  - **When it does run it is a SHALLOW, COLOUR-PRESERVING lift.**
+    `ASK_CLEAN_DEPTH` is 16, not 46 — a narrow band just under the paper's own
+    white, so anything with any body to it is below the floor and is never
+    touched. Pencil at 175 under paper at 205 is thirty units down: at the old
+    depth it was inside the band and was erased, at this one it is ink.
+  - **NOTHING TOUCHING A STROKE IS EVER WHITENED** (`nearInk`). Every stroke
+    has an anti-aliased skirt a shade lighter than its core, and that skirt
+    sits inside the band — whiten it and the working is not erased but THINNED,
+    which on faint pencil is most of the way to erased. Ink is marked first and
+    its neighbours are spared, so edges are protected **by construction**
+    rather than by a threshold that happens to miss them.
+  - **A SHADOW refuses the whole pass** (`ASK_CLEAN_BAND_MAX`). A gradient puts
+    real paper on both sides of the floor — lifted where it is bright,
+    untouched where it is dark — which comes out patchy, so the crop goes as it
+    is. `ASK_CLEAN_BG_NOISE` is what keeps that from refusing every page:
+    ordinary paper varies by a few luma units and that is not a shadow. In
+    practice most photographs take this branch, which is exactly what "crop
+    only" means.
+  - **Colour survives** (`ASK_CLEAN_CHROMA`): a blue pen, a highlighter and a
+    pale wash of water are all part of what is being asked about.
+  - Still **all-or-nothing** and still no AI call, so the same picture always
+    goes out the same way. Every refusal hands it back untouched, and so does a
+    tainted canvas.
 
 ### 🖨 …and the picture is the question SET OUT AS A WORKSHEET (v1.23.0)
 
@@ -1142,7 +1169,8 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   `mbListOf`, `mbIsLearning`, `mbInList`, `mbSetTab`, `mbSelectedIds`,
   `mbCardChipHtml`, `mbCardLearnClick`, `mbNoteWin`/`mbNoteMiss`'s learning
   guards, `ASK_WA_NUMBER`, `mbAskText`, `mbAskWaUrl`, `mbAskRoute`,
-  `_askCleanPixels`, `_askTier`, `_askPictureOptions`, `askSheetFor`), run
+  `_askCleanPixels`, `_askHasWorking`, `ASK_CLEAN_DEPTH`, `ASK_CLEAN_BAND_MAX`,
+  `_askTier`, `_askPictureOptions`, `askSheetFor`), run
   `node tools/scan-tests.mjs` — and after touching the sheet's LAYOUT run
   `node tools/ask-sheet-render.mjs` and LOOK at what it writes, because a sheet
   that renders is not the same as one that reads. Every failure is silent.
@@ -1152,7 +1180,10 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   deletes a question the student cannot see. A message that stops naming who is
   asking reaches the teacher as a picture from an unknown number. And the
   clean-up going from all-or-nothing to half-applied flattens a photograph of
-  an experiment into a white plate while looking perfectly clean.
+  an experiment into a white plate while looking perfectly clean. And a band
+  that goes deep again, or a `nearInk` guard that goes away, rubs the child's
+  own pencil working off the picture and sends the teacher the question with
+  the work removed — which is the one thing he was being asked to look at.
 - After touching **the marking repair pass** (`SCAN_MARK_FIX_*`,
   `_markFixPass`, `_applyMarkFix`, `_itemNeedsMarking`, `_markFixBatchItems`,
   `_markFixPrompt`, `hasWriting` in `SCAN_SYS` / `SCAN_MARK_RULE` /

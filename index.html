@@ -1264,7 +1264,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.23.0';
+var APP_VERSION = 'v1.24.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -6367,7 +6367,7 @@ async function askSheetFor(m) {
       }
     } else if (m.img) {
       var raw = await _askFetchDataUrl(m.img);
-      var cleaned = await _askClean(raw);
+      var cleaned = await _askClean(raw, _askHasWorking(m));
       figs.__main = await _askLoadImage(cleaned || raw);
     }
     /* A 'built' sheet with not one figure drawn is still the whole question —
@@ -6388,26 +6388,55 @@ async function askSheetFor(m) {
 
 var ASK_WA_NUMBER = '6590223314';        // Mr Chung, in full international form
 var ASK_WA_MAX_CHARS = 900;              // wa.me refuses a very long ?text=
-/* The clean-up is the white-point clamp a scanner driver does, and it is the
-   same statistic `_mbInkLevel` already reads off the page: the paper's own
-   white as the 98th percentile of the luma. Everything within
-   ASK_CLEAN_DEPTH of it and low in colour is snapped to pure white, which
-   takes out the grey of a photographed page, a shadow gradient and the
-   show-through from the back of the sheet. It is DETERMINISTIC and free — no
-   AI call — so the same picture always goes out the same way. */
-var ASK_CLEAN_DEPTH = 46;                // luma units below white that count as paper
+/* ---- CROP ONLY. DO NOT CLEAN. ----
+   The crop is what gets sent, as it came off the photograph and IN COLOUR.
+   Cleaning a scanned page is not reliably an improvement and it went wrong in
+   the one way that matters: the clamp below reads "near the paper's white" as
+   paper, and **a student's own pencil working is near the paper's white** — a
+   photographed page at 205 with pencil at 175 had every stroke of that
+   working snapped to pure white while the printed text, being far darker,
+   came through untouched. The picture that reached the teacher was the
+   question with the child's work rubbed off it, which is the one thing he
+   needed to see.
+
+   So the clean-up is OFF unless there is working on the picture, and when it
+   does run it is a SHALLOW, COLOUR-PRESERVING lift rather than a flattening:
+   `ASK_CLEAN_DEPTH` is a narrow band just under the paper's own white, so
+   anything with any body to it — printed line work and faint pencil alike —
+   is below the floor and is never touched. Colour was always preserved
+   (`ASK_CLEAN_CHROMA`) and still is: a pencil line, a blue pen and a
+   highlighter all have to survive.
+
+   IT IS DETERMINISTIC AND FREE — no AI call — so the same picture always goes
+   out the same way. */
+var ASK_CLEAN_DEPTH = 16;                // a NARROW band under the paper's white — see above
 var ASK_CLEAN_CHROMA = 26;               // a real colour is part of the drawing, never paper
 var ASK_CLEAN_WHITE_MIN = 120;           // too dark to be a photograph OF paper at all
 var ASK_CLEAN_BG_MIN = 0.55;             // most of it has to be background
 var ASK_CLEAN_INK_MIN = 0.004;           // and there has to be something written on it
+/* The guard against a SHADOW. A photographed page is rarely evenly lit, and a
+   gradient puts real paper on both sides of the floor — lifted where it is
+   bright, untouched where it is dark, which comes out patchy. So if a real
+   share of the picture sits inside the band, the band is not one flat paper
+   colour and the whole pass is refused: the crop goes as it is.
+   `ASK_CLEAN_BG_NOISE` is what keeps that from refusing every page — ordinary
+   paper varies by a few luma units, and that variation is not a shadow. */
+var ASK_CLEAN_BAND_MAX = 0.02;
+var ASK_CLEAN_BG_NOISE = 12;
 var ASK_CLEAN_MAX_SIDE = 1600;
+
+/* Working on it is what turns the clean-up ON, and the answer is already on
+   the entry: a question that was MARKED is a question the student wrote on. */
+function _askHasWorking(m) {
+  return !!(m && (m.studentAnswer || m.verdict));
+}
 
 /* All-or-nothing, exactly like the Portal's own paper clean. Half-cleaning a
    picture is worse than leaving it alone, and a photograph of an experiment —
    bright, and with no line work — is the case where flattening the highlights
    destroys the very thing being asked about. Any refusal hands the picture
    back untouched. */
-function _askCleanPixels(px) {
+function _askCleanPixels(px, w) {
   var i, hist = new Array(256), total = 0;
   for (i = 0; i < 256; i++) hist[i] = 0;
   for (i = 0; i + 3 < px.length; i += 4) {
@@ -6426,8 +6455,35 @@ function _askCleanPixels(px) {
   for (i = 0; i < Math.max(0, white * 0.55); i++) ink += hist[i];
   if (bg / total < ASK_CLEAN_BG_MIN) return false;        // no page to clean
   if (ink / total < ASK_CLEAN_INK_MIN) return false;      // no line work to protect
-  for (i = 0; i + 3 < px.length; i += 4) {
+  var band = 0;
+  for (i = Math.max(0, floor); i < Math.max(0, white - ASK_CLEAN_BG_NOISE); i++) band += hist[i];
+  if (band / total > ASK_CLEAN_BAND_MAX) return false;    // a shadow, not one flat paper colour
+  /* NOTHING TOUCHING A STROKE IS EVER WHITENED. Every stroke — printed or
+     pencilled — has an anti-aliased skirt a shade lighter than its core, and
+     that skirt sits inside the band. Whiten it and the working is not erased
+     but THINNED, which on faint pencil is most of the way to erased. So ink
+     is marked first and its immediate neighbours are spared, which protects
+     every edge by construction rather than by choosing a threshold that
+     happens to miss them. */
+  var n = px.length >> 2, ink = new Uint8Array(n), j;
+  for (j = 0; j < n; j++) {
+    i = j << 2;
+    if (px[i + 3] < 60) continue;
+    if (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114 < floor) ink[j] = 1;
+  }
+  function nearInk(k) {
+    if (ink[k]) return true;
+    var y = (k / w) | 0, x = k - y * w;
+    if (x > 0 && ink[k - 1]) return true;
+    if (x < w - 1 && ink[k + 1]) return true;
+    if (k >= w && ink[k - w]) return true;
+    if (k + w < n && ink[k + w]) return true;
+    return false;
+  }
+  for (j = 0; j < n; j++) {
+    i = j << 2;
     if (px[i + 3] < 60) continue;                          // a hole stays a hole
+    if (nearInk(j)) continue;                              // the stroke and its own edge
     var r = px[i], g = px[i + 1], b = px[i + 2];
     var lum = r * 0.299 + g * 0.587 + b * 0.114;
     if (lum < floor) continue;
@@ -6437,7 +6493,10 @@ function _askCleanPixels(px) {
   }
   return true;
 }
-function _askClean(dataUrl) {
+/* `on` is the whole policy: with nothing written on the picture there is no
+   clean at all and the crop is sent exactly as it was cut out. */
+function _askClean(dataUrl, on) {
+  if (!on) return Promise.resolve(dataUrl);
   return new Promise(function (resolve) {
     var img = new Image();
     img.onload = function () {
@@ -6449,7 +6508,7 @@ function _askClean(dataUrl) {
         var ctx = c.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
         var d = ctx.getImageData(0, 0, w, h);
-        if (!_askCleanPixels(d.data)) { resolve(dataUrl); return; }
+        if (!_askCleanPixels(d.data, w)) { resolve(dataUrl); return; }
         ctx.putImageData(d, 0, 0);
         resolve(c.toDataURL('image/jpeg', 0.92));
       } catch (e) { resolve(dataUrl); }      // a tainted canvas is not a reason to send nothing
@@ -6521,7 +6580,7 @@ async function mbAskChung(id) {
     var pic = await askSheetFor(m);
     if (!pic && m.img) {
       var raw = await _askFetchDataUrl(m.img);
-      pic = await _askClean(raw);
+      pic = await _askClean(raw, _askHasWorking(m));
     }
 
     // The share sheet, with the picture really attached.

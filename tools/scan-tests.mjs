@@ -140,7 +140,8 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     mbIsWrong, mbIsRight, mbFindByKey, MB_CLEAR_WINS, MB_KEY_PREFIX,
     mbListOf, mbIsLearning, mbInList, mbCardChipHtml, mbSelectedIds, mbPickAll, mbSetTab,
     MB_LIST_MISTAKE, MB_LIST_LEARNING,
-    mbAskText, mbAskWaUrl, mbAskRoute, _askCleanPixels, ASK_WA_NUMBER,
+    mbAskText, mbAskWaUrl, mbAskRoute, _askCleanPixels, _askHasWorking,
+    ASK_WA_NUMBER, ASK_CLEAN_DEPTH, ASK_CLEAN_BAND_MAX,
     _askTier, _askPictureOptions, _askWrap, ASK_SHEET_W, ASK_SHEET_MAX_H,
     set mistakes(v) { _mistakes = v; },
     get mistakes() { return _mistakes; },
@@ -2639,42 +2640,90 @@ ok('a share the student cancelled is not reported as a failure',
 ok('the button is on every row of BOTH lists', /mbAskChung\(/.test(html) &&
    /💬 Ask Mr Chung/.test(html));
 
-/* The clean-up is deterministic and all-or-nothing: half-cleaning a picture
-   is worse than leaving it alone, and a photograph of an experiment is the
-   case where flattening the highlights destroys what is being asked about. */
+/* ---------- CROP ONLY. DO NOT CLEAN. ----------
+   Cleaning a scanned page is not reliably an improvement, and it went wrong
+   in the one way that matters: the clamp reads "near the paper's white" as
+   paper, and a student's own PENCIL WORKING is near the paper's white. A page
+   at 205 with pencil at 175 had every stroke of that working snapped to pure
+   white while the printed text, being far darker, came through untouched —
+   so the picture that reached the teacher was the question with the child's
+   work rubbed off it, which is the one thing he needed to see.
+
+   So it is OFF unless there is working on the picture, and when it does run
+   it is a shallow, colour-preserving lift that provably keeps the working. */
+ok('nothing written on it means no clean at all — the crop goes as it was cut',
+   /function _askClean\(dataUrl, on\) \{\s*\n\s*if \(!on\) return Promise\.resolve\(dataUrl\);/.test(html));
+ok('…and working on it is what turns it on',
+   api._askHasWorking({ studentAnswer: '7x + 12' }) === true &&
+   api._askHasWorking({ verdict: 'wrong' }) === true &&
+   api._askHasWorking({}) === false);
+ok('…read at both call sites, never assumed',
+   (html.match(/_askClean\(raw, _askHasWorking\(m\)\)/g) || []).length === 2);
+ok('the band is NARROW — the deep one is what erased the pencil',
+   api.ASK_CLEAN_DEPTH <= 20);
+
 {
   const px = (n, f) => { const a = new Uint8ClampedArray(n * 4); for (let i = 0; i < n; i++) f(a, i * 4, i); return a; };
+  const W = 40;                                   // the rows the neighbour test walks
   /* A photographed page: grey paper at ~205 with a bit of dark ink. */
   const page = px(1000, (a, o, i) => {
     const ink = i % 100 < 2;                     // 2% ink
     a[o] = a[o + 1] = a[o + 2] = ink ? 40 : 200 + (i % 7);
     a[o + 3] = 255;
   });
-  ok('a photographed page is cleaned', api._askCleanPixels(page) === true);
+  ok('a flat page with working on it is still lifted', api._askCleanPixels(page, W) === true);
   ok('…and its background really goes to pure white',
-     page[20] === 255 && page[21] === 255 && page[22] === 255);   // pixel 5 is background
+     page[4 * 20] === 255 && page[4 * 20 + 1] === 255);          // pixel 20 is background
   ok('…and the ink is left alone', page[0] === 40);               // pixel 0 is ink
+
+  /* THE ONE THAT MATTERS. Faint pencil sits just under the paper's white, so
+     a deep band eats it. Not one pencil pixel may be whitened. */
+  const pencil = px(2000, (a, o, i) => {
+    const printed = i % 200 < 2;                  // dark printed text
+    const pencilled = i % 200 >= 100 && i % 200 < 112;   // faint working
+    a[o] = a[o + 1] = a[o + 2] = printed ? 45 : (pencilled ? 175 : 205);
+    a[o + 3] = 255;
+  });
+  const before = pencil.filter((v, k) => k % 4 === 0 && v > 150 && v < 195).length;
+  api._askCleanPixels(pencil, W);
+  const after = pencil.filter((v, k) => k % 4 === 0 && v > 150 && v < 195).length;
+  ok('a page with pencil working on it never loses a stroke of it', after === before, before + ' → ' + after);
+
+  /* A shadow gradient is most real photographs, and it puts a real share of
+     the picture inside the band — which is not paper, so the whole pass is
+     refused and the crop goes as it is. */
+  const shadow = px(4000, (a, o, i) => {
+    const ink = i % 400 < 3;
+    a[o] = a[o + 1] = a[o + 2] = ink ? 45 : Math.round(212 - (i / 4000) * 26);
+    a[o + 3] = 255;
+  });
+  ok('a page with a shadow across it is refused — cleaning it is guesswork',
+     api._askCleanPixels(shadow, W) === false);
+
   /* A dark photograph is not a page and must be handed back untouched. */
   const dark = px(1000, (a, o) => { a[o] = a[o + 1] = a[o + 2] = 60; a[o + 3] = 255; });
-  ok('a dark photograph is refused rather than half-cleaned', api._askCleanPixels(dark) === false);
+  ok('a dark photograph is refused rather than half-cleaned', api._askCleanPixels(dark, W) === false);
   /* No line work at all — a photo of an experiment, not a worksheet. */
   const blank = px(1000, (a, o) => { a[o] = a[o + 1] = a[o + 2] = 250; a[o + 3] = 255; });
-  ok('a picture with nothing written on it is refused', api._askCleanPixels(blank) === false);
-  /* A pale wash of REAL colour is part of the drawing, never paper. */
+  ok('a picture with nothing written on it is refused', api._askCleanPixels(blank, W) === false);
+  /* COLOUR SURVIVES — a blue pen, a highlighter, a pale wash of water are all
+     part of what is being asked about. */
   const blue = px(1000, (a, o, i) => {
     const ink = i % 100 < 2;
     if (ink) { a[o] = a[o + 1] = a[o + 2] = 40; }
     else { a[o] = 190; a[o + 1] = 205; a[o + 2] = 245; }   // pale blue water
     a[o + 3] = 255;
   });
-  api._askCleanPixels(blue);
+  api._askCleanPixels(blue, W);
   ok('a pale wash of real colour survives — it is the drawing, not the page',
      !(blue[0] === 255 && blue[1] === 255 && blue[2] === 255));
 }
+ok('a stroke and its own anti-aliased edge are spared by construction',
+   /if \(nearInk\(j\)\) continue;/.test(html));
 ok('a hole stays a hole', /if \(px\[i \+ 3\] < 60\) continue; {26}\/\/ a hole stays a hole/.test(html));
 ok('the clean-up is plain code, never an AI call',
    !/askGemini[\s\S]{0,40}_askClean/.test(html) &&
-   /function _askCleanPixels[\s\S]{0,1600}return true;\n\}/.test(html));
+   /function _askCleanPixels[\s\S]{0,3200}return true;\n\}/.test(html));
 api.mistakes = [];
 api.user = null;
 
