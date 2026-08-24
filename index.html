@@ -1264,7 +1264,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.22.0';
+var APP_VERSION = 'v1.23.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -6111,6 +6111,281 @@ async function mbRemovePicked() {
    themselves.
    ===================================================================== */
 
+/* =====================================================================
+   🖨 THE QUESTION, SET OUT AS A WORKSHEET — what actually gets sent
+   ---------------------------------------------------------------------
+   A crop off a photograph is the question as it really was, and it is the
+   wrong thing to send a teacher on a phone: grey paper, the student's own
+   pencil still on it, skewed, and 9pt print shrunk into a chat bubble. The
+   app already holds something better — `blocks`, the rapid-add reproduction
+   made when the question was filed: the wording read off the page as text
+   with each figure cropped and placed where it belongs. So the picture that
+   goes to WhatsApp is that question TYPESET, laid out exactly as the CER
+   app's own "try again" worksheet lays it out.
+
+   IT IS DRAWN ON A CANVAS, not rendered from HTML. There is no library here,
+   and the two library-free ways of turning markup into a picture both fail on
+   exactly this input: `foreignObject` taints the canvas the moment a figure
+   comes from Storage, and a screenshot API does not exist in a page. Drawing
+   is more code and it is predictable — the same question always comes out the
+   same, on every phone, with no fonts to embed and nothing to taint.
+
+   THE THREE TIERS ARE THE VIEWER'S OWN (`_askTier` mirrors cer/mistakes.html
+   `tierOf`), and they must stay in step or the sheet a student is sent stops
+   matching the sheet they get back on paper:
+     • built — the reproduction: wording typeset, figures in place, the
+       options printed underneath (the blocks deliberately leave them out),
+       and the full working box.
+     • whole — the crop IS the whole question, wording and options and all, so
+       nothing is printed twice and it gets the SHORT box.
+     • flat  — the transcription, with the figure beside it.
+
+   EVERY FAILURE FALLS BACK RATHER THAN STOPPING. A figure that will not load
+   is left out and the wording still asks the question; a sheet that cannot be
+   drawn at all hands back to the cleaned crop, which is what was sent before
+   this existed.
+   ===================================================================== */
+
+var ASK_SHEET_W = 1240;              // px — A4 proportions at about 150dpi
+var ASK_SHEET_PAD = 76;
+var ASK_SHEET_MAX_H = 3600;          // a very long question is still ONE picture
+var ASK_SHEET_FIG_MAX_H = 620;
+var ASK_SHEET_FONT = "'Segoe UI', Roboto, -apple-system, Helvetica, Arial, sans-serif";
+var ASK_INK = '#1A1A1A', ASK_INK_SOFT = '#55554F', ASK_INK_FAINT = '#8A8A84', ASK_LINE = '#ECECEA';
+
+function _askTier(m) {
+  if (Array.isArray(m.blocks) && m.blocks.length) return 'built';
+  if (m.img && m.shot === 'question') return 'whole';
+  return 'flat';
+}
+/* The word list must not be printed under a picture that already carries the
+   choices — four empty brackets under the options themselves reads as a fault
+   in the sheet. The same `role: 'options'` contract the viewer reads. */
+function _askPictureOptions(blocks) {
+  return (blocks || []).some(function (b) { return b && b.type === 'image' && b.role === 'options' && b.url; });
+}
+
+function _askLoadImage(src) {
+  return new Promise(function (resolve) {
+    if (!src) { resolve(null); return; }
+    var img = new Image();
+    img.onload = function () { resolve(img); };
+    img.onerror = function () { resolve(null); };
+    img.crossOrigin = 'anonymous';
+    img.src = src;
+  });
+}
+/* Storage URLs are fetched to a data url first: an <img> drawn straight from
+   a cross-origin URL taints the canvas, and a tainted canvas cannot be read
+   back — which is the whole point of drawing it. A fetch that fails resolves
+   to the url anyway, so `_askLoadImage` gets its own chance before we give up
+   on that figure. */
+async function _askFetchDataUrl(url) {
+  try {
+    var res = await fetch(url, { mode: 'cors' });
+    var blob = await res.blob();
+    return await new Promise(function (ok, no) {
+      var fr = new FileReader();
+      fr.onload = function () { ok(String(fr.result)); };
+      fr.onerror = no;
+      fr.readAsDataURL(blob);
+    });
+  } catch (e) { return url; }
+}
+
+function _askWrap(ctx, text, maxW) {
+  var out = [];
+  String(text == null ? '' : text).split(/\n/).forEach(function (para) {
+    var words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) { out.push(''); return; }
+    var line = '';
+    words.forEach(function (w) {
+      var next = line ? line + ' ' + w : w;
+      if (ctx.measureText(next).width <= maxW || !line) { line = next; return; }
+      out.push(line);
+      line = w;
+    });
+    if (line) out.push(line);
+  });
+  return out;
+}
+
+/* Laid out first, drawn second, because the canvas has to be made at the
+   right height before a pixel goes on it. Each entry knows how tall it is. */
+function _askLayout(ctx, m, tier, figs) {
+  var innerW = ASK_SHEET_W - ASK_SHEET_PAD * 2;
+  var items = [], H = ASK_SHEET_PAD;
+  function text(str, font, size, colour, lead, gapAfter) {
+    ctx.font = font;
+    var lines = _askWrap(ctx, str, innerW);
+    items.push({ t: 'text', lines: lines, font: font, colour: colour, lead: lead, y: H });
+    H += lines.length * lead + (gapAfter || 0);
+  }
+  function gap(n) { H += n; }
+  function rule(colour, w, after) { items.push({ t: 'rule', y: H, colour: colour, w: w }); H += (w || 1) + (after || 0); }
+
+  // ---- the sheet head, word for word the viewer's own ----
+  var bits = [];
+  if (m.level) bits.push(levelLabel(m.level) || m.level);
+  if (m.subject) bits.push(subjectLabel(m.subject) || m.subject);
+  text(bits.join(' ') + (bits.length ? ' — a question to go through' : 'A question to go through'),
+       '700 34px ' + ASK_SHEET_FONT, 34, ASK_INK, 44, 10);
+  text('Polymath Learning Centre · sent from Scan & Answer', '400 19px ' + ASK_SHEET_FONT, 19, ASK_INK_SOFT, 27, 16);
+  rule(ASK_INK, 3, 26);
+
+  /* The question head, the viewer's own two runs: the number in bold and the
+     paper's own number beside it small and grey (.qNum + .qMeta). One bold
+     run for both would read as part of the question. */
+  items.push({ t: 'head', y: H, num: '1.', meta: m.number ? 'was question ' + m.number : '' });
+  H += 32 + 14;
+
+  var opts = (m.options || []).filter(function (o) { return o && (o.label || o.text); });
+  var picOpts = false;
+
+  if (tier === 'built') {
+    (m.blocks || []).forEach(function (b) {
+      if (b.type === 'text') { text(b.text, '400 23px ' + ASK_SHEET_FONT, 23, ASK_INK, 40, 16); return; }
+      var im = figs[b.url];
+      if (!im) {
+        /* Said out loud rather than silently dropped. The wording around it
+           very often reads "the diagram below shows…", and a teacher looking
+           at that above blank paper cannot tell whether the figure is missing
+           or the question never had one. */
+        text('[ a figure here could not be loaded — please ask me to send the original ]',
+             'italic 400 18px ' + ASK_SHEET_FONT, 18, ASK_INK_FAINT, 26, 14);
+        return;
+      }
+      if (b.role === 'options') picOpts = true;
+      var w = Math.min(innerW, im.width), h = im.height * (w / im.width);
+      if (h > ASK_SHEET_FIG_MAX_H) { h = ASK_SHEET_FIG_MAX_H; w = im.width * (h / im.height); }
+      items.push({ t: 'img', img: im, y: H, x: ASK_SHEET_PAD + (innerW - w) / 2, w: w, h: h, frame: true });
+      H += h + 22;
+    });
+  } else if (tier === 'whole') {
+    var im = figs.__main;
+    if (im) {
+      /* Never drawn LARGER than its own pixels. A whole-question crop is
+         normally wider than the column and fills it, but a small one blown up
+         to the full width is a blurred question, and a teacher squinting at
+         an upscaled photograph is exactly what this sheet exists to end. */
+      var w2 = Math.min(innerW, im.width), h2 = im.height * (w2 / im.width);
+      items.push({ t: 'img', img: im, y: H, x: ASK_SHEET_PAD, w: w2, h: h2, frame: false });
+      H += h2 + 18;
+    } else {
+      text(m.question || '', '400 23px ' + ASK_SHEET_FONT, 23, ASK_INK, 40, 16);
+    }
+  } else {
+    text(m.question || '', '400 23px ' + ASK_SHEET_FONT, 23, ASK_INK, 40, 16);
+    var im3 = figs.__main;
+    if (im3) {
+      var w3 = Math.min(innerW, im3.width), h3 = im3.height * (w3 / im3.width);
+      if (h3 > ASK_SHEET_FIG_MAX_H) { h3 = ASK_SHEET_FIG_MAX_H; w3 = im3.width * (h3 / im3.height); }
+      items.push({ t: 'img', img: im3, y: H, x: ASK_SHEET_PAD + (innerW - w3) / 2, w: w3, h: h3, frame: true });
+      H += h3 + 22;
+    }
+  }
+
+  // ---- the options, unless the picture already carries them ----
+  var showOpts = opts.length && tier !== 'whole' && !picOpts;
+  if (showOpts) {
+    gap(4);
+    opts.forEach(function (o) {
+      text('(' + (o.label || '') + ')   ' + (o.text || ''), '400 22px ' + ASK_SHEET_FONT, 22, ASK_INK, 34, 6);
+    });
+    gap(10);
+  }
+
+  // ---- room to answer, exactly as the worksheet gives it ----
+  if (!opts.length) {
+    var boxH = (tier === 'whole') ? 90 : 190;
+    items.push({ t: 'box', y: H, h: boxH });
+    H += boxH + 18;
+  }
+  text('Answer: ______________________________', '400 22px ' + ASK_SHEET_FONT, 22, ASK_INK_SOFT, 32, 20);
+
+  return { items: items, height: Math.min(ASK_SHEET_MAX_H, H + ASK_SHEET_PAD - 20) };
+}
+
+function _askDrawSheet(m, tier, figs) {
+  var probe = document.createElement('canvas').getContext('2d');
+  var plan = _askLayout(probe, m, tier, figs);
+  var c = document.createElement('canvas');
+  c.width = ASK_SHEET_W;
+  c.height = Math.max(400, Math.round(plan.height));
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.textBaseline = 'top';
+  plan.items.forEach(function (it) {
+    if (it.t === 'text') {
+      ctx.font = it.font;
+      ctx.fillStyle = it.colour;
+      it.lines.forEach(function (ln, i) { ctx.fillText(ln, ASK_SHEET_PAD, it.y + i * it.lead); });
+    } else if (it.t === 'rule') {
+      ctx.fillStyle = it.colour;
+      ctx.fillRect(ASK_SHEET_PAD, it.y, ASK_SHEET_W - ASK_SHEET_PAD * 2, it.w || 1);
+    } else if (it.t === 'img') {
+      ctx.drawImage(it.img, it.x, it.y, it.w, it.h);
+      if (it.frame) {
+        ctx.strokeStyle = ASK_LINE;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(it.x + 0.5, it.y + 0.5, it.w - 1, it.h - 1);
+      }
+    } else if (it.t === 'head') {
+      ctx.font = '700 23px ' + ASK_SHEET_FONT;
+      ctx.fillStyle = ASK_INK;
+      ctx.fillText(it.num, ASK_SHEET_PAD, it.y);
+      if (it.meta) {
+        var numW = ctx.measureText(it.num).width;
+        ctx.font = '400 17px ' + ASK_SHEET_FONT;
+        ctx.fillStyle = ASK_INK_FAINT;
+        ctx.fillText(it.meta, ASK_SHEET_PAD + numW + 14, it.y + 5);
+      }
+    } else if (it.t === 'box') {
+      ctx.strokeStyle = ASK_LINE;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(ASK_SHEET_PAD + 1, it.y + 1, ASK_SHEET_W - ASK_SHEET_PAD * 2 - 2, it.h - 2);
+    }
+  });
+  return c.toDataURL('image/jpeg', 0.92);
+}
+
+/* The whole thing, and it never throws: anything at all going wrong hands
+   back '' and the caller sends the cleaned crop, which is what it sent before
+   this existed. */
+async function askSheetFor(m) {
+  try {
+    if (typeof document === 'undefined') return '';
+    var tier = _askTier(m);
+    var figs = {};
+    if (tier === 'built') {
+      var urls = (m.blocks || []).filter(function (b) { return b && b.type === 'image' && b.url; });
+      for (var i = 0; i < urls.length; i++) {
+        var d = await _askFetchDataUrl(urls[i].url);
+        var im = await _askLoadImage(d);
+        if (im) figs[urls[i].url] = im;
+      }
+    } else if (m.img) {
+      var raw = await _askFetchDataUrl(m.img);
+      var cleaned = await _askClean(raw);
+      figs.__main = await _askLoadImage(cleaned || raw);
+    }
+    /* A 'built' sheet with not one figure drawn is still the whole question —
+       its wording is typeset and that is what asks it. A sheet with NOTHING
+       on it is not: no wording, no picture and no options is a page that
+       asks nothing, and sending one would be worse than sending the message
+       alone. */
+    var hasWords = (tier === 'built')
+      ? (m.blocks || []).some(function (b) { return b && b.type === 'text' && b.text; })
+      : !!(m.question || '').trim();
+    if (!hasWords && !figs.__main && !Object.keys(figs).length && !(m.options || []).length) return '';
+    return _askDrawSheet(m, tier, figs);
+  } catch (e) {
+    console.warn('ask: the worksheet could not be drawn', e);
+    return '';
+  }
+}
+
 var ASK_WA_NUMBER = '6590223314';        // Mr Chung, in full international form
 var ASK_WA_MAX_CHARS = 900;              // wa.me refuses a very long ?text=
 /* The clean-up is the white-point clamp a scanner driver does, and it is the
@@ -6238,37 +6513,38 @@ async function mbAskChung(id) {
   _askBusy = true;
   mbRenderBody();
   try {
-    /* The share sheet, with the picture really attached — but only where the
-       picture can be read back at all. A Storage URL fetched cross-origin can
-       fail, and a failure here is never a dead end: the link route below says
-       everything the share route would have said and carries the picture as a
-       url the teacher can open. */
-    if (m.img && mbAskRoute() === 'share') {
-      var clean = '';
-      try {
-        var res = await fetch(m.img, { mode: 'cors' });
-        var blob = await res.blob();
-        var raw = await new Promise(function (ok, no) {
-          var fr = new FileReader();
-          fr.onload = function () { ok(String(fr.result)); };
-          fr.onerror = no;
-          fr.readAsDataURL(blob);
-        });
-        clean = await _askClean(raw);
-      } catch (e) { console.warn('ask: picture could not be read back', e); }
-      if (clean) {
-        var file = _askDataUrlToFile(clean, 'question.jpg');
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text: text });
-          toast('💬 Choose WhatsApp and send it to Mr Chung.', 6000);
-          return;
-        }
+    /* THE PICTURE IS THE QUESTION SET OUT AS A WORKSHEET, not the raw crop —
+       the reproduction this app made when it filed the question, laid out the
+       way the CER app's own "try again" sheet lays it out. A sheet that could
+       not be drawn falls back to the cleaned crop, which is what was sent
+       before this existed. */
+    var pic = await askSheetFor(m);
+    if (!pic && m.img) {
+      var raw = await _askFetchDataUrl(m.img);
+      pic = await _askClean(raw);
+    }
+
+    // The share sheet, with the picture really attached.
+    if (pic && mbAskRoute() === 'share') {
+      var file = _askDataUrlToFile(pic, 'question.jpg');
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text: text });
+        toast('💬 Choose WhatsApp and send it to Mr Chung.', 6000);
+        return;
       }
     }
-    // Every other device, and every failure above: the chat, the message, and
-    // the picture as a link. Opened in a new tab so the app is still here.
-    window.open(mbAskWaUrl(text + (m.img ? '\n' + m.img : '')), '_blank', 'noopener');
-    toast(m.img
+
+    /* Every other device: the chat, the message, and the picture as a LINK —
+       so the typeset sheet is uploaded and that is what the link points at. A
+       failed upload is not a failed ask; it falls back to the crop already in
+       Storage, and failing that to no picture at all. */
+    var link = m.img || '';
+    if (pic) {
+      try { link = (await _mbUpload(pic, 'ask_' + m.id + '_' + Date.now().toString(36))) || link; }
+      catch (e) { console.warn('ask: the sheet could not be uploaded', e); }
+    }
+    window.open(mbAskWaUrl(text + (link ? '\n' + link : '')), '_blank', 'noopener');
+    toast(link
       ? '💬 WhatsApp is open with your question and a link to the picture — press send.'
       : '💬 WhatsApp is open with your question — press send.', 6000);
   } catch (e) {

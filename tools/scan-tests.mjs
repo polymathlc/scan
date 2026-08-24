@@ -141,6 +141,7 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     mbListOf, mbIsLearning, mbInList, mbCardChipHtml, mbSelectedIds, mbPickAll, mbSetTab,
     MB_LIST_MISTAKE, MB_LIST_LEARNING,
     mbAskText, mbAskWaUrl, mbAskRoute, _askCleanPixels, ASK_WA_NUMBER,
+    _askTier, _askPictureOptions, _askWrap, ASK_SHEET_W, ASK_SHEET_MAX_H,
     set mistakes(v) { _mistakes = v; },
     get mistakes() { return _mistakes; },
     get tab() { return _mbTab; },
@@ -2630,7 +2631,9 @@ ok('…and it is a constant, not typed into the url',
 ok('the route is decided in ONE place, so the button can say which it is',
    (html.match(/function mbAskRoute\(/g) || []).length === 1);
 ok('a device with no file sharing still sends the question, with a link to the picture',
-   /window\.open\(mbAskWaUrl\(text \+ \(m\.img \? '\\n' \+ m\.img : ''\)\)/.test(html));
+   /window\.open\(mbAskWaUrl\(text \+ \(link \? '\\n' \+ link : ''\)\)/.test(html));
+ok('…and that link points at the TYPESET sheet, falling back to the crop already in Storage',
+   /var link = m\.img \|\| '';[\s\S]{0,320}_mbUpload\(pic,/.test(html));
 ok('a share the student cancelled is not reported as a failure',
    /e\.name === 'AbortError'/.test(html));
 ok('the button is on every row of BOTH lists', /mbAskChung\(/.test(html) &&
@@ -2674,6 +2677,76 @@ ok('the clean-up is plain code, never an AI call',
    /function _askCleanPixels[\s\S]{0,1600}return true;\n\}/.test(html));
 api.mistakes = [];
 api.user = null;
+
+/* =====================================================================
+   🖨 THE QUESTION, SET OUT AS A WORKSHEET
+   ---------------------------------------------------------------------
+   What goes to WhatsApp is no longer the raw crop: it is the rapid-add
+   reproduction typeset the way the CER app's own "try again" sheet lays it
+   out. There is no canvas in Node, so the DRAWING is exercised in a real
+   headless browser by tools/ask-sheet-render.mjs; what is pinned here is the
+   part that decides WHAT is drawn, and the fallbacks that stop it ever being
+   a dead end.
+   ===================================================================== */
+/* ---------- The three tiers ---------- */
+ok('blocks make it the reproduction — the whole point of the change',
+   api._askTier({ blocks: [{ type: 'text', text: 'x' }] }) === 'built');
+ok('a whole-question crop with no blocks is the crop',
+   api._askTier({ blocks: [], img: 'u', shot: 'question' }) === 'whole');
+ok('a figure crop falls to the transcription with the figure beside it',
+   api._askTier({ blocks: [], img: 'u', shot: 'figure' }) === 'flat');
+ok('nothing at all is still the transcription', api._askTier({}) === 'flat');
+/* The tiers are the VIEWER's own — they have to stay in step, or the sheet a
+   student is sent stops matching the sheet they get back on paper. */
+ok('…and blocks outrank a crop, exactly as the viewer orders them',
+   api._askTier({ blocks: [{ type: 'text', text: 'x' }], img: 'u', shot: 'question' }) === 'built');
+
+/* The word list must not be printed under a picture that already carries the
+   choices: four empty brackets under the options themselves reads as a fault
+   in the sheet. The same `role: 'options'` contract the viewer reads. */
+ok('a picture of the options is recognised',
+   api._askPictureOptions([{ type: 'image', role: 'options', url: 'u' }]) === true);
+ok('…and an ordinary figure is not',
+   api._askPictureOptions([{ type: 'image', url: 'u' }]) === false);
+ok('…and one with no url is not — nothing was drawn, so the words are still needed',
+   api._askPictureOptions([{ type: 'image', role: 'options', url: '' }]) === false);
+ok('the word list is held back only for a picture of the options',
+   /var showOpts = opts\.length && tier !== 'whole' && !picOpts;/.test(html));
+
+/* Every failure falls back rather than stopping. */
+ok('a sheet that could not be drawn hands back nothing, and the crop is sent instead',
+   /catch \(e\) \{\s*\n\s*console\.warn\('ask: the worksheet could not be drawn'[\s\S]{0,60}return '';/.test(html) &&
+   /var pic = await askSheetFor\(m\);\s*\n\s*if \(!pic && m\.img\)/.test(html));
+ok('a figure that would not load is SAID, not silently dropped',
+   /a figure here could not be loaded/.test(html));
+ok('a sheet with no wording, no picture and no options is refused outright',
+   /if \(!hasWords && !figs\.__main && !Object\.keys\(figs\)\.length && !\(m\.options \|\| \[\]\)\.length\) return '';/.test(html));
+ok('a crop is never drawn larger than its own pixels',
+   /var w2 = Math\.min\(innerW, im\.width\)/.test(html));
+ok('a very long question is still ONE picture', api.ASK_SHEET_MAX_H > 1000 &&
+   /Math\.min\(ASK_SHEET_MAX_H, H \+ ASK_SHEET_PAD - 20\)/.test(html));
+
+/* Storage urls are fetched to a data url before they are drawn: an <img> from
+   another origin TAINTS the canvas, and a tainted canvas cannot be read back
+   — which is the whole point of drawing it. */
+ok('figures are fetched to a data url before they are drawn',
+   /_askFetchDataUrl\(urls\[i\]\.url\)/.test(html) &&
+   /async function _askFetchDataUrl[\s\S]{0,300}readAsDataURL/.test(html));
+ok('…and a fetch that fails still lets the <img> have its own try',
+   /catch \(e\) \{ return url; \}/.test(html));
+
+/* The MCQ rule, straight from the viewer: options get the answer line alone,
+   an open question gets the working box — and a whole-question crop gets the
+   short one, because it brought the paper's own ruled space with it. */
+ok('only an open question gets a working box', /if \(!opts\.length\) \{[\s\S]{0,140}t: 'box'/.test(html));
+ok('…and a whole-question crop gets the short one',
+   /var boxH = \(tier === 'whole'\) \? 90 : 190;/.test(html));
+
+/* And it is what actually gets sent. */
+ok('the sheet is what travels, not the crop',
+   /var file = _askDataUrlToFile\(pic, 'question\.jpg'\)/.test(html));
+ok('…and on a device that cannot share files, the LINK points at the sheet too',
+   /_mbUpload\(pic, 'ask_' \+ m\.id/.test(html));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

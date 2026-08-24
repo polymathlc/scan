@@ -1089,6 +1089,52 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   (bright, no line work) is exactly where flattening the highlights destroys
   what is being asked about. Every refusal hands the picture back untouched, and
   so does a tainted canvas.
+
+### 🖨 …and the picture is the question SET OUT AS A WORKSHEET (v1.23.0)
+
+`ASK_SHEET_*` / `_askTier` / `_askPictureOptions` / `_askWrap` / `_askLayout` /
+`_askDrawSheet` / `askSheetFor` (search `SET OUT AS A WORKSHEET`).
+
+- **A crop off a photograph is the wrong thing to send a teacher on a phone**:
+  grey paper, the student's own pencil still on it, skewed, 9pt print shrunk
+  into a chat bubble. The app already holds something better — `blocks`, the
+  rapid-add reproduction made when the question was filed — so what travels is
+  that question TYPESET, laid out the way `cer/mistakes.html` lays its own
+  "try again" worksheet out.
+- **IT IS DRAWN ON A CANVAS, not rendered from HTML.** There is no library
+  here, and the two library-free ways of turning markup into a picture both
+  fail on exactly this input: `foreignObject` **taints** the canvas the moment
+  a figure comes from Storage (and a tainted canvas cannot be read back, which
+  is the whole point of drawing it), and a screenshot API does not exist in a
+  page. Drawing is more code and it is predictable.
+- **`_askTier` mirrors the viewer's `tierOf`, and they must stay in step** —
+  `built` (wording typeset, figures in place, the word options printed
+  underneath because the blocks deliberately leave them out, full working
+  box), `whole` (the crop IS the question, so nothing is printed twice and it
+  gets the SHORT box), `flat` (the transcription with its figure). A sheet
+  that stops matching the sheet the student gets back on paper is a silent
+  drift.
+- **The `role: 'options'` contract is honoured here too** (`_askPictureOptions`):
+  a picture that already carries the four choices must not have the word list
+  printed under it, or the sheet shows four empty brackets.
+- **Figures are fetched to a data url BEFORE they are drawn**, or the canvas is
+  tainted and `toDataURL` throws.
+- **Every failure falls back rather than stopping.** A figure that will not
+  load is replaced by a one-line note — wording reading "the diagram below
+  shows…" above blank paper cannot be told from a question that never had one.
+  A sheet that cannot be drawn hands back `''` and the cleaned crop is sent, as
+  it was before this existed. A sheet with **no wording, no picture and no
+  options is refused outright**: a page that asks nothing is worse than sending
+  the message alone.
+- **A crop is never drawn larger than its own pixels**, and the whole sheet is
+  capped at `ASK_SHEET_MAX_H` — it has to stay ONE picture.
+- **On a device that cannot share files the LINK points at the sheet too**: it
+  is uploaded and that url goes in the message, falling back to the crop
+  already in Storage if the upload fails.
+- There is no canvas in Node, so `tools/scan-tests.mjs` pins what DECIDES the
+  sheet and **`node tools/ask-sheet-render.mjs`** draws it for real in a
+  headless browser and writes each case out to look at. Run that one after
+  touching the layout — it needs `npm i playwright-core`.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
 ## House rules
@@ -1096,7 +1142,10 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   `mbListOf`, `mbIsLearning`, `mbInList`, `mbSetTab`, `mbSelectedIds`,
   `mbCardChipHtml`, `mbCardLearnClick`, `mbNoteWin`/`mbNoteMiss`'s learning
   guards, `ASK_WA_NUMBER`, `mbAskText`, `mbAskWaUrl`, `mbAskRoute`,
-  `_askCleanPixels`), run `node tools/scan-tests.mjs`. Every failure is silent.
+  `_askCleanPixels`, `_askTier`, `_askPictureOptions`, `askSheetFor`), run
+  `node tools/scan-tests.mjs` — and after touching the sheet's LAYOUT run
+  `node tools/ask-sheet-render.mjs` and LOOK at what it writes, because a sheet
+  that renders is not the same as one that reads. Every failure is silent.
   A learning entry that starts clearing itself deletes the list the moment it
   begins working — and the streak CHIP is the half that is easy to miss, since
   it promises a clearing that never comes. A tick that survives a tab switch
