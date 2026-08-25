@@ -17,6 +17,24 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 💬 Ask Mr Chung goes straight to his chat now (v1.25.0)
+
+Pressing **💬 Ask Mr Chung** used to open the phone's share sheet: find
+WhatsApp in it, then find Mr Chung in a contact list. It now opens **his own
+conversation directly**, by his number — no sheet, nothing to hunt for and
+nothing to scroll, and it works even if you have never messaged him and do not
+have him saved. The message is already written and the question travels as a
+link to the typeset sheet, which opens for him whether or not he is signed in.
+
+**📎 beside it is the other way**, for when you would rather the picture came
+through as an image: that is the share sheet, with the picture really
+attached, at the price of picking WhatsApp and then picking the chat. It is
+only shown on a device that can actually do it.
+
+No web page can attach a file to a WhatsApp link — `wa.me` carries text and
+nothing else — so those two really are the only routes there are, and the
+button now takes the one that lands in the right chat.
+
 ## What it does
 
 Three buttons and two tabs. The **Snap** tab is a camera:

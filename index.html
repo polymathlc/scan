@@ -551,6 +551,10 @@
      under it on a narrow phone rather than squeezing the question's wording. */
   .mbDrop { flex: none; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
   .mbAsk { font-size: 0.76rem; padding: 7px 12px; white-space: nowrap; }
+  /* 📎 is the alternative route, not a second Ask button — it is deliberately
+     the quiet one, so the button that lands in the right chat is the obvious
+     thing to press. */
+  .mbAskAttach { font-size: 0.9rem; padding: 5px 10px; line-height: 1; }
   @media (max-width: 560px) {
     .mbRow { flex-wrap: wrap; }
     .mbDrop { flex-direction: row; width: 100%; justify-content: flex-end; }
@@ -1264,7 +1268,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.24.0';
+var APP_VERSION = 'v1.25.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -5964,12 +5968,19 @@ function mbRowHtml(m) {
     '</div>' +
     (m.img ? '<div class="mbThumb"><img src="' + escHtml(m.img) + '" alt=""></div>' : '') +
     '<div class="mbDrop">' +
-      '<button class="btn mbAsk" title="' +
-        (mbAskRoute() === 'share'
-          ? 'Send this question to Mr Chung on WhatsApp, with the picture attached'
-          : 'Open WhatsApp with this question and a link to the picture') + '"' +
+      /* The button goes STRAIGHT to Mr Chung's chat — by his number, so there
+         is no share sheet to open, no WhatsApp to find in it and no contact
+         list to scroll. 📎 is the other trade-off, and it is only drawn on a
+         device that can really do it: the share sheet, which attaches the
+         picture itself and costs two picks to get to the right chat. */
+      '<button class="btn mbAsk" title="Open Mr Chung&#39;s WhatsApp chat with this question and a link to the picture"' +
         (_askBusy ? ' disabled' : '') +
         ' onclick="mbAskChung(\'' + m.id + '\')">💬 Ask Mr Chung</button>' +
+      (mbAskRoute() === 'share'
+        ? '<button class="btn btnGhost mbAskAttach" title="Send it with the picture attached instead — you choose WhatsApp, then Mr Chung"' +
+            (_askBusy ? ' disabled' : '') +
+            ' onclick="mbAskChung(\'' + m.id + '\', \'attach\')">📎</button>'
+        : '') +
       '<button class="btn btnGhost" title="Remove" onclick="mbRemove(\'' + m.id + '\')">✕</button>' +
     '</div>' +
   '</div>';
@@ -6088,16 +6099,29 @@ async function mbRemovePicked() {
    `wa.me/<number>?text=` carries TEXT and nothing else, and there is no API,
    no URL and no trick that attaches an image to it. What a page CAN do is
    `navigator.share({ files })`, which hands the picture and the message to
-   the phone's own share sheet with WhatsApp one tap away and the image really
-   attached. So that is the path, and the tap is the browser's price, not
-   something this app forgot to do.
+   the phone's own share sheet with the image really attached — at the price
+   of picking WhatsApp out of the sheet and then picking Mr Chung out of a
+   contact list. Those are the only two routes there are.
 
-   AND IT ALWAYS ENDS SOMEWHERE. A laptop, or a browser without file sharing,
-   falls back to `wa.me` with the message and a LINK to the picture in
-   Storage — which is a perfectly good way to send a question, and is what
-   makes this work on a desktop at all. `mbAskRoute` is the ONE place that
-   choice is made, so the button can say which of the two it is about to do
-   before it is pressed.
+   SO THE BUTTON TAKES THE ONE THAT LANDS IN THE RIGHT CHAT. `wa.me` with his
+   NUMBER opens Mr Chung's own conversation — no share sheet, no hunting, no
+   scrolling, and it works even if a student has never messaged him and does
+   not have him saved. The picture goes as a LINK to the sheet in Storage,
+   which is a Firebase download url and therefore opens for him whether or
+   not he is signed in. Getting to the right chat is the part a student gives
+   up on, so that is the part the button buys.
+
+   📎 IS THE OTHER TRADE-OFF, kept and never made the default: the share
+   sheet, with the picture really attached. It is drawn only on a device that
+   can actually do it — `mbAskRoute` is the ONE place that is decided — so it
+   is never a button that does nothing.
+
+   AND THE TAB IS CLAIMED INSIDE THE CLICK. The sheet has to be drawn and
+   uploaded before the link exists, and by then the user gesture has expired:
+   a `window.open` after the await is a blocked popup on iOS Safari, which
+   reads as a button that does nothing at all. `_askClaimTab` opens it at the
+   moment of the press and `_askGoTo` points it at WhatsApp when the link is
+   ready; a tab that ends up unused is closed rather than left blank.
 
    THE MESSAGE HAS TO SAY WHO IS ASKING. A picture arriving from an unknown
    number with "could you help me" is a message the teacher cannot act on, so
@@ -6563,12 +6587,54 @@ function _askDataUrlToFile(dataUrl, name) {
   return new File([arr], name, { type: mime });
 }
 
+/* THE TAB IS CLAIMED INSIDE THE CLICK, and that is not tidiness — it is the
+   only thing that makes the direct route work on a phone. The sheet has to
+   be drawn and uploaded first, and by the time that has finished the user
+   gesture has expired: a window.open() after the await is a POPUP BLOCKED on
+   iOS Safari, which looks exactly like a button that does nothing. So a tab
+   is opened the instant the button is pressed, told what it is waiting for,
+   and pointed at WhatsApp when the link is ready. */
+function _askClaimTab() {
+  try {
+    var w = window.open('about:blank', '_blank');
+    if (w && w.document) {
+      w.document.write('<title>Opening WhatsApp…</title><p style="font:16px/1.6 system-ui,sans-serif;' +
+        'padding:28px;color:#333">Getting your question ready — WhatsApp will open in a moment.</p>');
+      w.document.close();
+    }
+    return w || null;
+  } catch (e) { return null; }
+}
+function _askGoTo(win, url) {
+  if (win && !win.closed) {
+    try { win.opener = null; } catch (e) {}
+    win.location.replace(url);
+  } else {
+    window.open(url, '_blank', 'noopener');
+  }
+}
+
 var _askBusy = false;
-async function mbAskChung(id) {
+/* `mode` is 'direct' (default) or 'attach', and the difference is the whole
+   trade-off written down:
+
+     direct — straight into MR CHUNG'S OWN CHAT by his number, so there is no
+              share sheet, no hunting for WhatsApp and no scrolling a contact
+              list. The picture travels as a LINK, because no page anywhere
+              can put a file into a wa.me message.
+     attach — the phone's share sheet, so the picture is really attached, at
+              the price of picking WhatsApp and then picking the chat.
+
+   Direct is what the button does, because getting to the right chat is the
+   part a student gives up on. */
+async function mbAskChung(id, mode) {
   if (_askBusy) return;
   var m = _mistakes.filter(function (x) { return x.id === id; })[0];
   if (!m) return;
+  var attach = mode === 'attach';
   var text = mbAskText(m);
+  // Claimed BEFORE the first await — see _askClaimTab.
+  var win = attach ? null : _askClaimTab();
   _askBusy = true;
   mbRenderBody();
   try {
@@ -6583,29 +6649,30 @@ async function mbAskChung(id) {
       pic = await _askClean(raw, _askHasWorking(m));
     }
 
-    // The share sheet, with the picture really attached.
-    if (pic && mbAskRoute() === 'share') {
+    // The share sheet, with the picture really attached. Only ever on ask.
+    if (attach && pic && mbAskRoute() === 'share') {
       var file = _askDataUrlToFile(pic, 'question.jpg');
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], text: text });
-        toast('💬 Choose WhatsApp and send it to Mr Chung.', 6000);
+        toast('💬 Choose WhatsApp, then Mr Chung, and send it.', 6000);
         return;
       }
     }
 
-    /* Every other device: the chat, the message, and the picture as a LINK —
-       so the typeset sheet is uploaded and that is what the link points at. A
-       failed upload is not a failed ask; it falls back to the crop already in
+    /* Mr Chung's own chat, the message, and the picture as a LINK — so the
+       typeset sheet is uploaded and that is what the link points at. A failed
+       upload is not a failed ask; it falls back to the crop already in
        Storage, and failing that to no picture at all. */
     var link = m.img || '';
     if (pic) {
       try { link = (await _mbUpload(pic, 'ask_' + m.id + '_' + Date.now().toString(36))) || link; }
       catch (e) { console.warn('ask: the sheet could not be uploaded', e); }
     }
-    window.open(mbAskWaUrl(text + (link ? '\n' + link : '')), '_blank', 'noopener');
+    _askGoTo(win, mbAskWaUrl(text + (link ? '\n' + link : '')));
+    win = null;
     toast(link
-      ? '💬 WhatsApp is open with your question and a link to the picture — press send.'
-      : '💬 WhatsApp is open with your question — press send.', 6000);
+      ? '💬 Mr Chung\u2019s chat is open with your question and a link to the picture — press send.'
+      : '💬 Mr Chung\u2019s chat is open with your question — press send.', 6000);
   } catch (e) {
     // A share the student cancelled is not an error worth a message.
     if (!(e && e.name === 'AbortError')) {
@@ -6613,6 +6680,8 @@ async function mbAskChung(id) {
       toast('That could not be opened — try again.', 4000);
     }
   } finally {
+    // A claimed tab that was never used is a blank window left open.
+    if (win && !win.closed) { try { win.close(); } catch (e2) {} }
     _askBusy = false;
     mbRenderBody();
   }
