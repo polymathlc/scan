@@ -2706,6 +2706,39 @@ ok('who the run is for is on screen the whole time, not in a menu',
      /stuStop\(\)/.test(api.stuRowHtml({ id: 'uid_x', name: 'Mei', managed: false }, 1)));
   api.asStudent = null;
 }
+/* THE ROSTER WAS PRINTED AS "[object Object]", the whole way down the window.
+   `.then(stuRender)` hands the RESOLVED ARRAY to stuRender's first parameter,
+   which is the error MESSAGE — so every student was stringified into the
+   error paragraph and not one row was drawn. It is called with nothing. */
+ok('the roster is drawn, not handed to the error slot',
+   /stuLoad\(true\)\.then\(function \(\) \{ stuRender\(\); \}\)/.test(html));
+/* An error message is TEXT. Anything else reaching that parameter is a caller
+   passing something it should not — a promise's value, an Error object — and
+   printing it at the teacher is exactly how the wall of "[object Object]"
+   happened. The guard is the structural half of the fix. */
+ok('…and a non-string can never be printed as one',
+   /if \(typeof err === 'string' && err\) \{ body\.innerHTML/.test(html));
+ok('a real error message still is', /stuRender\(String\(\(e && e\.message\)/.test(html));
+
+/* 🟠 THE CENTRE'S OWN MARK. The tab and a home-screen shortcut had no icon at
+   all before this, and the header wore an emoji. */
+ok('the header wears the Polymath logo',
+   /class="brandLogo" src="https:\/\/dl\.dropboxusercontent\.com\/scl\/fi\/h40yjlyg8ldefwfaa3dib\/polymath-logo-sticker\.png/.test(html));
+ok('…the same picture the Science portal uses', (function () {
+  const cer = fs.readFileSync(new URL('../../cer/index.html', import.meta.url), 'utf8');
+  const mine = (html.match(/https:\/\/dl\.dropboxusercontent\.com\/scl\/fi\/[^"']+polymath-logo-sticker\.png[^"']*/) || [])[0];
+  return !!mine && cer.indexOf(mine) >= 0;
+})());
+/* A broken-image icon in the header of every page is worse than the emoji it
+   replaced, and this app is opened on school connections. */
+ok('…and falls back to a drawn mark rather than a broken image',
+   /onerror="this\.onerror=null;this\.src='data:image\/svg\+xml/.test(html));
+ok('the tab and a home-screen shortcut have an icon now',
+   /<link rel="icon" href="https:\/\/dl\.dropboxusercontent\.com/.test(html) &&
+   /<link rel="apple-touch-icon" href="https:\/\/dl\.dropboxusercontent\.com/.test(html));
+/* A logo of any other shape must not be stretched into this square. */
+ok('the logo is contained, never stretched', /\.brandLogo \{[^}]*object-fit: contain/.test(html));
+
 /* A child added at the centre has no Google account, so the id is the SAME
    shape the Ans Key annotator makes — one student, one row, both apps. */
 ok('a centre-added student uses the shared managed id shape',

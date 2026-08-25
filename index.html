@@ -12,6 +12,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Scan">
 <meta name="theme-color" content="#FFE0B2">
+<!-- The centre's own mark, the same picture the four portals wear. The tab
+     and a home-screen shortcut had no icon at all before this. -->
+<link rel="icon" href="https://dl.dropboxusercontent.com/scl/fi/h40yjlyg8ldefwfaa3dib/polymath-logo-sticker.png?rlkey=o1ra4taqy79gt9t8u096v82zj">
+<link rel="apple-touch-icon" href="https://dl.dropboxusercontent.com/scl/fi/h40yjlyg8ldefwfaa3dib/polymath-logo-sticker.png?rlkey=o1ra4taqy79gt9t8u096v82zj">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   :root {
@@ -60,7 +64,12 @@
     width: 38px; height: 38px; border-radius: 11px; flex: none;
     display: grid; place-items: center;
     background: var(--accent); font-size: 20px;
+    overflow: hidden;
   }
+  /* The logo fills its own box. `object-fit: contain` is what keeps the
+     square fallback square and stops a logo of any other shape being
+     stretched into this one. */
+  .brandLogo { width: 100%; height: 100%; object-fit: contain; display: block; }
   .brandText { display: flex; flex-direction: column; line-height: 1.25; }
   .brandTitle { font-size: 1.06rem; font-weight: 700; letter-spacing: -0.01em; }
   .brandSub { font-size: 0.74rem; color: var(--ink-faint); }
@@ -732,7 +741,14 @@
 
 <header>
   <div class="brand">
-    <div class="brandMark">📸</div>
+    <!-- The logo, with the SAME inline-SVG fallback the Science portal uses:
+         a broken-image icon in the header of every page is worse than the
+         emoji it replaced, and this app is opened on school connections. -->
+    <div class="brandMark">
+      <img class="brandLogo" src="https://dl.dropboxusercontent.com/scl/fi/h40yjlyg8ldefwfaa3dib/polymath-logo-sticker.png?rlkey=o1ra4taqy79gt9t8u096v82zj" alt="Polymath Learning Centre"
+           loading="eager" fetchpriority="high"
+           onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22 viewBox=%220 0 40 40%22%3E%3Crect width=%2240%22 height=%2240%22 rx=%228%22 fill=%22%234a7c59%22/%3E%3Ctext x=%2220%22 y=%2229%22 font-family=%22DM Sans,sans-serif%22 font-size=%2224%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EP%3C/text%3E%3C/svg%3E';">
+    </div>
     <div class="brandText">
       <div class="brandTitle">Scan &amp; Answer</div>
       <div class="brandSub"><span class="brandOrg">Polymath Learning Centre · </span><span id="versionTag"></span></div>
@@ -1352,7 +1368,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.27.0';
+var APP_VERSION = 'v1.27.1';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -8040,7 +8056,11 @@ function stuOpen() {
   if (!stuAllowed()) return;
   $('stuModal').classList.add('open');
   stuRender();
-  stuLoad(true).then(stuRender).catch(function (e) {
+  /* `.then(stuRender)` hands the RESOLVED ROSTER to stuRender's first
+     parameter, which is the error message — so the whole array was printed
+     as "[object Object],[object Object],…" where the students should be. It
+     is called with nothing on purpose. */
+  stuLoad(true).then(function () { stuRender(); }).catch(function (e) {
     console.warn('roster: could not be read', e);
     stuRender(String((e && e.message) || 'the roster could not be read'));
   });
@@ -8071,7 +8091,12 @@ function stuRowHtml(r, i) {
 function stuRender(err) {
   var body = $('stuList');
   if (!body) return;
-  if (err) { body.innerHTML = '<p class="sub">' + escHtml(err) + '</p>'; return; }
+  /* AN ERROR MESSAGE IS TEXT. Anything else reaching this parameter is a
+     caller passing something it should not — a promise's resolved value, an
+     Error object — and printing it at the teacher is how a roster of forty
+     students came out as a wall of "[object Object]". A non-string is not a
+     message, so it is ignored and the roster is drawn. */
+  if (typeof err === 'string' && err) { body.innerHTML = '<p class="sub">' + escHtml(err) + '</p>'; return; }
   if (!_stuRows) { body.innerHTML = '<p class="sub">Loading the roster…</p>'; return; }
   body.innerHTML = _stuRows.length
     ? _stuRows.map(stuRowHtml).join('')

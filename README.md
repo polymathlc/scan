@@ -17,6 +17,17 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## The roster read “[object Object]”, and the logo is on (v1.27.1)
+
+Opening **👥 Students** printed a wall of `[object Object]` where the roster
+should have been. Loading the list handed the students to the slot that prints
+an *error message*, so every one of them was stringified into it and not a
+single row was drawn. Fixed, and the slot now refuses anything that is not
+really a message.
+
+The header, the browser tab and a home-screen shortcut also wear the Polymath
+logo now — the same mark the other apps use. There was no icon at all before.
+
 ## 👥 Scan a paper FOR one of your students (v1.27.0)
 
 A student comes to the centre with a paper. Press **👥 Students** in the header,
