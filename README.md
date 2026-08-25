@@ -17,6 +17,12 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## No square behind the logo (v1.27.2)
+
+The header's mark was a pale-orange rounded tile — right when what sat in it
+was an emoji, which needs something to sit on. A logo does not, so the tile is
+gone and the logo stands on the page. Nothing else moved.
+
 ## The roster read “[object Object]”, and the logo is on (v1.27.1)
 
 Opening **👥 Students** printed a wall of `[object Object]` where the roster

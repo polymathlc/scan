@@ -1025,7 +1025,11 @@ children's mistakes pile into one heap.
   use, with the same inline-SVG fallback — a broken-image icon in the header of
   every page is worse than the emoji it replaced, and this app is opened on
   school connections. It is the favicon and the home-screen icon too; there was
-  none of either before.
+  none of either before. **`.brandMark` carries no background, radius or
+  clipping** (v1.27.2): the accent-coloured rounded square was there for the
+  EMOJI, which needs something to sit on, and a tile behind a logo is a second
+  badge around a badge — with no background the radius and the overflow only
+  crop the corners off a logo that is not square.
 - **Switching REREADS the book** (`mbForget()` then `mbLoad(true)`, on both
   start and stop): a badge left from the last child is a count of somebody
   else's mistakes sitting under this one's name. And it is **refused mid-run**,
