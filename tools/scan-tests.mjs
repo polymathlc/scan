@@ -2627,14 +2627,36 @@ ok('…and it is a constant, not typed into the url',
      api.mbAskWaUrl('x'.repeat(5000)).length < 5000);
 }
 /* The honest limit, written down: a page cannot attach a file to a wa.me
-   link, so the share sheet is the only route that really carries the picture
-   — and every device that cannot do it still gets the question through. */
-ok('the route is decided in ONE place, so the button can say which it is',
+   link — there is no parameter, no API and no trick — so there are exactly
+   two routes, and which one the BUTTON takes is the whole decision.
+
+   It takes the one that lands in Mr Chung's own chat, because hunting for
+   WhatsApp in a share sheet and then scrolling a contact list is the part a
+   student gives up on. Turn that back into the share sheet by default and the
+   button still works perfectly and is still the thing nobody finishes. */
+ok('the route is decided in ONE place, so 📎 is only drawn where it can work',
    (html.match(/function mbAskRoute\(/g) || []).length === 1);
-ok('a device with no file sharing still sends the question, with a link to the picture',
-   /window\.open\(mbAskWaUrl\(text \+ \(link \? '\\n' \+ link : ''\)\)/.test(html));
+ok('the button opens MR CHUNG\'S OWN CHAT — no share sheet, nothing to scroll',
+   /_askGoTo\(win, mbAskWaUrl\(text \+ \(link \? '\\n' \+ link : ''\)\)\)/.test(html));
+ok('…and the share sheet is only ever reached by asking for it',
+   /if \(attach && pic && mbAskRoute\(\) === 'share'\)/.test(html));
+ok('…so the default mode is the direct one', /var attach = mode === 'attach';/.test(html));
+ok('📎 asks for the attach route by name',
+   /mbAskChung\(\\'' \+ m\.id \+ '\\', \\'attach\\'\)/.test(html));
+ok('…and is drawn ONLY where the device can really share a file',
+   /mbAskRoute\(\) === 'share'\s*\n\s*\? '<button class="btn btnGhost mbAskAttach"/.test(html));
 ok('…and that link points at the TYPESET sheet, falling back to the crop already in Storage',
    /var link = m\.img \|\| '';[\s\S]{0,320}_mbUpload\(pic,/.test(html));
+/* THE TAB IS CLAIMED INSIDE THE CLICK. The sheet is drawn and uploaded first,
+   so by the time the link exists the user gesture has gone: a window.open()
+   after the await is a blocked popup on iOS Safari, and a blocked popup reads
+   as a button that does nothing at all — on the phones this is FOR. */
+ok('the tab is opened at the press, before anything is awaited',
+   /var win = attach \? null : _askClaimTab\(\);[\s\S]{0,200}?try \{/.test(html));
+ok('…and a claimed tab that was never used is closed, not left blank',
+   /if \(win && !win\.closed\) \{ try \{ win\.close\(\); \}/.test(html));
+ok('…and a tab that could not be claimed still opens WhatsApp',
+   /window\.open\(url, '_blank', 'noopener'\);/.test(html));
 ok('a share the student cancelled is not reported as a failure',
    /e\.name === 'AbortError'/.test(html));
 ok('the button is on every row of BOTH lists', /mbAskChung\(/.test(html) &&

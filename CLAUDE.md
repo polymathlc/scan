@@ -1027,7 +1027,7 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
 `MB_LIST_MISTAKE` / `MB_LIST_LEARNING` / `mbListOf` / `mbIsLearning` / `mbInList`
 / `mbCardLearnClick` / `mbSetTab` (search `TWO LISTS, ONE MACHINE`), and
 `ASK_WA_NUMBER` / `mbAskText` / `mbAskWaUrl` / `mbAskRoute` / `_askCleanPixels`
-/ `mbAskChung` (search `ASK MR CHUNG`).
+/ `_askClaimTab` / `_askGoTo` / `mbAskChung` (search `ASK MR CHUNG`).
 
 ### Two lists, one collection
 
@@ -1064,14 +1064,31 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   **cannot** put a file into a WhatsApp message: `wa.me/<number>?text=` carries
   text and nothing else, and there is no API, URL or trick that attaches an
   image to it. What a page **can** do is `navigator.share({ files })`, which
-  hands the picture and the message to the phone's own share sheet with
-  WhatsApp one tap away and the image really attached. **The tap is the
-  browser's price, not something the app forgot to do** — do not "fix" this by
-  reaching for an attachment parameter that does not exist.
-- **`mbAskRoute` is the ONE place that choice is made**, so the button can say
-  which of the two it is about to do before it is pressed. Every device that
-  cannot share files still gets the question through: `wa.me` with the message
-  and a **link** to the picture in Storage.
+  hands the picture and the message to the phone's own share sheet with the
+  image really attached — at the price of picking WhatsApp out of the sheet
+  and then picking Mr Chung out of a contact list. Those are the only two
+  routes there are; do not "fix" this by reaching for an attachment parameter
+  that does not exist.
+- **THE BUTTON TAKES THE ONE THAT LANDS IN THE RIGHT CHAT** (v1.25.0). `wa.me`
+  with his NUMBER opens Mr Chung's own conversation — no share sheet, nothing
+  to hunt for, nothing to scroll, and it works even for a student who has
+  never messaged him and does not have him saved. The picture goes as a
+  **link** to the sheet in Storage, which is a Firebase download url and
+  therefore opens for him whether or not he is signed in. **Getting to the
+  right chat is the part a student gives up on**, so that is the part the
+  button buys; the share sheet was the default until v1.25.0 and it is exactly
+  what the complaint was about.
+- **📎 is the other trade-off, kept and never made the default.** It is drawn
+  only on a device that can really share a file — **`mbAskRoute` is the ONE
+  place that is decided** — so it is never a button that does nothing.
+  `mbAskChung(id, mode)` takes `'attach'` for it; anything else is direct.
+- **THE TAB IS CLAIMED INSIDE THE CLICK** (`_askClaimTab` / `_askGoTo`). The
+  sheet has to be drawn and uploaded before the link exists, and by then the
+  user gesture has expired: a `window.open` after the `await` is a **blocked
+  popup on iOS Safari**, which reads as a button that does nothing at all — on
+  exactly the phones this is for. A claimed tab that ends up unused is closed
+  rather than left blank, and a tab that could not be claimed still falls back
+  to a plain `window.open`.
 - **The message names WHO is asking.** A picture arriving from an unknown
   number with "could you help me" is a message the teacher cannot act on, so
   the student's name, level, subject and the question's number go in the text.
@@ -1169,6 +1186,7 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   `mbListOf`, `mbIsLearning`, `mbInList`, `mbSetTab`, `mbSelectedIds`,
   `mbCardChipHtml`, `mbCardLearnClick`, `mbNoteWin`/`mbNoteMiss`'s learning
   guards, `ASK_WA_NUMBER`, `mbAskText`, `mbAskWaUrl`, `mbAskRoute`,
+  `_askClaimTab`, `_askGoTo`, `mbAskChung`'s `mode`,
   `_askCleanPixels`, `_askHasWorking`, `ASK_CLEAN_DEPTH`, `ASK_CLEAN_BAND_MAX`,
   `_askTier`, `_askPictureOptions`, `askSheetFor`), run
   `node tools/scan-tests.mjs` — and after touching the sheet's LAYOUT run
@@ -1178,7 +1196,12 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   begins working — and the streak CHIP is the half that is easy to miss, since
   it promises a clearing that never comes. A tick that survives a tab switch
   deletes a question the student cannot see. A message that stops naming who is
-  asking reaches the teacher as a picture from an unknown number. And the
+  asking reaches the teacher as a picture from an unknown number. The button
+  falling back to the share sheet by default still works perfectly and is still
+  the thing nobody finishes — hunting for WhatsApp and then scrolling a contact
+  list is the friction this was changed to remove. And a tab claimed after the
+  `await` rather than inside the click is a blocked popup on iOS Safari, which
+  is not an error anywhere: it is a button that does nothing. And the
   clean-up going from all-or-nothing to half-applied flattens a photograph of
   an experiment into a white plate while looking perfectly clean. And a band
   that goes deep again, or a `nearInk` guard that goes away, rubs the child's
