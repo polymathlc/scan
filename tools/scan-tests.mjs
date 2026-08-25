@@ -2736,8 +2736,18 @@ ok('…and falls back to a drawn mark rather than a broken image',
 ok('the tab and a home-screen shortcut have an icon now',
    /<link rel="icon" href="https:\/\/dl\.dropboxusercontent\.com/.test(html) &&
    /<link rel="apple-touch-icon" href="https:\/\/dl\.dropboxusercontent\.com/.test(html));
-/* A logo of any other shape must not be stretched into this square. */
+/* A logo of any other shape must not be stretched into its box. */
 ok('the logo is contained, never stretched', /\.brandLogo \{[^}]*object-fit: contain/.test(html));
+/* NOTHING SITS BEHIND THE LOGO. The accent-coloured rounded square was there
+   for the EMOJI that used to be in it — a glyph needs something to sit on and
+   a logo does not, so a tile behind one is a second badge around a badge. And
+   with no background the radius and the clipping only crop the corners off a
+   logo that is not square. */
+ok('the mark has no coloured tile behind the logo',
+   !/\.brandMark \{[^}]*background:/.test(html));
+ok('…and nothing to crop its corners with',
+   !/\.brandMark \{[^}]*border-radius:/.test(html) &&
+   !/\.brandMark \{[^}]*overflow:/.test(html));
 
 /* A child added at the centre has no Google account, so the id is the SAME
    shape the Ans Key annotator makes — one student, one row, both apps. */

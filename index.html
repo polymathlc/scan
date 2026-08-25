@@ -60,11 +60,16 @@
      buttons onto a second row. */
   .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; min-width: 0; }
   .brandTitle, .brandSub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* The mark is a BOX AND NOTHING ELSE — no tile behind the logo. It used to
+     be an accent-coloured rounded square because what sat in it was an emoji,
+     which needs something to sit ON; a logo does not, and a coloured square
+     behind one is a second badge around a badge. No background means the
+     radius and the clipping have nothing to do either, so they are gone with
+     it rather than left to crop the corners off a logo that is not square. */
   .brandMark {
-    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    width: 38px; height: 38px; flex: none;
     display: grid; place-items: center;
-    background: var(--accent); font-size: 20px;
-    overflow: hidden;
+    font-size: 20px;
   }
   /* The logo fills its own box. `object-fit: contain` is what keeps the
      square fallback square and stops a logo of any other shape being
@@ -1368,7 +1373,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.27.1';
+var APP_VERSION = 'v1.27.2';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
