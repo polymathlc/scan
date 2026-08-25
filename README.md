@@ -17,6 +17,42 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📄 Send a PDF, and it is marked against the answer key inside it (v1.26.0)
+
+A parent asked for this: *"may I request for a function where my child can
+upload a PDF where he did his mistakes working and have the app mark it with
+reference to the answer in the PDF?"*
+
+Tap **🖼** on the Snap tab (or drag the file onto the page) and choose a PDF.
+
+- **Every page is read.** The PDF is split into its pages and each one is put
+  through exactly the same reading the camera's photos get — three pages a
+  call, in order, with a question that runs over a page break stitched back
+  together. It is deliberately not sent as one file: a whole PDF handed to the
+  AI in one go is how a page gets quietly skipped.
+- **A page that will not open is shown as a failed page**, never dropped, and
+  a PDF longer than there is room for says how many pages were left out.
+- **🔑 The answer key in the same PDF is used first.** Most practice papers
+  carry their answers — beside each question, or as a marking scheme at the
+  back. The back is the hard case, because the pages are read in threes and
+  the questions on page 1 are marked long before page 11 is reached, so the
+  key is now hunted for and transcribed **before any marking starts** and then
+  given to every batch. The pages it came off are labelled 🔑 and every answer
+  taken from it wears **🔑 from the paper's key**, so you can see at a glance
+  which marks came off the paper and which the AI worked out.
+- **…but the key says what the answer IS, not how it has to be worded.** A key
+  that says "24 g" still marks "24 grams" correct, and one that says "it
+  evaporates" still marks "it turns into water vapour" correct. **Your own
+  marking notes decide** what wording is acceptable — the same notebook your
+  Ans Key app and the Science Learning Portal write to.
+- **A disagreement is said out loud.** If the working reaches a different
+  answer from the printed key, the key still stands, and the card says ⚠ with
+  one line explaining the difference. A printed key can hold a misprint, and
+  that is for a teacher to look at rather than for the app to decide.
+
+Everything else follows for free: the score, the report on the whole script,
+and the mistake book that keeps every question the child got wrong.
+
 ## 💬 Ask Mr Chung goes straight to his chat now (v1.25.0)
 
 Pressing **💬 Ask Mr Chung** used to open the phone's share sheet: find

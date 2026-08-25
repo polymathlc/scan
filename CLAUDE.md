@@ -961,6 +961,89 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
 - **`_scanRun` is bumped on every run**, so a reply that arrives after the teacher has started again
   is dropped instead of landing among the new answers.
 
+## 📄 A PDF is a pile of pages, and 🔑 its own answer key (v1.26.0)
+
+`PDFJS_URL` / `pdfIsPdf` / `pdfjsReady` / `pdfPageScale` / `_pdfPageToFile` /
+`pdfToFiles` / `_filesToPages` / `_pdfBusy` (search `A PDF IS A PILE OF
+PAGES`), and `SCAN_KEY_*` / `_keyRow` / `keyNumKey` / `_keyFold` / `_keyBlock`
+/ `_keySourceOf` / `_scanKeyPass` / `SCAN_KEY_SYS` / `_keyPrompt` (search
+`THE PAPER'S OWN ANSWER KEY`).
+
+A parent asked for this in as many words: let the child upload the PDF he did
+his working on, and have the app **mark it against the answer key printed in
+that same PDF**.
+
+### The PDF is SPLIT, never sent whole
+
+- **Every page is rendered to a picture and handed to `addShots` — the ONE
+  queue.** From that moment a PDF page is a photographed page: the same
+  batching, the same continuation stitching across a page break, the same
+  marking, report and mistake book. Do not give a PDF its own pipeline.
+- **It is not sent as one attachment.** Gemini will take a PDF, and that is
+  exactly how a page gets skipped: a twenty-page document arrives as one blur
+  and the model answers the questions it noticed. `SCAN_BATCH` pages a call is
+  what makes the read exhaustive, and it can only work on PAGES. A whole PDF
+  would also lock **Kimi** out entirely, which refuses one by name.
+- **Every page is accounted for.** A page that will not render is pushed as a
+  **failed card in its own place**, never skipped and never swept to the front
+  — a page that vanishes reads as one that was read and had nothing on it, and
+  one shown out of order sends a teacher looking for the wrong page. A document longer than there is room for says
+  how many were left out; a PDF that would not open says why.
+- **The page is painted WHITE before it is drawn.** A PDF page is transparent
+  where nothing is drawn and a transparent canvas flattens to **black** in a
+  JPEG — the whole page, ink and all.
+- **pdf.js DETACHES the buffer it is handed** (`buf.slice(0)`), and it is
+  loaded **only when a PDF is really chosen**: this app opens on a camera on a
+  phone, and half a megabyte of library on every load for a feature most runs
+  never touch is the wrong trade. A failed load is not remembered for ever.
+- **`pdfPageScale`** takes the long side to `SCAN_PHOTO_MAX_SIDE`. A PDF page
+  is measured at 72dpi, so an A4 at scale 1 is 595px across and "$140.20" and
+  "$14.20" are the same handful of pixels.
+- **`_pdfBusy` holds the buttons exactly as a run does.** A second pile queued
+  on top of one still being rendered is pages in the wrong order, and the
+  order IS the page numbers every answer cites.
+
+### 🔑 The answer key
+
+- **The inline case needs nothing** — a key printed beside its question is in
+  the same batch as the question.
+- **THE KEY AT THE BACK IS A PROBLEM OF BATCHING, not of prompting.** The call
+  marking pages 1–3 has never seen the marking scheme on page 11 and never
+  will: those pages are not in the request. So the key is read FIRST, in its
+  own pass over every page, and the rows are handed to every batch as TEXT.
+- **It only runs where a key could be somewhere the batch cannot see**
+  (`SCAN_KEY_MIN_PAGES`). One or two photographed pages cannot hide a marking
+  scheme, and a second pass on the commonest case buys nothing.
+- **The ration is per run and spent BEFORE the call**, refilled once in
+  `runScan` and nowhere else — the same shape as the algebra rewrite and the
+  marking repair.
+- **It TRANSCRIBES, and is deliberately the one call that is NOT grounded.** A
+  transcriber told what the answer should say writes that down instead of what
+  is on the page. It is also told never to solve, never to invent a row, and
+  that a child's handwriting is not a key.
+- **THE KEY IS THE AUTHORITY ON WHAT THE ANSWER IS, NOT ON HOW IT MUST BE
+  WORDED.** A key says "24 g" and a child who wrote "24 grams" is right; a key
+  says "it evaporates" and "it turns into water vapour" is right. What decides
+  that is the teacher's own **marking standards**, which reach the prompt
+  through `aiGrounding('scan')` like everything else. Lose that clause and the
+  app marks on characters, which is worse than not marking at all.
+- **A disagreement is SAID, never resolved in silence.** The key stands — it
+  is the paper speaking — but a printed key can hold a misprint, so `keyNote`
+  carries one plain sentence and the card prints it. On the card, not only in
+  a tooltip: a phone has no hover.
+- **`_keySourceOf` is the ONE place 🔑 is decided**, and it needs both halves:
+  the model said "key" AND a key was really in play. A badge that is on every
+  card says nothing, and the badge's whole value is that a teacher can trust
+  it — this mark came off the paper, not out of a model.
+- **`keyNumKey` collapses `Q12 (b)`, `12b` and `12(B)`** — a paper and its
+  marking scheme almost never number a question the same way twice. It is the
+  Learning Portal's `_epNumKey` under another name.
+- **An answer-key page returns no questions, and SAYS SO** (`status: 'key'`).
+  Rendered as "nothing on this page" it reads as a page that failed.
+- **Rewriting the answer takes 🔑 off the card** (`_ansEditApply`). A teacher
+  who has just retyped it owns it, and leaving the badge would claim the
+  paper's key said something it did not.
+
 ## ✍️ What the student actually WROTE — the marking repair pass (v1.20.0)
 
 `SCAN_MARK_FIX_CALLS` / `SCAN_MARK_FIX_MAX` / `SCAN_MARK_FIX_SYS` /
@@ -1207,6 +1290,24 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   that goes deep again, or a `nearInk` guard that goes away, rubs the child's
   own pencil working off the picture and sends the teacher the question with
   the work removed — which is the one thing he was being asked to look at.
+- After touching **the PDF split or the answer key** (`pdfIsPdf`,
+  `pdfjsReady`, `pdfPageScale`, `_pdfPageToFile`, `pdfToFiles`,
+  `_filesToPages`, `_pdfBusy`, `SCAN_KEY_*`, `_keyRow`, `keyNumKey`,
+  `_keyFold`, `_keyBlock`, `_keySourceOf`, `_scanKeyPass`, `_keyPrompt`,
+  `SCAN_KEY_SYS`, or `_ansEditApply`'s 🔑 clear), run
+  `node tools/scan-tests.mjs`. Every failure is silent and the run still
+  finishes — it simply finishes SHORT, and a run that came back with 18
+  questions when the paper had 25 looks exactly like one that worked. A page
+  dropped instead of shown as failed is a question nobody knows was missed. A
+  page rendered at its own 72dpi is a page of guesses. A transparent page not
+  painted white flattens to solid black in the JPEG. Sending the PDF whole
+  puts a twenty-page blur in front of the model and locks Kimi out entirely.
+  On the key side: a badge that stops needing a real key is on every card and
+  worth nothing; a key that is allowed to be matched CHARACTER FOR CHARACTER
+  marks "24 grams" wrong against "24 g"; a disagreement resolved in silence
+  hides a misprint from the one person who could spot it; and a ration spent
+  after the call rather than before it lets one stubborn paper buy call after
+  call.
 - After touching **the marking repair pass** (`SCAN_MARK_FIX_*`,
   `_markFixPass`, `_applyMarkFix`, `_itemNeedsMarking`, `_markFixBatchItems`,
   `_markFixPrompt`, `hasWriting` in `SCAN_SYS` / `SCAN_MARK_RULE` /
