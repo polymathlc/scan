@@ -126,6 +126,10 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     _parseAIJson, _scanNewItem, _scanFoldRows, _scanStr, _scanPrompt, scanSubjectRule,
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
     _ansEditApply, _ansEditNote, _ansTrim, _ansNoteTitle, _ansOptionFrom,
+    pdfIsPdf, pdfPageScale, PDF_MIN_SCALE, PDF_MAX_SCALE, PDFJS_URL, PDFJS_WORKER,
+    _keyRow, keyNumKey, _keyFold, _keyBlock, _keySourceOf, SCAN_KEY_SYS, _keyPrompt,
+    SCAN_KEY_MIN_PAGES, SCAN_KEY_BATCH, SCAN_KEY_CALLS, SCAN_KEY_MAX_ROWS, SCAN_KEY_ANS_CHARS,
+    set scanKey(v) { _scanKey = v; },
     _applyMarkFix, _itemNeedsMarking, _markFixBatchItems, _markFixPrompt,
     SCAN_MARK_FIX_SYS, SCAN_MARK_FIX_CALLS, SCAN_MARK_FIX_MAX,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
@@ -608,7 +612,12 @@ ok('the 🎤 starts hidden and is only shown where it works',
 ok('the dock belongs to the Snap tab, exactly as the bar does',
    /camDock'\)\.classList\.toggle\('hidden', !on \|\| _tab !== 'snap'\)/.test(html));
 ok('✓ is reachable with a question and no picture at all',
-   /done\.disabled = _scanning \|\| \(!ready\.length && !ask\);/.test(html));
+   /done\.disabled = busy \|\| \(!ready\.length && !ask\);/.test(html));
+/* Splitting a PDF holds the buttons exactly as a run does: a second pile
+   queued on top of one still being rendered is pages in the wrong order, and
+   the order IS the page numbers every answer cites. */
+ok('…and is held while a PDF is being split into pages',
+   /var busy = _scanning \|\| _pdfBusy;/.test(html));
 ok('a run with no pages takes the ask-alone path',
    /if \(shots\.length\) await _runPages\([\s\S]{0,120}else askErr = await _runAskAlone\(/.test(html));
 ok('the ask-alone call is grounded too — the one door',
@@ -2604,6 +2613,215 @@ api.mistakes = [];
   ok('…and the ticks that ARE read are scoped to the tab on show',
      api.mbSelectedIds().join() === 'm1');
 }
+
+/* ---------- 📄 A PDF IS A PILE OF PAGES ----------
+   A parent asked for this by name: the child uploads the PDF he did his
+   working on. Every failure below is silent and the run still finishes — it
+   simply finishes short, and a run that came back with 18 questions when the
+   paper had 25 looks exactly like a run that worked. */
+ok('a PDF is recognised by its type', api.pdfIsPdf({ type: 'application/pdf', name: 'paper.pdf' }));
+/* Some phones and some Drive exports hand over a PDF with no type at all, and
+   a PDF that reads as "not a picture" is refused as a file it cannot use. */
+ok('…and by its name when the browser gives no type',
+   api.pdfIsPdf({ type: '', name: 'P5 Maths Paper 2.PDF' }));
+ok('a picture is not a PDF', !api.pdfIsPdf({ type: 'image/jpeg', name: 'page.jpg' }));
+ok('a spreadsheet is neither', !api.pdfIsPdf({ type: 'text/csv', name: 'marks.csv' }));
+
+/* THE WHOLE READ RESTS ON THE SMALL PRINT. A PDF page is measured at 72dpi,
+   so an A4 rendered at scale 1 is 595px across and "$140.20" and "$14.20" are
+   the same handful of pixels. Too small and every answer is a guess; too big
+   and the canvas is megabytes per page for no more legibility. */
+{
+  const a4 = api.pdfPageScale(595, 842);
+  ok('an A4 page is rendered well above its own size', a4 > 2.5, a4);
+  ok('…and its long side lands on the photo ceiling',
+     Math.abs(842 * a4 - 2200) < 1, 842 * a4);
+  ok('a poster-sized page is capped rather than blowing the canvas',
+     api.pdfPageScale(2000, 3000) <= api.PDF_MAX_SCALE);
+  ok('a tiny page is still rendered bigger than itself',
+     api.pdfPageScale(200, 260) >= api.PDF_MIN_SCALE);
+  ok('a page with no size does not come back as zero',
+     api.pdfPageScale(0, 0) >= api.PDF_MIN_SCALE);
+}
+/* IT IS SPLIT INTO PAGES AND NOT SENT WHOLE. Gemini will take a PDF as one
+   attachment, and that is exactly how a page gets skipped — a twenty-page
+   document arrives as one blur and the model answers the questions it
+   noticed. The batching is what makes the read exhaustive, and it can only
+   work on pages. A whole PDF would also lock Kimi out entirely. */
+ok('every page goes through the ONE queue, as an ordinary picture',
+   /pdfToFiles\(f, room - live/.test(html) && /_filesToPages\(files, room0\)/.test(html));
+/* The strip IS the order of the paper, so a page that would not render is a
+   failed card WHERE IT BELONGS — one swept to the front sends a teacher
+   looking for the wrong page. */
+ok('…and a failed page keeps its place in the pile',
+   /if \(f && f\.dead\) \{[\s\S]{0,240}?status: 'error'/.test(html));
+ok('…and what reaches the queue is a PICTURE, never the PDF itself',
+   /new File\(\[arr\], name, \{ type: 'image\/jpeg' \}\)/.test(html));
+/* A page that will not render is a FAILED CARD. A page that vanishes reads as
+   one that was read and had nothing on it, which is the one thing this must
+   never do. */
+ok('a page that would not render is pushed as a failed card, never skipped',
+   /status: 'error', err: 'this page would not open'/.test(html));
+ok('…and the pages that would not open are named',
+   /' of “' \+ \(f\.name \|\| 'that PDF'\) \+ '” would not open/.test(html));
+ok('a document longer than there is room for says how many were left out',
+   /has ' \+ res\.total \+ ' pages and only the first '/.test(html));
+ok('a PDF that could not be opened at all says why', /could not be opened — ' \+/.test(html));
+/* A PDF page is transparent where nothing is drawn, and a transparent canvas
+   flattens to BLACK in a JPEG — the whole page, ink and all. */
+ok('the page is painted white before it is drawn',
+   /ctx\.fillStyle = '#fff';\s*\n\s*ctx\.fillRect\(0, 0, c\.width, c\.height\);\s*\n\s*await page\.render/.test(html));
+ok('…and rendered as JPEG, never PNG', /c\.toDataURL\('image\/jpeg', SCAN_JPEG_Q\)/.test(html));
+/* pdf.js DETACHES the buffer it is handed: pass the original and a second
+   read of the same file throws on an empty ArrayBuffer. */
+ok('pdf.js is handed a COPY of the bytes', /getDocument\(\{ data: buf\.slice\(0\) \}\)/.test(html));
+/* This app opens on a camera on a phone. Half a megabyte of library on every
+   load, for a feature most runs never touch, is the wrong trade. */
+ok('pdf.js is loaded only when a PDF is really chosen',
+   !/<script src="[^"]*pdf\.min\.js/.test(html) && /sc\.src = PDFJS_URL/.test(html));
+ok('…and its worker is pointed at before it is used',
+   /GlobalWorkerOptions\.workerSrc = PDFJS_WORKER/.test(html));
+ok('…and a failed load is not remembered as a failure for ever',
+   /_pdfjsLoading\.catch\(function \(\) \{ _pdfjsLoading = null; \}\)/.test(html));
+ok('the worker and the library are the same version',
+   api.PDFJS_URL.replace('pdf.min.js', '') === api.PDFJS_WORKER.replace('pdf.worker.min.js', ''));
+ok('a PDF can be chosen from the gallery button',
+   /id="galleryInput" accept="application\/pdf,image\/\*"/.test(html));
+
+/* ---------- 🔑 THE PAPER'S OWN ANSWER KEY ----------
+   "Mark it with reference to the answer in the pdf." The key beside a
+   question is in the same batch and needs nothing; the key at the BACK is a
+   problem of batching — the call marking page 1 has never seen page 11 and
+   never will, whatever the prompt says. So it is read first, in its own pass,
+   and handed to every batch as text. */
+ok('the key pass runs before a single question is marked',
+   /_scanKey = await _scanKeyPass\(run, shots\);[\s\S]{0,900}?await _runPages\(/.test(html));
+ok('…and every batch is told what it found', /_keyBlock\(_scanKey\) \+/.test(html));
+ok('…and last paper’s key never marks this one',
+   /_scanKey = null; +\/\/ last paper's key must never mark this one/.test(html));
+/* It only runs where a key could be somewhere the batch cannot see. One or
+   two photographed pages cannot hide a marking scheme, and spending a second
+   pass on the commonest case buys nothing. */
+ok('the pass stands down on a paper too short to hide a key',
+   /if \(shots\.length < SCAN_KEY_MIN_PAGES\) return null;/.test(html) &&
+   api.SCAN_KEY_MIN_PAGES >= 2);
+/* THE RATION IS PER RUN and is spent BEFORE the call, so a failure cannot buy
+   another try — the trap every other pass in this file is built around. */
+ok('the ration is spent before the call, not after',
+   /if \(_keyCallsLeft <= 0\) break;\s*\n\s*_keyCallsLeft--;/.test(html));
+ok('…and refilled once per run and nowhere else',
+   (html.match(/_keyCallsLeft = SCAN_KEY_CALLS/g) || []).length === 1);
+/* It TRANSCRIBES. A transcriber told what the answer should say writes that
+   down instead of what is on the page, so this call is deliberately the one
+   that is not grounded in the teaching notes — and it must never solve. */
+ok('the key pass is deliberately ungrounded',
+   /system: SCAN_KEY_SYS,/.test(html) && !/SCAN_KEY_SYS \+ aiGrounding/.test(html));
+ok('…and is told to transcribe, never to solve',
+   /TRANSCRIBE, NEVER SOLVE/.test(api.SCAN_KEY_SYS));
+ok('…and never to invent a row', /never invent a row/.test(api.SCAN_KEY_SYS));
+ok('…and that a child’s handwriting is not a key',
+   /Handwriting is not a key/.test(api.SCAN_KEY_SYS));
+ok('…and a page of questions with nothing filled in is not one',
+   /A page of QUESTIONS with nothing filled in is not a key/.test(api.SCAN_KEY_SYS));
+ok('the key call never asks for a page it was not given',
+   /return \{"keyPages":\[\],"rows":\[\]\}/.test(api.SCAN_KEY_SYS));
+
+/* A row is a number AND an answer. Either half missing is a row that can
+   never be matched to a question, or one that says nothing about it. */
+ok('a row needs both halves',
+   !api._keyRow({ number: '16' }) && !api._keyRow({ answer: '24 g' }) &&
+   !!api._keyRow({ number: '16', answer: '24 g' }));
+ok('a very long "answer" is cut rather than filling the prompt',
+   api._keyRow({ number: '1', answer: 'x'.repeat(5000) }).answer.length <= api.SCAN_KEY_ANS_CHARS);
+/* A paper and its marking scheme almost never number a question the same way
+   twice — the exam paper builder in the Learning Portal collapses them the
+   same way. */
+ok('"Q12 (b)", "12b" and "12(B)" are one question',
+   api.keyNumKey('Q12 (b)') === api.keyNumKey('12b') &&
+   api.keyNumKey('12b') === api.keyNumKey('12(B)'));
+ok('…and 12 is not 121', api.keyNumKey('12') !== api.keyNumKey('121'));
+{
+  /* Deduped by number: a marking scheme photographed twice, or a page sent
+     twice, must not put the same answer in the block twice. */
+  const k = api._keyFold([
+    { number: '16', answer: '24 g' },
+    { number: '16', answer: 'twenty-four grams' },
+    { number: '17', answer: '(2)' },
+    { number: '', answer: 'orphan' },
+    { number: '18', answer: '' }
+  ]);
+  ok('the same number is kept once, first one wins',
+     k.rows.length === 2 && k.byNum[api.keyNumKey('16')] === '24 g', JSON.stringify(k.rows));
+  ok('…and a half-row never reaches the block',
+     !k.rows.some(r => !r.number || !r.answer));
+  const big = api._keyFold(Array.from({ length: 400 }, (_, i) => ({ number: 'q' + i, answer: 'a' })));
+  ok('a runaway key is capped', big.rows.length === api.SCAN_KEY_MAX_ROWS, big.rows.length);
+}
+/* The block is only ever built when rows were really found, so a run with no
+   key carries not one extra character — and the authority rule sits with the
+   rows for the same reason: a paragraph about a key that is not there is
+   noise on every other run. */
+ok('no key means no block at all',
+   api._keyBlock(null) === '' && api._keyBlock({ rows: [], pages: [] }) === '');
+{
+  const block = api._keyBlock({ rows: [{ number: '16', answer: '24 g' }], pages: [9, 10], byNum: {} });
+  ok('the block gives the key row by row', /16 → 24 g/.test(block));
+  ok('…and says which pages it came off', /pages 9, 10/.test(block));
+  /* THE KEY IS THE AUTHORITY ON WHAT THE ANSWER IS, NOT ON HOW IT MUST BE
+     WORDED. A key says "24 g" and a child who wrote "24 grams" is right; a
+     key says "it evaporates" and "it turns into water vapour" is right. Lose
+     this and the app marks on characters, which is worse than not marking. */
+  ok('…and that the key decides the answer', /USE IT FIRST/.test(block));
+  ok('…but that marking is on MEANING, not on matching its characters',
+     /Mark on MEANING/.test(block) && /Never mark a student wrong for not/.test(block));
+  ok('…and that the teacher’s own marking standards decide what is acceptable',
+     /marking standards you were given above/.test(block));
+  /* A printed key can hold a misprint. The key stands — it is the paper
+     speaking — but a disagreement resolved silently either way is the one
+     thing a marked script must not do. */
+  ok('…and that a disagreement is SAID rather than resolved in silence',
+     /IF YOUR OWN WORKING DISAGREES/.test(block) && /"keyNote"/.test(block));
+  ok('…and that the key pages are not returned as questions',
+     /DO NOT RETURN THE ANSWER-KEY PAGES AS QUESTIONS/.test(block));
+}
+/* 🔑 is only worth anything if a teacher can trust it. A model that stamps
+   "key" on a run with no key in it would put the badge on every card. */
+{
+  api.scanKey = null;
+  ok('🔑 is refused on a run with no key and no answer',
+     api._keySourceOf({ answerSource: 'key', answer: '' }) === '');
+  ok('…but the INLINE case still earns it — a key printed beside the question',
+     api._keySourceOf({ answerSource: 'key', answer: '24 g' }) === 'key');
+  api.scanKey = { rows: [{ number: '1', answer: 'a' }], pages: [9], byNum: {} };
+  ok('…and a run that really read a key earns it',
+     api._keySourceOf({ answerSource: 'key', answer: '24 g' }) === 'key');
+  ok('"worked" is never a key', api._keySourceOf({ answerSource: 'worked', answer: 'x' }) === '');
+  ok('…and neither is a missing field', api._keySourceOf({ answer: 'x' }) === '');
+  api.scanKey = null;
+}
+/* A teacher who has just rewritten the answer owns it: leaving 🔑 on the card
+   would claim the paper's key said something it did not. */
+{
+  const it = { answer: '24 g', answerSource: 'key', keyNote: 'I make it 25 g.', marked: false, options: [] };
+  api._ansEditApply(it, { answer: '25 g', explanation: '' });
+  ok('rewriting the answer takes 🔑 off the card',
+     it.answerSource === '' && it.keyNote === '');
+  const same = { answer: '24 g', answerSource: 'key', keyNote: 'note', marked: false, options: [] };
+  api._ansEditApply(same, { answer: '24 g', explanation: 'why' });
+  ok('…and leaving it alone keeps it', same.answerSource === 'key' && same.keyNote === 'note');
+}
+/* An answer-key page returns no questions, which is the key doing its job —
+   not a page that failed. Said as "nothing on this page" it reads as a page
+   the app could not manage. */
+ok('a key page says what it is rather than "nothing on this page"',
+   /if \(s\.status === 'key'\) return '🔑 answer key';/.test(html) &&
+   /_scanKey\.pages\.indexOf\(start \+ k \+ 1\) >= 0 \? 'key' : 'empty'/.test(html));
+/* A phone has no hover, so the disagreement is on the card as well as in the
+   chip's title — a warning nobody can read is not a warning. */
+ok('the disagreement is printed on the card, not only in a tooltip',
+   /class="keyNoteBox"/.test(html));
+ok('the repair pass is told when an answer came off the key',
+   /the paper's own answer key" : 'already worked out'/.test(html));
 
 /* ---------- 💬 Ask Mr Chung ---------- */
 ok('the number is the one asked for, in full international form',

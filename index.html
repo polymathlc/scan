@@ -301,6 +301,25 @@
     background: #FCEDEB; color: #8C2E1D; border: 1px solid #EFC6BF;
     border-radius: 999px; padding: 3px 12px;
   }
+  /* 🔑 Where the answer came from — the paper's own key, or worked out here.
+     Green because it is the STRONGER of the two: this mark was made against
+     the paper rather than against a model's opinion of it. */
+  .keyChip {
+    font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+    background: #F4FAF4; color: #2C6B33; border: 1px solid #CFE7D0;
+    border-radius: 999px; padding: 3px 12px;
+  }
+  .keyWarn {
+    font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+    background: #FDF4E3; color: #7A5410; border: 1px solid #E7BD72;
+    border-radius: 999px; padding: 3px 12px;
+  }
+  .keyNoteBox {
+    margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm);
+    background: #FDF4E3; border: 1px solid #E7BD72;
+  }
+  .keyNoteLabel { font-size: 0.72rem; font-weight: 700; color: #7A5410; letter-spacing: .03em; text-transform: uppercase; }
+  .keyNoteText { font-size: 0.9rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
   .youBox { margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--line); }
   .youLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
   .youText { font-size: 0.92rem; margin-top: 4px; white-space: pre-wrap; }
@@ -727,14 +746,14 @@
     <div id="snapEmpty" class="snapEmpty">
       <div class="padIcon">📷</div>
       <div class="padTitle">Photograph the page — or just ask</div>
-      <div class="padSub" id="padSub">One photo per page, then press ✓.<br>Or type your question below and press ✓ with no photo at all.</div>
+      <div class="padSub" id="padSub">One photo per page, then press ✓.<br>Or tap 🖼 to send a PDF — every page of it is read.<br>Or type your question below and press ✓ with no photo at all.</div>
     </div>
 
     <!-- The picker's value is cleared BEFORE the files are queued: an input
          still holding last time's file fires no `change` for the same photo
          picked twice, so the second tap would do nothing at all. -->
     <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple style="display:none">
-    <input type="file" id="galleryInput" accept="image/*" multiple style="display:none">
+    <input type="file" id="galleryInput" accept="application/pdf,image/*" multiple style="display:none">
 
     <div class="shots" id="shots"></div>
 
@@ -1020,7 +1039,7 @@
     <button class="askBtn" id="micBtn" type="button" title="Dictate" hidden>🎤</button>
   </div>
   <div class="camBar hidden" id="camBar">
-    <button class="camSide" id="galleryBtn" title="Choose pictures from your gallery">
+    <button class="camSide" id="galleryBtn" title="Choose a PDF, or pictures from your gallery">
       <span id="galleryFace">🖼</span>
       <span class="camBadge hidden" id="shotBadge">0</span>
     </button>
@@ -1268,7 +1287,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.25.0';
+var APP_VERSION = 'v1.26.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2250,6 +2269,7 @@ var SCAN_PHOTO_MAX_SIDE = 2200;  // small print survives this; the whole read re
 var SCAN_JPEG_Q = 0.9;
 
 var _shots = [];                 // [{ id, name, url, mimeType, data, status, err, n }]
+var _pdfBusy = false;            // a PDF is being split into pages
 var _shotSeq = 0;
 var _answers = [];               // [{ number, page, question, options[], option, answer, explanation }]
 var _scanning = false;
@@ -2375,6 +2395,7 @@ var SCAN_SYS =
   '"marks":"2/3 when the paper prints a mark allocation, otherwise an empty string",' +
   '"feedback":"what to say to the student about what they wrote, or an empty string",' +
   '"subject":"science | math | english | chinese",' +
+  '"answerSource":"key | worked","keyNote":"",' +
   '"questionBox":[ymin,xmin,ymax,xmax],"diagramBox":[ymin,xmin,ymax,xmax]}]}. ' +
   'Rules: one entry for every question actually PRINTED on the ' +
   'attached pictures, in the order they appear, keeping the paper\'s own numbering in "number" ("16", "3a"). ' +
@@ -2400,6 +2421,14 @@ var SCAN_SYS =
   'arithmetic back against the numbers printed on the page. A quick wrong answer is worse than no answer. ' +
   SCAN_SUBJECT_FIELD_RULE +
   SCAN_MARK_RULE +
+  /* Where the answer came from. A teacher checking a mark has to know whether
+     it was taken off the paper's own key or worked out by a model, so the
+     card says which — the same reason the Learning Portal's Mark Paper badges
+     every row it marks. */
+  '"answerSource" is "key" when the answer you give is the one the paper itself prints — an answer key or ' +
+  'marking scheme on these pages, or one given to you above — and "worked" when you worked it out yourself. ' +
+  '"keyNote" is empty unless a printed key and your own working disagree, and then it is ONE plain sentence ' +
+  'saying what you worked out and why it differs. ' +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
 
 /* ---- The instruction, alongside the pages ----
@@ -2731,20 +2760,209 @@ async function _prepShot(file) {
   }
 }
 
-async function addShots(files) {
-  files = Array.prototype.slice.call(files || []).filter(function (f) {
-    return f && f.type && f.type.indexOf('image/') === 0;
+/* =====================================================================
+   📄 A PDF IS A PILE OF PAGES
+   ---------------------------------------------------------------------
+   A parent asked for this in as many words: let the child upload the PDF he
+   did his working on and have the app mark it against the answer key printed
+   in the same PDF.
+
+   IT IS SPLIT INTO PAGES AND NOTHING ELSE IS NEW. Every page is rendered to
+   a picture and handed to `addShots` — the ONE queue — so from that moment on
+   a PDF page is a photographed page: the same batching, the same continuation
+   stitching across a page break, the same marking, the same report, the same
+   mistake book. Do not give a PDF its own pipeline.
+
+   AND IT IS NOT SENT WHOLE. Gemini will take a PDF as one attachment, and
+   that is exactly how a page gets skipped: a twenty-page document arrives as
+   one blur of context and the model quietly answers the questions it noticed.
+   The batching (SCAN_BATCH pages a call) is what makes the read exhaustive,
+   and it can only work on pages. A whole PDF would also lock out Kimi
+   entirely, which refuses one by name rather than sending a request without
+   its pages.
+
+   EVERY PAGE IS ACCOUNTED FOR. A page that will not render is pushed as a
+   FAILED card rather than skipped, because a page that vanishes reads as one
+   that was read and had nothing on it — which is the one thing this must
+   never do. A document longer than there is room for says how many pages
+   were left out, and names them.
+
+   pdf.js is loaded ONLY when a PDF is really chosen. This app opens on a
+   camera on a phone, and half a megabyte of library on every load for a
+   feature most runs never touch is the wrong trade. */
+var PDFJS_VER = '3.11.174';
+var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VER + '/pdf.min.js';
+var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VER + '/pdf.worker.min.js';
+var PDF_MAX_SCALE = 4;           // a poster-sized page must not blow the canvas
+var PDF_MIN_SCALE = 1.6;         // …and a small one is still rendered above its own size
+var _pdfjsLoading = null;
+
+function pdfIsPdf(f) {
+  return !!f && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''));
+}
+
+function pdfjsReady() {
+  if (typeof pdfjsLib !== 'undefined' && pdfjsLib && pdfjsLib.getDocument) return Promise.resolve(pdfjsLib);
+  if (_pdfjsLoading) return _pdfjsLoading;
+  _pdfjsLoading = new Promise(function (resolve, reject) {
+    var sc = document.createElement('script');
+    sc.src = PDFJS_URL;
+    sc.onload = function () {
+      if (typeof pdfjsLib === 'undefined' || !pdfjsLib || !pdfjsLib.getDocument) {
+        reject(new Error('the PDF reader did not load'));
+        return;
+      }
+      try { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; } catch (e) {}
+      resolve(pdfjsLib);
+    };
+    sc.onerror = function () { reject(new Error('the PDF reader could not be downloaded')); };
+    document.head.appendChild(sc);
   });
-  if (!files.length) { toast('Choose pictures — photos of the pages, not a PDF.', 4000); return; }
-  var room = SCAN_MAX_SHOTS - _shots.length;
-  if (room <= 0) { toast('That is ' + SCAN_MAX_SHOTS + ' pictures already — read these first.', 5000); return; }
-  if (files.length > room) {
-    toast('Only ' + room + ' more picture' + (room === 1 ? '' : 's') + ' will fit — the rest were left out.', 5000);
-    files = files.slice(0, room);
+  // A failed load must not be remembered as a failure for ever — the next
+  // try is usually a better connection, not a broken app.
+  _pdfjsLoading.catch(function () { _pdfjsLoading = null; });
+  return _pdfjsLoading;
+}
+
+/* The scale to render one page at. A PDF page is measured at 72dpi, so an A4
+   is 595 points across and rendering it at 1 is unreadable print. The long
+   side is taken up to SCAN_PHOTO_MAX_SIDE — the same ceiling a phone photo
+   is shrunk to, because the whole read rests on the small print and "$140.20"
+   and "$14.20" are the same handful of pixels. */
+function pdfPageScale(w, h) {
+  var max = Math.max(w || 0, h || 0);
+  if (!max) return PDF_MIN_SCALE;
+  return Math.max(PDF_MIN_SCALE, Math.min(PDF_MAX_SCALE, SCAN_PHOTO_MAX_SIDE / max));
+}
+
+/* One page → a JPEG File, ready for the ordinary queue. JPEG and never PNG:
+   a rendered page as PNG is several times the size for no more legibility,
+   and the size is what the model is charged on. */
+async function _pdfPageToFile(pdf, n, name) {
+  var page = await pdf.getPage(n);
+  var v1 = page.getViewport({ scale: 1 });
+  var vp = page.getViewport({ scale: pdfPageScale(v1.width, v1.height) });
+  var c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(vp.width));
+  c.height = Math.max(1, Math.round(vp.height));
+  var ctx = c.getContext('2d');
+  // A PDF page is transparent where nothing is drawn, and a transparent
+  // canvas flattens to BLACK in a JPEG — the whole page, ink and all.
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  var dataUrl = c.toDataURL('image/jpeg', SCAN_JPEG_Q);
+  c.width = c.height = 0;                 // let the bitmap go before the next page
+  var bin = atob(dataUrl.split(',')[1] || '');
+  var len = bin.length, arr = new Uint8Array(len);
+  while (len--) arr[len] = bin.charCodeAt(len);
+  return new File([arr], name, { type: 'image/jpeg' });
+}
+
+/* Every page of one PDF, in order, as picture files. `room` is how many will
+   fit; anything past it is REPORTED rather than dropped in silence. */
+async function pdfToFiles(file, room, onProgress) {
+  var lib = await pdfjsReady();
+  var buf = await file.arrayBuffer();
+  // pdf.js DETACHES the buffer it is handed, so it gets a copy.
+  var pdf = await lib.getDocument({ data: buf.slice(0) }).promise;
+  var total = pdf.numPages || 0;
+  var take = Math.max(0, Math.min(total, room));
+  var base = String(file.name || 'document').replace(/\.pdf$/i, '');
+  var out = [], failed = [];
+  for (var n = 1; n <= take; n++) {
+    if (onProgress) onProgress(n, take, total);
+    try {
+      out.push(await _pdfPageToFile(pdf, n, base + ' p' + n + '.jpg'));
+    } catch (e) {
+      // Named, never skipped: a page that vanishes reads as one that was
+      // read and held nothing.
+      console.warn('pdf: page ' + n + ' would not render', e);
+      failed.push(n);
+      out.push(null);
+    }
+  }
+  try { pdf.destroy(); } catch (e) {}
+  return { files: out, total: total, taken: take, failed: failed };
+}
+
+/* Turn whatever was chosen into pictures: a PDF becomes its pages, a picture
+   stays itself, and the order they were chosen in is kept — the page numbers
+   every answer cites are this order. Anything that is neither is refused BY
+   NAME rather than swallowed. */
+async function _filesToPages(files, room) {
+  /* ONE ORDERED LIST. A page that would not render is a `{ dead: name }`
+     marker where it belongs, not a card swept to the front — the strip IS the
+     order of the paper, and a failure shown in the wrong place is a teacher
+     looking for the wrong page. */
+  var out = [], notes = [], live = 0;
+  for (var i = 0; i < files.length && live < room; i++) {
+    var f = files[i];
+    if (pdfIsPdf(f)) {
+      var res;
+      try {
+        res = await pdfToFiles(f, room - live, function (n, take) {
+          scanProgress(n - 1, take, '📄 Opening “' + (f.name || 'the PDF') + '” — page ' + n + ' of ' + take + '…');
+        });
+      } catch (e) {
+        console.warn('pdf: could not be opened', e);
+        notes.push('“' + (f.name || 'that PDF') + '” could not be opened — ' + ((e && e.message) || 'it may be password-protected or damaged') + '.');
+        continue;
+      }
+      res.files.forEach(function (pf, k) {
+        if (pf) { out.push(pf); live++; }
+        else out.push({ dead: (f.name || 'PDF') + ' page ' + (k + 1) });
+      });
+      if (res.taken < res.total) {
+        notes.push('“' + (f.name || 'That PDF') + '” has ' + res.total + ' pages and only the first ' +
+          res.taken + ' fitted — read these, then send the rest.');
+      }
+      if (res.failed.length) {
+        notes.push('Page' + (res.failed.length === 1 ? ' ' : 's ') + res.failed.join(', ') +
+          ' of “' + (f.name || 'that PDF') + '” would not open.');
+      }
+    } else if (f && f.type && f.type.indexOf('image/') === 0) {
+      out.push(f);
+      live++;
+    } else {
+      notes.push('“' + ((f && f.name) || 'that file') + '” is not a PDF or a picture, so it was left out.');
+    }
+  }
+  scanProgressOff();
+  return { files: out, live: live, notes: notes };
+}
+
+async function addShots(files) {
+  files = Array.prototype.slice.call(files || []);
+  if (!files.length) return;
+  var room0 = SCAN_MAX_SHOTS - _shots.length;
+  if (room0 <= 0) { toast('That is ' + SCAN_MAX_SHOTS + ' pages already — read these first.', 5000); return; }
+  var hasPdf = files.some(pdfIsPdf);
+  if (hasPdf) { _pdfBusy = true; renderShots(); }
+  var prepared;
+  try {
+    prepared = await _filesToPages(files, room0);
+  } finally {
+    _pdfBusy = false;
+  }
+  prepared.notes.forEach(function (msg) { toast(msg, 7000); });
+  files = prepared.files;
+  if (!files.length) {
+    renderShots();
+    if (!prepared.notes.length) toast('Choose a PDF or photos of the pages.', 4000);
+    return;
   }
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     var id = 'shot_' + (++_shotSeq);
+    // A page that would not render is a FAILED card IN ITS OWN PLACE, never a
+    // silent gap and never swept to the front of the pile.
+    if (f && f.dead) {
+      _shots.push({ id: id, name: f.dead, url: '', mimeType: '', data: '',
+                    status: 'error', err: 'this page would not open', n: 0 });
+      renderShots();
+      continue;
+    }
     var shot = { id: id, name: f.name || 'photo', url: '', mimeType: '', data: '', status: '', err: '', n: 0 };
     _shots.push(shot);
     renderShots();
@@ -2778,6 +2996,7 @@ function moveShot(id, dir) {
 function shotStateText(s) {
   if (s.status === 'error') return '⚠ ' + (s.err || 'could not be read');
   if (s.status === 'reading') return '⏳ reading…';
+  if (s.status === 'key') return '🔑 answer key';
   if (s.status === 'done') return '✓ ' + s.n + ' question' + (s.n === 1 ? '' : 's');
   if (s.status === 'empty') return '· nothing on this page';
   return '';
@@ -2826,16 +3045,20 @@ function renderCamBar() {
     face.innerHTML = '🖼';
   }
 
-  $('galleryBtn').disabled = _scanning;
-  $('cameraBtn').disabled = _scanning;
+  // Splitting a PDF holds the buttons exactly as a run does: a second pile
+  // queued on top of one still being rendered is pages in the wrong order,
+  // and the order IS the page numbers every answer cites.
+  var busy = _scanning || _pdfBusy;
+  $('galleryBtn').disabled = busy;
+  $('cameraBtn').disabled = busy;
   // Either half is enough to press ✓ with: pages, or a typed question, or
   // both. A ✓ that stayed flat while a question sat in the box would be the
   // app refusing to answer something it can perfectly well answer.
   var ask = askText();
   var done = $('readBtn');
-  done.disabled = _scanning || (!ready.length && !ask);
-  done.innerHTML = _scanning ? '<span class="camSpin"></span>' : '✓';
-  done.title = _scanning ? 'Working…' : (ready.length ? 'Read and answer' : 'Answer what you asked');
+  done.disabled = busy || (!ready.length && !ask);
+  done.innerHTML = busy ? '<span class="camSpin"></span>' : '✓';
+  done.title = _scanning ? 'Working…' : (_pdfBusy ? 'Opening the PDF…' : (ready.length ? 'Read and answer' : 'Answer what you asked'));
 
   var box = $('askText');
   if (box) box.disabled = _scanning;
@@ -2952,6 +3175,7 @@ function _scanPrompt(n, from, total, carry, ask) {
       ' of ' + total + ' of a Singapore worksheet or exam paper, in order. ' + who + '\n' +
     SCAN_READING_NOTE +
     scanSubjectRule() +
+    _keyBlock(_scanKey) +
     'Find EVERY question printed on these pages. Work the correct answer to each one out yourself first. Then, ' +
     'question by question: where the student has written something, mark it and write them feedback; where the ' +
     'question is blank, leave the marking fields empty and just give the answer.\n' +
@@ -2961,6 +3185,187 @@ function _scanPrompt(n, from, total, carry, ask) {
     'Every other entry has "continuation": false.\n' +
     SCAN_DETAIL_RULE[detail] + '\n' +
     'Count the questions on these pages, then check your reply has that many entries before you send it.';
+}
+
+/* =====================================================================
+   🔑 THE PAPER'S OWN ANSWER KEY
+   ---------------------------------------------------------------------
+   A parent asked for this: the child uploads the PDF he did his working on,
+   and the app marks it AGAINST THE ANSWER PRINTED IN THAT SAME PDF. Most
+   practice papers carry their key — beside each question, or as a marking
+   scheme at the back.
+
+   THE INLINE CASE NEEDS NOTHING. A key printed beside its question is in the
+   same batch as the question, so the main read already sees it.
+
+   THE KEY AT THE BACK IS THE WHOLE PROBLEM, and it is a problem of BATCHING.
+   Pages are read SCAN_BATCH at a time — that is what makes the read
+   exhaustive rather than a twenty-page blur — so the call marking pages 1–3
+   has never seen the marking scheme on page 11 and never will. No amount of
+   prompting fixes that: the pages are not in the request.
+
+   So the key is read FIRST, in its own cheap pass over every page, and the
+   rows it finds are handed to every batch as TEXT. One extra pass, bounded by
+   a ration, with a small output and low thinking — it transcribes, it does
+   not solve.
+
+   IT ONLY RUNS WHEN A KEY COULD BE SOMEWHERE ELSE (SCAN_KEY_MIN_PAGES). One
+   or two photographed pages cannot hide a marking scheme the main read will
+   not already see, and spending a second pass on the commonest case — a
+   worksheet photographed on the spot — buys nothing.
+
+   AND THE KEY IS THE AUTHORITY ON WHAT THE ANSWER IS, NOT ON HOW IT MUST BE
+   WORDED. That distinction is the whole of the marking: a key says "24 g" and
+   a child who wrote "24 grams" is right; a key says "it evaporates" and a
+   child who wrote "it turns into water vapour" is right. What decides that is
+   the teacher's own marking standards, which reach this prompt through
+   aiGrounding('scan') like everything else. Mark on meaning, never on
+   matching the key's characters. */
+var SCAN_KEY_MIN_PAGES = 3;      // below this, nothing can be on a page the batch cannot see
+var SCAN_KEY_BATCH = 6;          // pages per key call — it transcribes, so it can take more
+var SCAN_KEY_CALLS = 6;          // the ration, per run, spent BEFORE the call
+var SCAN_KEY_MAX_ROWS = 240;     // a whole paper's worth, and a ceiling
+var SCAN_KEY_ANS_CHARS = 220;    // a key gives the answer, not the lesson
+var _scanKey = null;             // { rows: [{ number, answer }], pages: [n], byNum: {} }
+var _keyCallsLeft = 0;
+
+var SCAN_KEY_SYS =
+  'You are transcribing an ANSWER KEY. The attached pictures are pages of a Singapore worksheet or exam ' +
+  'paper. Some of them may be a printed answer key, a marking scheme, a solutions page or a page that ' +
+  'prints the answers beside the questions; most of them are probably just questions. ' +
+  'Reply with STRICT JSON only, no markdown, exactly this shape: ' +
+  '{"keyPages":[1],"rows":[{"number":"16","answer":"24 g"}]}. ' +
+  '"keyPages" lists which of the attached pictures are answer-key or marking-scheme pages, 1 for the first ' +
+  'attached picture — an EMPTY list when none of them is. ' +
+  '"rows" is one entry per answer the key gives, in the order printed, "number" copying the paper\'s own ' +
+  'numbering exactly ("16", "8(a)") and "answer" being the answer the key gives, copied as it stands — the ' +
+  'value with its unit, the correct option\'s number or letter, or the model answer condensed to one or two ' +
+  'short sentences. ' +
+  'TRANSCRIBE, NEVER SOLVE. You are copying what is printed; if a page holds no printed answers, return no ' +
+  'rows for it. Do not work anything out, do not correct the key, and never invent a row for a question ' +
+  'whose answer is not printed on these pages — a made-up key is worse than no key, because every question ' +
+  'it touches is then marked against it. ' +
+  'A page of QUESTIONS with nothing filled in is not a key. Handwriting is not a key either: a child\'s own ' +
+  'answer written on the paper is the thing being marked, so ignore it here and transcribe only what is ' +
+  'PRINTED as the answer. ' +
+  'If none of these pages is an answer key, return {"keyPages":[],"rows":[]}. ' +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+function _keyPrompt(n, from, total) {
+  return 'The attached ' + (n === 1 ? 'picture is page ' + from : n + ' pictures are pages ' + from + '–' + (from + n - 1)) +
+    ' of ' + total + ' of one document, in order.\n' +
+    'Is any of them a printed answer key or marking scheme, and if so what answers does it give? ' +
+    'Transcribe only what is printed. Return {"keyPages":[],"rows":[]} if none of them is.';
+}
+
+/* One key row, kept only if it is really a row: a number AND an answer.
+   Either half missing is a row that can never be matched to a question or
+   can never say anything about one. */
+function _keyRow(r) {
+  var number = _scanStr(r && r.number, 24);
+  var answer = _scanStr(r && r.answer, SCAN_KEY_ANS_CHARS);
+  if (!number || !answer) return null;
+  return { number: number, answer: answer };
+}
+
+/* The number a key row and a question are matched on. Same job as the exam
+   paper builder's `_epNumKey` in the Learning Portal: a paper and its marking
+   scheme almost never number a question the same way twice, so "Q12 (b)",
+   "12b" and "12(B)" all collapse to one key. */
+function keyNumKey(n) {
+  // The leading "Q" goes: a marking scheme printing "Q12 (b)" against a paper
+  // printing "12(b)" is the SAME question, and that is the commonest way the
+  // two disagree about how a question is written down.
+  return String(n == null ? '' : n).toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^q(?=\d)/, '');
+}
+
+/* The rows folded into one key. Deduped by number — a marking scheme printed
+   twice, or a page photographed twice, must not put the same answer in twice
+   and make the block twice as long as the paper. */
+function _keyFold(rows, into) {
+  var key = into || { rows: [], pages: [], byNum: {} };
+  (rows || []).forEach(function (raw) {
+    if (key.rows.length >= SCAN_KEY_MAX_ROWS) return;
+    var r = _keyRow(raw);
+    if (!r) return;
+    var k = keyNumKey(r.number);
+    if (!k || key.byNum[k]) return;
+    key.byNum[k] = r.answer;
+    key.rows.push(r);
+  });
+  return key;
+}
+
+/* What the main read is told. It is only ever built when rows were really
+   found, so a run with no key carries not one extra character — and the
+   authority rule sits HERE rather than in SCAN_SYS for the same reason: a
+   paragraph about a key that is not there is noise on every other run. */
+function _keyBlock(key) {
+  if (!key || !key.rows.length) return '';
+  return 'THE PAPER\'S OWN ANSWER KEY, transcribed from ' +
+      (key.pages.length
+        ? 'page' + (key.pages.length === 1 ? ' ' : 's ') + key.pages.join(', ') + ' of this document'
+        : 'this document') + ':\n' +
+    key.rows.map(function (r) { return r.number + ' → ' + r.answer; }).join('\n') + '\n' +
+    'USE IT FIRST. Where a question below has a row here, that row is what the answer IS: put it in "answer" ' +
+    'and set "answerSource" to "key". Work the question out yourself as well, as a check — but the key is the ' +
+    'paper speaking and it stands. Where a question has NO row here, work the answer out yourself as usual and ' +
+    'set "answerSource" to "worked".\n' +
+    'THE KEY SAYS WHAT THE ANSWER IS, NOT HOW IT HAS TO BE WORDED. Mark on MEANING. The same value written ' +
+    'differently or with the unit spelled out, the same idea in different words, the same result reached by ' +
+    'another valid method — all correct. The marking standards you were given above decide which wordings are ' +
+    'acceptable; apply them, and accept any answer a fair teacher would. Never mark a student wrong for not ' +
+    'matching the key\'s exact characters.\n' +
+    'IF YOUR OWN WORKING DISAGREES WITH THE KEY, the key still stands as "answer" — but say so: put one plain ' +
+    'sentence in "keyNote" giving what you worked out and why it differs, and say the same thing in "feedback" ' +
+    'rather than marking the student wrong in silence. A key can hold a misprint, and that is for a teacher to ' +
+    'look at. Leave "keyNote" empty whenever you and the key agree.\n' +
+    'DO NOT RETURN THE ANSWER-KEY PAGES AS QUESTIONS. The printed answers on them are the paper speaking, not a ' +
+    'student\'s work: no entry, no marking.\n';
+}
+
+/* The pass itself. It never throws at its caller: a key that could not be
+   read is a run WITHOUT a key, which is exactly the run this app has always
+   done — and far better than a run that stops because of it. */
+async function _scanKeyPass(run, shots) {
+  if (shots.length < SCAN_KEY_MIN_PAGES) return null;
+  var key = { rows: [], pages: [], byNum: {} };
+  for (var start = 0; start < shots.length; start += SCAN_KEY_BATCH) {
+    if (run !== _scanRun) return null;
+    if (_keyCallsLeft <= 0) break;
+    _keyCallsLeft--;                            // spent BEFORE the call, so a failure buys no retry
+    var batch = shots.slice(start, start + SCAN_KEY_BATCH);
+    scanProgress(start, shots.length,
+      '🔑 Looking for the answer key — page ' + (start + 1) +
+      (batch.length > 1 ? '–' + (start + batch.length) : '') + ' of ' + shots.length + '…');
+    try {
+      var raw = await window.askGemini(_keyPrompt(batch.length, start + 1, shots.length), {
+        // It TRANSCRIBES. A transcriber told what the answer should say
+        // writes that down instead of what is on the page, which is why
+        // this call is deliberately ungrounded.
+        system: SCAN_KEY_SYS,
+        maxOutputTokens: 4096,
+        // No thinkingLevel on purpose: the engine's own floor is the right
+        // one for copying words off a page, and naming it here would freeze
+        // a level this file cannot see (AI_THINK_MIN is the module's, not a
+        // global) the day the model's scale changes again.
+        temperature: 0,
+        json: true,
+        images: batch.map(function (s) { return { mimeType: s.mimeType, data: s.data }; })
+      });
+      var p = _parseAIJson(raw) || {};
+      _keyFold(p.rows, key);
+      (Array.isArray(p.keyPages) ? p.keyPages : []).forEach(function (n) {
+        var page = start + (Number(n) || 0);     // batch-local → the whole document
+        if (page >= start + 1 && page <= start + batch.length && key.pages.indexOf(page) < 0) key.pages.push(page);
+      });
+    } catch (e) {
+      console.warn('key: that batch could not be read', e);
+    }
+  }
+  if (run !== _scanRun) return null;
+  key.pages.sort(function (a, b) { return a - b; });
+  return key.rows.length ? key : null;
 }
 
 /* The three verdicts, and nothing else. Anything the model invents beyond
@@ -3188,8 +3593,25 @@ function _scanNewItem(r, batchStart, batchLen) {
     studentAnswer: mk.studentAnswer,
     verdict: mk.verdict,
     marks: mk.marks,
-    feedback: mk.feedback
+    feedback: mk.feedback,
+    // Where the answer came from, and the disagreement if there was one.
+    answerSource: _keySourceOf(r),
+    keyNote: _scanStr(r && r.keyNote, 400)
   };
+}
+
+/* 🔑 or nothing. `answerSource` is only ever believed when it says "key" AND
+   a key was really in play — one read off the paper into `_scanKey`, or one
+   printed on the pages the model was reading. A model that stamps "key" on a
+   run with no key in it would put a 🔑 on every card, and a badge that is on
+   every card says nothing at all. The badge's whole value is that a teacher
+   can trust it: this mark came off the paper, not out of a model. */
+function _keySourceOf(r) {
+  if (String((r && r.answerSource) || '').toLowerCase().trim() !== 'key') return '';
+  if (_scanKey && _scanKey.rows.length) return 'key';
+  // The inline case — a key printed beside the question, so the batch saw it
+  // without the key pass ever running.
+  return (r && _scanStr(r.answer, 900)) ? 'key' : '';
 }
 
 /* Fold a batch's rows into the run. The ONE place `continuation` is honoured:
@@ -3419,7 +3841,15 @@ function _markFixPrompt(items) {
         (it.options && it.options.length
           ? '\nOPTIONS: ' + it.options.map(function (o) { return '(' + o.label + ') ' + o.text; }).join('  ')
           : '') +
-        '\nCORRECT ANSWER (already worked out — do not change it): ' + _scanStr(it.answer, 700);
+        '\nCORRECT ANSWER (' + (it.answerSource === 'key' ? "the paper's own answer key" : 'already worked out') +
+          ' — do not change it): ' + _scanStr(it.answer, 700) +
+        /* The key says what the answer IS, never how it has to be worded —
+           the same rule the main read is held to, restated here because this
+           call decides a verdict on its own. */
+        (it.answerSource === 'key'
+          ? '\n(That is the paper\'s key. Mark on MEANING: the same value written differently, the same idea ' +
+            'in other words or the same result by another method is correct.)'
+          : '');
     }).join('\n\n');
 }
 
@@ -3570,7 +4000,9 @@ async function _runPages(run, shots, ask, detail, failedPages) {
     batch.forEach(function (s, k) {
       var n = madeOn[start + k + 1] || 0;
       s.n = n;
-      s.status = n ? 'done' : 'empty';
+      // A key page returning no questions is the key doing its job, not a
+      // page that failed — so it keeps saying what it is.
+      s.status = n ? 'done' : (_scanKey && _scanKey.pages.indexOf(start + k + 1) >= 0 ? 'key' : 'empty');
     });
     // Whatever the last entry was, the next batch may be continuing it.
     var last = _answers[_answers.length - 1];
@@ -3639,6 +4071,8 @@ async function runScan() {
   _scanning = true;
   _algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS;   // a fresh ration, once, per run
   _markFixLeft = SCAN_MARK_FIX_CALLS;         // and the same for the marking repair
+  _keyCallsLeft = SCAN_KEY_CALLS;             // …and for the hunt for the answer key
+  _scanKey = null;                            // last paper's key must never mark this one
   _answers = [];
   _report = null;                 // last paper's report must never outlive its paper
   _askedFor = ask;
@@ -3651,6 +4085,27 @@ async function runScan() {
   $('answersWrap').classList.remove('hidden');
 
   try {
+    /* 🔑 THE KEY IS READ BEFORE A SINGLE QUESTION IS MARKED, and it has to
+       be: the pages are read SCAN_BATCH at a time, so the call marking page
+       1 has never seen the marking scheme on page 11. It never throws — a
+       key that could not be read is a run without one, which is every run
+       this app did before this existed. */
+    if (shots.length) {
+      _scanKey = await _scanKeyPass(run, shots);
+      if (run !== _scanRun) return;
+      if (_scanKey) {
+        // The pages the key was on are SAID so, or they come back "nothing on
+        // this page" at the end of the run — which reads as a page that
+        // failed rather than one that did its job.
+        _scanKey.pages.forEach(function (n) {
+          var sh = shots[n - 1];
+          if (sh) { sh.status = 'key'; sh.n = 0; }
+        });
+        renderShots();
+        toast('🔑 Found the answer key — ' + _scanKey.rows.length + ' answer' +
+          (_scanKey.rows.length === 1 ? '' : 's') + '. Marking against it.', 5000);
+      }
+    }
     if (shots.length) await _runPages(run, shots, ask, detail, failedPages);
     else askErr = await _runAskAlone(run, ask, detail);
   } finally {
@@ -3753,8 +4208,14 @@ function _ansOptionFrom(it, answer) {
 function _ansEditApply(it, patch) {
   if (!it || !patch) return it;
   var before = JSON.stringify([it.answer, it.explanation, it.verdict, it.marks, it.feedback, it.option || '']);
+  var wasAnswer = it.answer;
   it.answer = _ansTrim(patch.answer, ANS_ANSWER_MAX);
   it.option = _ansOptionFrom(it, it.answer);
+  /* A teacher who has just rewritten the answer owns it: leaving 🔑 on the
+     card would claim the paper's key said something it did not, which is the
+     one thing that badge must never do. The disagreement note goes with it —
+     it was about an answer that is no longer on the card. */
+  if (it.answer !== wasAnswer) { it.answerSource = ''; it.keyNote = ''; }
   it.explanation = _ansTrim(patch.explanation, ANS_WHY_MAX);
   if (it.marked) {
     var v = String(patch.verdict == null ? '' : patch.verdict).toLowerCase().trim();
@@ -3896,6 +4357,22 @@ function answerCardHtml(it, i) {
       'Rewrite it with ✎ Edit before handing it over — the unitary method or a model is what is marked.' +
       '">⚠ uses algebra</span>');
   }
+  /* 🔑 WHERE THE ANSWER CAME FROM. A teacher or a parent checking a mark has
+     to know whether it was taken off the paper's own answer key or worked out
+     by a model — they are very different things to trust — so the card says
+     which, the same way the Learning Portal's Mark Paper badges every row it
+     marks. It is only ever drawn when a key was really in play. */
+  if (it.answerSource === 'key') {
+    head.push('<span class="keyChip" title="This answer is the one printed in the paper\'s own answer key, ' +
+      'not one worked out here.">🔑 from the paper\'s key</span>');
+  }
+  /* …and where the key and the working DISAGREE, that is said out loud. The
+     key still stands — it is the paper speaking — but a printed key can hold
+     a misprint, and a disagreement quietly resolved either way is the one
+     thing a marked script must not do. */
+  if (it.keyNote) {
+    head.push('<span class="keyWarn" title="' + escHtml(it.keyNote) + '">⚠ differs from the working</span>');
+  }
   // An answer a person has rewritten must not read as one the AI wrote —
   // this is the answer key the class is about to be marked from.
   if (it.edited) head.push('<span class="ansEdited">✎ Edited by you</span>');
@@ -3924,6 +4401,12 @@ function answerCardHtml(it, i) {
       '<div class="ansText">' + escHtml(ans) + '</div></div>' : '') +
     (it.marked && it.feedback
       ? '<div class="fbBox"><div class="fbLabel">Feedback</div><div class="fbText">' + escHtml(it.feedback) + '</div></div>'
+      : '') +
+    // A phone has no hover, so the disagreement is on the card as well as in
+    // the chip's title — a warning nobody can read is not a warning.
+    (it.keyNote
+      ? '<div class="keyNoteBox"><div class="keyNoteLabel">⚠ The key and the working differ</div>' +
+        '<div class="keyNoteText">' + escHtml(it.keyNote) + '</div></div>'
       : '') +
     (it.explanation ? '<div class="whyBox"><div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
     _vetCardFootHtml(it, i) +
