@@ -1013,6 +1013,19 @@ children's mistakes pile into one heap.
   thing this can get wrong and it is silent, so who the run is for is on screen
   the whole time rather than tucked into a menu — and the 📕 button and the
   💬 Ask Mr Chung message both name them too.
+- **`.then(stuRender)` PRINTED THE WHOLE ROSTER AS `[object Object]`** (v1.27.1).
+  A promise hands its resolved value to the first parameter, and `stuRender`'s
+  first parameter is the error MESSAGE — so forty students were stringified
+  into the error paragraph and not one row was drawn. It is called with
+  nothing (`.then(function () { stuRender(); })`), **and the parameter now
+  refuses anything that is not a string**: an error message is text, and
+  something else arriving there is a caller mistake rather than a thing to
+  print at the teacher. Both halves, because either alone leaves the trap set.
+- **The header wears the centre's own logo**, the same picture the four portals
+  use, with the same inline-SVG fallback — a broken-image icon in the header of
+  every page is worse than the emoji it replaced, and this app is opened on
+  school connections. It is the favicon and the home-screen icon too; there was
+  none of either before.
 - **Switching REREADS the book** (`mbForget()` then `mbLoad(true)`, on both
   start and stop): a badge left from the last child is a count of somebody
   else's mistakes sitting under this one's name. And it is **refused mid-run**,
