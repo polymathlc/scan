@@ -161,6 +161,10 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     _mbPaperDoc, _mbMailDoc, camAvailable,
     set mistakes(v) { _mistakes = v; },
     set shots(v) { _shots = v; },
+    STU_COL, scanForUid, scanForName, stuAllowed, stuRowHtml,
+    set asStudent(v) { _asStudent = v; },
+    get asStudent() { return _asStudent; },
+    set stuRows(v) { _stuRows = v; },
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
     _scanSubject, itemSubject, itemSubjectWhy, itemTarget, _vetGroupBySubject,
@@ -743,7 +747,7 @@ ok('and the window itself refuses to open for anyone else',
    /if \(!it \|\| !isAdmin\(currentUser\)\) return;/.test(html));
 ok('an account change closes the window and repaints the cards',
    /if \(\$\('ansEditModal'\)\) \$\('ansEditModal'\)\.classList\.remove\('open'\);/.test(html) &&
-   /applyNotesVisibility\(\);[\s\S]{0,900}if \(_answers\.length\) renderAnswers\(\);/.test(html));
+   /applyNotesVisibility\(\);[\s\S]{0,1600}if \(_answers\.length\) renderAnswers\(\);/.test(html));
 ok('the ✎ never prints — a printed key with a button on it is a button nobody can press',
    /class="ansEditBtn noPrint"/.test(html));
 ok('the mark picker is hidden on a question nobody attempted',
@@ -952,8 +956,11 @@ ok('the papers are not a shared name either', api.MB_PAPER_COL === 'scanPapers')
 ok('the pictures are in this app’s own Storage folder', api.MB_IMG_PATH === 'scan-mistakes');
 ok('every path is built from those constants, never spelled out',
    !/collection\('mistakes'\)/.test(html) && !/collection\("mistakes"\)/.test(html));
-ok('the book is read from the signed-in account’s OWN subtree',
-   /db\.collection\('users'\)\.doc\(currentUser\.uid\)\.collection\(MB_COL\)/.test(html));
+/* 👥 The book is read from whoever the run is FOR — the teacher, or the
+   student they are scanning for at the centre. `scanForUid()` is the one door
+   and every other path stays with the signed-in account. */
+ok('the book is read from whoever the run is for',
+   /db\.collection\('users'\)\.doc\(scanForUid\(\)\)\.collection\(MB_COL\)/.test(html));
 
 /* What is a mistake. The blank rule the marking and the report are both built
    on has to hold here too — a question nobody attempted is not one they got
@@ -2613,6 +2620,106 @@ api.mistakes = [];
   ok('…and the ticks that ARE read are scoped to the tab on show',
      api.mbSelectedIds().join() === 'm1');
 }
+
+/* ---------- 👥 SCANNING FOR A STUDENT AT THE CENTRE ----------
+   A student comes in with a paper; the teacher scans it on the centre's own
+   device and every question they got wrong should land in THEIR book. The one
+   thing this can get wrong is filing a paper under the wrong child, and it is
+   silent — so the door is one function and the banner is always on screen. */
+ok('the roster is the one the centre already has, not a second list',
+   api.STU_COL === 'studentProfiles');
+{
+  api.asStudent = null;
+  api.user = { uid: 'admin1', email: 'chungzhikai@gmail.com' };
+  ok('with nobody chosen the book is the signed-in account’s own',
+     api.scanForUid() === 'admin1' && api.scanForName() === '');
+  api.asStudent = { id: 'stu_9', name: 'Ben' };
+  ok('…and with a student chosen it is theirs',
+     api.scanForUid() === 'stu_9' && api.scanForName() === 'Ben');
+  api.asStudent = null;
+}
+/* IT IS NOT AN IMPERSONATION. Exactly three things move — which book is read,
+   which book is written, which Storage folder the crops go to. Everything
+   below stays the SIGNED-IN account's, and each one is a real fault if it
+   follows: the teaching notes ground every answer, the vetting lists are the
+   teacher's own question banks, and `scanPapers.owner` is pinned to
+   `request.auth.uid` by the Firestore rules themselves. */
+ok('the crops go to the book they are filed in',
+   /storage\.ref\(MB_IMG_PATH \+ '\/' \+ scanForUid\(\)/.test(html));
+ok('…but the teaching notes stay the TEACHER’s',
+   !/notesCollRef\(scanForUid\(\)\)/.test(html) &&
+   /notesCollRef\(currentUser\.uid\)/.test(html));
+ok('…and the vetting lists do too',
+   /db\.collection\('users'\)\.doc\(currentUser\.uid\)\.collection\(t\.col\)/.test(html));
+ok('…and the worksheet is owned by whoever made it, as the rules demand',
+   /owner: currentUser\.uid,/.test(html));
+/* Hiding a button is never the lock: this one writes into another account's
+   subtree, so the handlers ask again. */
+ok('only the teacher may open the roster or scan for anyone',
+   /function stuAllowed\(\) \{ return isAdmin\(currentUser\); \}/.test(html) &&
+   /function stuOpen\(\) \{\s*\n\s*if \(!stuAllowed\(\)\) return;/.test(html) &&
+   /function stuStart\(i\) \{\s*\n\s*if \(!stuAllowed\(\)\) return;/.test(html) &&
+   /async function stuAdd\(\) \{\s*\n\s*if \(!stuAllowed\(\)\) return;/.test(html));
+{
+  api.user = { uid: 'kid1', email: 'kid@example.com' };
+  ok('a student is refused outright', !api.stuAllowed());
+  api.user = { uid: 'admin1', email: 'chungzhikai@gmail.com' };
+  ok('…and the teacher is not', api.stuAllowed());
+}
+/* An account change drops it, always. A device signed out and back in as
+   somebody else must not go on filing papers into a child's book. */
+ok('an account change drops the student being scanned for',
+   /if \(!stuAllowed\(\) && _asStudent\) \{ _asStudent = null; _stuPrevMeta = null; mbForget\(\); \}/.test(html));
+/* Switching REREADS. A badge left over from the last child is a count of
+   somebody else's mistakes sitting on screen under this one's name. */
+ok('starting and stopping both forget the book and read it again',
+   (html.match(/mbForget\(\);[^\n]*\n\s*mbLoad\(true\);/g) || []).length === 2);
+/* The level and the subject are what the answers are pitched at AND what the
+   teaching notes are matched against, so a P3 paper must not be answered to
+   whatever the picker was left on — and the teacher's own choice comes back. */
+ok('the student’s level and subject are used while scanning for them',
+   /if \(r\.level && LEVELS\.indexOf\(r\.level\) !== -1\) \$\('scanLevel'\)\.value = r\.level;/.test(html));
+ok('…and the teacher’s own are put back on ↩',
+   /_stuPrevMeta = \{ level: \$\('scanLevel'\)\.value \|\| '', subject: \$\('scanSubject'\)\.value \|\| '' \}/.test(html) &&
+   /\$\('scanLevel'\)\.value = _stuPrevMeta\.level;/.test(html));
+/* A run in flight owns the pages and the answers. Switching under it would
+   file half a paper in one book and half in another. */
+ok('the student cannot be switched mid-run',
+   (html.match(/if \(_scanning\) \{ toast\('Finish reading this paper first\./g) || []).length === 2);
+/* THE BANNER IS THE SAFETY. */
+ok('who the run is for is on screen the whole time, not in a menu',
+   /id="stuBar"/.test(html) && /id="stuBarWho"/.test(html) &&
+   /bar\.classList\.toggle\('hidden', !_asStudent\)/.test(html));
+{
+  /* A managed student's book is the CENTRE's record of them; a student with
+     their own account gets it on their own phone. A teacher who thinks it is
+     the second and it is the first finds out weeks later. */
+  api.asStudent = null;
+  const managed = api.stuRowHtml({ id: 'managed_x', name: 'Ben', level: 'P5', subject: 'math', managed: true }, 0);
+  const real = api.stuRowHtml({ id: 'uid_x', name: 'Mei', level: 'P4', subject: 'science', managed: false }, 1);
+  ok('the roster says which rows have an account of their own',
+     /kept at the centre/.test(managed) && /has their own account/.test(real));
+  ok('…and a row with no name is still shown rather than dropped',
+     /\(no name yet\)/.test(api.stuRowHtml({ id: 'z', name: '', managed: false }, 2)));
+  api.asStudent = { id: 'uid_x', name: 'Mei' };
+  ok('the row being scanned for offers ↩ Stop rather than a second start',
+     /stuStop\(\)/.test(api.stuRowHtml({ id: 'uid_x', name: 'Mei', managed: false }, 1)));
+  api.asStudent = null;
+}
+/* A child added at the centre has no Google account, so the id is the SAME
+   shape the Ans Key annotator makes — one student, one row, both apps. */
+ok('a centre-added student uses the shared managed id shape',
+   /var id = 'managed_' \+ Date\.now\(\)/.test(html));
+/* The message names whose question it is. A picture arriving under the
+   teacher's own name is a message about a paper he is holding. */
+ok('💬 Ask Mr Chung names the STUDENT when the run is for one',
+   /if \(_asStudent\) return scanForName\(\);/.test(html));
+ok('the 📕 button says whose book it is',
+   /lab\.textContent = _asStudent \? scanForName\(\) \+ '\\u2019s questions'/.test(html));
+/* No rules change was needed and none may be assumed: the paths this uses are
+   already `isOwner(uid) || isAdmin()`. A NEW collection would fail closed. */
+ok('nothing new is written outside the paths the rules already cover',
+   !/collection\('scanStudents'\)/.test(html) && !/collection\('scanRoster'\)/.test(html));
 
 /* ---------- 📄 A PDF IS A PILE OF PAGES ----------
    A parent asked for this by name: the child uploads the PDF he did his

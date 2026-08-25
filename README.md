@@ -17,6 +17,33 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 👥 Scan a paper FOR one of your students (v1.27.0)
+
+A student comes to the centre with a paper. Press **👥 Students** in the header,
+pick them, and every paper you scan from then on is marked and filed under
+**them** — their mistake book, their learning list, their questions to try
+again. The banner across the top of the Snap tab says who you are scanning for
+the whole time, and **↩ Stop** puts you back on your own account.
+
+- **The roster is the one you already have.** It is the same student list your
+  Ans Key app keeps, so a student appears in both and you keep one list, not
+  two. A student who has signed in to any of the Polymath apps is on it
+  already.
+- **Add a child who has no Google account.** The **Add a student** box at the
+  bottom of the window makes a record kept at the centre. Their book lives on
+  your side and you open it for them; a student with an account of their own
+  gets their questions on their own phone. **Each row says which of the two it
+  is**, so you always know.
+- **Their level and subject are used** while you are scanning for them, and
+  yours come back when you stop — which is what pitches the answers right and
+  matches the right teaching notes.
+- **Only three things move**: whose mistake book is read, whose it is written
+  to, and where the cropped questions are stored. Your **teaching notes**, your
+  **vetting lists** and the **worksheet you print** all stay yours. It is not a
+  "sign in as them" — you are still you.
+- It is the **teacher's** button and nobody else's, and it is dropped the moment
+  the account changes.
+
 ## 📄 Send a PDF, and it is marked against the answer key inside it (v1.26.0)
 
 A parent asked for this: *"may I request for a function where my child can

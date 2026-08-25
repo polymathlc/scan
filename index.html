@@ -320,6 +320,32 @@
   }
   .keyNoteLabel { font-size: 0.72rem; font-weight: 700; color: #7A5410; letter-spacing: .03em; text-transform: uppercase; }
   .keyNoteText { font-size: 0.9rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
+  /* ---------- 👥 Scanning for a student ---------- */
+  .stuBar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 14px 18px; margin-bottom: 20px;
+    border-radius: var(--radius); background: #FFFBF3; border: 1px solid #E7BD72;
+  }
+  .stuBarIcon { font-size: 1.2rem; flex: none; }
+  .stuBarText { flex: 1 1 220px; font-size: 0.9rem; color: var(--ink-soft); line-height: 1.6; }
+  .stuBarText b { color: var(--ink); }
+  .stuList { display: flex; flex-direction: column; gap: 10px; }
+  .stuRow {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 16px; border-radius: var(--radius-sm);
+    background: var(--bg-soft); border: 1px solid var(--line);
+  }
+  .stuRow.on { background: #FFFBF3; border-color: #E7BD72; }
+  .stuMain { flex: 1 1 auto; min-width: 0; }
+  .stuName { font-weight: 700; font-size: 0.95rem; }
+  .stuMeta { font-size: 0.78rem; color: var(--ink-faint); margin-top: 3px; }
+  .stuKind { font-weight: 600; }
+  .stuKind.on { color: #2C6B33; }
+  .stuAdd { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .stuAddTitle { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
+  .stuAddRow { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stuAddRow input { flex: 2 1 180px; }
+  .stuAddRow select { flex: 1 1 120px; }
   .youBox { margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--line); }
   .youLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
   .youText { font-size: 0.92rem; margin-top: 4px; white-space: pre-wrap; }
@@ -712,6 +738,7 @@
       <div class="brandSub"><span class="brandOrg">Polymath Learning Centre · </span><span id="versionTag"></span></div>
     </div>
   </div>
+  <button class="btn" id="stuBtn" title="Scan a paper for one of your students" style="display:none">👥<span class="btnLabel">Students</span></button>
   <button class="btn" id="mbBtn" title="Your mistake book and learning list" style="display:none">📕<span class="btnLabel">My questions</span><span class="mbCount hidden" id="mbBadge">0</span></button>
   <button class="btn" id="quickNoteBtn" title="Add a note" style="display:none">✍️<span class="btnLabel">Add a note</span></button>
   <button class="btn" id="notesBtn" title="Teaching notes" style="display:none">📚<span class="btnLabel">Teaching notes</span></button>
@@ -742,6 +769,16 @@
 
   <!-- ---------- 📸 Snap ---------- -->
   <section id="scanPage" class="hidden snapDrop">
+
+    <!-- Filing a paper into the wrong child's book is the one thing this can
+         get wrong, and it is silent — so it is said at the top of the screen
+         the whole time rather than tucked into a menu. -->
+    <div class="stuBar hidden" id="stuBar">
+      <span class="stuBarIcon">📸</span>
+      <div class="stuBarText">Scanning for <b id="stuBarWho"></b> — every question they get wrong goes into
+        <b>their</b> mistake book, not yours.</div>
+      <button class="btn" onclick="stuStop()">↩ Stop</button>
+    </div>
 
     <div id="snapEmpty" class="snapEmpty">
       <div class="padIcon">📷</div>
@@ -1234,6 +1271,34 @@
 </div>
 
 <!-- ---------- 📥 Send to a vetting list (admin) ---------- -->
+<div class="modalBack" id="stuModal">
+  <div class="modalCard">
+    <div class="modalHead"><h2>👥 Your students</h2></div>
+    <div class="modalBody">
+      <p class="sub" id="stuNow" style="margin-top:0">Scanning for yourself.</p>
+      <p class="hint" style="margin-top:12px">Pick a student and every paper you scan is marked and filed under
+        <b>them</b> — their mistake book, their learning list, their questions to try again. Your teaching notes,
+        your vetting lists and the worksheet you print stay yours.</p>
+      <div class="stuList" id="stuList" style="margin-top:18px"></div>
+      <div class="stuAdd">
+        <div class="stuAddTitle">Add a student</div>
+        <p class="hint" style="margin:0 0 12px">For a child who comes to the centre but has no Google account of
+          their own. Their book is kept here, on the centre's side — a student who signs in themselves appears on
+          the list above by themselves, and gets their questions on their own phone.</p>
+        <div class="stuAddRow">
+          <input type="text" id="stuNewName" placeholder="Their name" autocomplete="off">
+          <select id="stuNewLevel"></select>
+          <select id="stuNewSubject"></select>
+          <button class="btn btnPrimary" id="stuAddBtn" onclick="stuAdd()">Add</button>
+        </div>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button class="btn" onclick="stuClose()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modalBack" id="vetModal">
   <div class="modalCard">
     <div class="modalHead"><h2>📥 Send to a vetting list</h2></div>
@@ -1287,7 +1352,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.26.0';
+var APP_VERSION = 'v1.27.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -5343,6 +5408,71 @@ var MB_CROP_MAX_SIDE = 1400;
    1400px does not survive being answered from. */
 var MB_QCROP_MAX_SIDE = 2000;
 
+/* =====================================================================
+   👥 SCANNING FOR A STUDENT AT THE CENTRE
+   ---------------------------------------------------------------------
+   A student comes in with a paper. The teacher scans it on the centre's own
+   device, and every question the student got wrong should land in THAT
+   STUDENT'S mistake book — not in the teacher's, where it is of no use to
+   anybody and where thirty children's mistakes pile up into one heap.
+
+   THE ROSTER IS THE ONE THE CENTRE ALREADY HAS. `studentProfiles` is the
+   collection the Ans Key annotator keeps its students in, and it is admin
+   readable and admin writable. A second roster living here would be a second
+   list to keep in step, and the first thing anybody would notice is a student
+   who exists in one app and not the other.
+
+   NO FIREBASE RULES CHANGE WAS NEEDED, and that is not luck — it is what
+   made this worth doing at all. `users/{uid}/scanMistakes` is already
+   `isOwner(uid) || isAdmin()` and `scan-mistakes/{uid}/…` in Storage already
+   lets `request.auth.token.admin` write, so the teacher can file into a
+   student's book today. The rules live in `polymathlc/math` and are shared
+   with every app in the project, so a deploy from there is a manual assembly
+   job with the whole project's access as the blast radius; a feature that
+   needs one is a feature that waits.
+
+   IT IS NOT AN IMPERSONATION, and that distinction is the whole safety
+   story. `scanForUid()` changes exactly THREE things: which book is read,
+   which book is written, and which Storage folder the cropped questions go
+   to. Everything else stays the teacher's, deliberately and by name:
+
+     • the TEACHING NOTES, which are resolved from `config/admin` and ground
+       every answer — a global "pretend to be this student" would quietly
+       write the teacher's own notebook into a child's account, or ground the
+       marking on nothing;
+     • the VETTING lists, which are the teacher's own question banks;
+     • the ✎ Edit → teach-a-rule door, for the same reason;
+     • `scanPapers.owner`, which the rules pin to `request.auth.uid` at
+       create — a worksheet made here is the teacher's copy, and the student
+       makes their own from their own book on their own device.
+
+   A MANAGED STUDENT IS A REAL CASE, not a workaround. A child who has never
+   signed in with Google has no Firebase account and cannot have one made for
+   them from here, so they get a `managed_…` profile exactly as the Ans Key
+   annotator already makes: their book is the CENTRE's record of them, opened
+   by the teacher on the centre's device. A student who HAS signed in gets the
+   full loop — the questions land in their own account and they see them on
+   their own phone. The panel says which of the two each row is, because a
+   teacher who thinks a child is getting their mistakes on their phone and is
+   wrong will find out weeks later. */
+var STU_COL = 'studentProfiles';     // the Ans Key annotator's roster — one list, not two
+var _asStudent = null;               // { id, name, level, subject, managed } while scanning for someone
+var _stuRows = null;                 // the roster, as last read
+var _stuBusy = false;
+var _stuPrevMeta = null;             // the teacher's own level/subject, put back on ↩
+
+/* THE ONE DOOR. Every path that reads or writes the mistake book asks this
+   and nothing else asks it. */
+function scanForUid() {
+  return (_asStudent && _asStudent.id) || (currentUser && currentUser.uid) || '';
+}
+function scanForName() {
+  return _asStudent ? (_asStudent.name || 'this student') : '';
+}
+/* Only the teacher, and checked in the HANDLER rather than only in the UI:
+   hiding a button is never the lock. */
+function stuAllowed() { return isAdmin(currentUser); }
+
 var _mistakes = [];                 // newest first
 var _mbSel = {};                    // id -> true, the ticked rows
 var _mbLoaded = false;
@@ -5350,8 +5480,8 @@ var _mbBusy = false;
 var _mbLastLink = '';
 var _mbTab = MB_LIST_MISTAKE;       // which of the two lists the window is showing
 
-function mbAvailable() { return !!(currentUser && currentUser.uid); }
-function _mbCol() { return db.collection('users').doc(currentUser.uid).collection(MB_COL); }
+function mbAvailable() { return !!scanForUid(); }
+function _mbCol() { return db.collection('users').doc(scanForUid()).collection(MB_COL); }
 
 /* A wrong answer is one that was MARKED and judged less than right. A blank
    was never attempted, so it is not a mistake — the same rule the marking and
@@ -5864,7 +5994,10 @@ async function _mbCropFor(it) {
 }
 async function _mbUpload(dataUrl, id) {
   if (!storage || !dataUrl) return '';
-  var ref = storage.ref(MB_IMG_PATH + '/' + currentUser.uid + '/' + id + '.jpg');
+  // The crop belongs with the book it is filed in, so it goes to the STUDENT's
+  // folder when the teacher is scanning for one. The Storage rules already
+  // allow that (`request.auth.token.admin`); nothing here widens anything.
+  var ref = storage.ref(MB_IMG_PATH + '/' + scanForUid() + '/' + id + '.jpg');
   await ref.putString(dataUrl, 'data_url');
   return await ref.getDownloadURL();
 }
@@ -6410,8 +6543,11 @@ function renderMbBadge() {
   if (!n) return;
   n.textContent = String(_mistakes.length);
   n.classList.toggle('hidden', !_mistakes.length);
-  b.title = mbInList(MB_LIST_MISTAKE).length + ' in your mistake book · ' +
-    mbInList(MB_LIST_LEARNING).length + ' in your learning list';
+  var whose = _asStudent ? scanForName() + '\u2019s' : 'your';
+  var lab = b.querySelector('.btnLabel');
+  if (lab) lab.textContent = _asStudent ? scanForName() + '\u2019s questions' : 'My questions';
+  b.title = mbInList(MB_LIST_MISTAKE).length + ' in ' + whose + ' mistake book · ' +
+    mbInList(MB_LIST_LEARNING).length + ' in ' + whose + ' learning list';
 }
 async function mbOpen() {
   if (!mbAvailable()) return;
@@ -7027,6 +7163,10 @@ function _askClean(dataUrl, on) {
 }
 
 function _askWho() {
+  // Scanning for a student at the centre: the question is theirs, so the
+  // message says their name. A picture arriving under the teacher's own name
+  // is a message about a paper he is holding rather than one about a child.
+  if (_asStudent) return scanForName();
   var name = (currentUser && (currentUser.displayName || currentUser.email)) || '';
   return String(name).split('@')[0].trim();
 }
@@ -7223,9 +7363,17 @@ function _mbPaperDoc(items) {
   var now = new Date();
   var ends = new Date(now.getTime() + MB_PAPER_DAYS * 86400000);
   return {
+    /* THE PAPER IS THE SIGNED-IN ACCOUNT'S, ALWAYS. The Firestore rules pin
+       `owner` to `request.auth.uid` at create, so a paper made while scanning
+       for a student is the TEACHER's copy — theirs to print and hand over.
+       The student's own copy is one they make from their own book on their
+       own device, which is what the book was built for. */
     owner: currentUser.uid,
     ownerEmail: currentUser.email || '',
     ownerName: currentUser.displayName || '',
+    // Who the questions belong to, when that is not the same person.
+    forStudent: (_asStudent && _asStudent.id) || '',
+    forStudentName: scanForName(),
     title: _mbPaperTitle(items),
     source: VET_SOURCE,                 // 'scan' — the same word the four portals read
     sourceApp: VET_SOURCE_APP,
@@ -7859,6 +8007,181 @@ function applyVetVisibility() {
   renderVetAllBtn();
 }
 
+/* ---- The roster ----
+   Read straight out of `studentProfiles`. A row with no name is still shown,
+   under its id, rather than dropped: a student the teacher cannot see is a
+   student they cannot scan for, and an unnamed row is a profile somebody has
+   not finished rather than one that does not exist. */
+async function stuLoad(force) {
+  if (!stuAllowed()) { _stuRows = []; return _stuRows; }
+  if (_stuRows && !force) return _stuRows;
+  var snap = await db.collection(STU_COL).get();
+  var rows = [];
+  snap.forEach(function (d) {
+    var p = d.data() || {};
+    rows.push({
+      id: d.id,
+      name: String(p.name || '').trim(),
+      level: String(p.level || ''),
+      subject: String(p.subject || ''),
+      email: String(p.email || ''),
+      managed: !!p.managed
+    });
+  });
+  rows.sort(function (a, b) {
+    return (a.level || '~').localeCompare(b.level || '~') ||
+           (a.name || '~').localeCompare(b.name || '~');
+  });
+  _stuRows = rows;
+  return rows;
+}
+
+function stuOpen() {
+  if (!stuAllowed()) return;
+  $('stuModal').classList.add('open');
+  stuRender();
+  stuLoad(true).then(stuRender).catch(function (e) {
+    console.warn('roster: could not be read', e);
+    stuRender(String((e && e.message) || 'the roster could not be read'));
+  });
+}
+function stuClose() { $('stuModal').classList.remove('open'); }
+
+function stuRowHtml(r, i) {
+  var who = [r.level ? levelLabel(r.level) : '', r.subject ? subjectLabel(r.subject) : ''].filter(Boolean).join(' ');
+  var here = _asStudent && _asStudent.id === r.id;
+  return '<div class="stuRow' + (here ? ' on' : '') + '">' +
+    '<div class="stuMain">' +
+      '<div class="stuName">' + escHtml(r.name || '(no name yet)') + '</div>' +
+      '<div class="stuMeta">' + escHtml(who || 'no level set') +
+        /* Which of the two this row is. A teacher who thinks a child is
+           getting their mistakes on their own phone and is wrong will only
+           find out weeks later. */
+        (r.managed
+          ? ' · <span class="stuKind">kept at the centre</span>'
+          : ' · <span class="stuKind on">has their own account</span>') +
+      '</div>' +
+    '</div>' +
+    (here
+      ? '<button class="btn" onclick="stuStop()">↩ Stop</button>'
+      : '<button class="btn btnPrimary" onclick="stuStart(' + i + ')">📸 Scan for</button>') +
+  '</div>';
+}
+
+function stuRender(err) {
+  var body = $('stuList');
+  if (!body) return;
+  if (err) { body.innerHTML = '<p class="sub">' + escHtml(err) + '</p>'; return; }
+  if (!_stuRows) { body.innerHTML = '<p class="sub">Loading the roster…</p>'; return; }
+  body.innerHTML = _stuRows.length
+    ? _stuRows.map(stuRowHtml).join('')
+    : '<p class="sub">Nobody on the roster yet. Add a student below, or they appear here once they have signed in to any of the Polymath apps.</p>';
+  var now = $('stuNow');
+  if (now) {
+    now.textContent = _asStudent
+      ? 'Scanning for ' + scanForName() + '. Every question they get wrong goes into their book, not yours.'
+      : 'Scanning for yourself.';
+  }
+}
+
+/* Add a student the centre teaches who has no Google account of their own.
+   The id shape is the Ans Key annotator's (`managed_…`), so a student added
+   in either app is the same student in both. */
+async function stuAdd() {
+  if (!stuAllowed()) return;
+  var name = ($('stuNewName').value || '').trim();
+  if (!name) { toast('Type the student\u2019s name first.'); $('stuNewName').focus(); return; }
+  if (_stuBusy) return;
+  _stuBusy = true;
+  $('stuAddBtn').disabled = true;
+  try {
+    var id = 'managed_' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+    await db.collection(STU_COL).doc(id).set({
+      name: name,
+      level: $('stuNewLevel').value || '',
+      subject: $('stuNewSubject').value || '',
+      days: [],
+      managed: true,
+      email: '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    $('stuNewName').value = '';
+    await stuLoad(true);
+    stuRender();
+    toast('“' + name + '” added — press 📸 Scan for to start filing papers under them.', 5000);
+  } catch (e) {
+    console.warn('roster: could not add', e);
+    toast('Could not add them: ' + ((e && e.message) || 'the roster refused the write'), 6000);
+  }
+  _stuBusy = false;
+  $('stuAddBtn').disabled = false;
+}
+
+/* Start and stop. Three things move and nothing else does — see the block at
+   the top of the mistake book. */
+function stuStart(i) {
+  if (!stuAllowed()) return;
+  var r = (_stuRows || [])[i];
+  if (!r) return;
+  if (_scanning) { toast('Finish reading this paper first.', 4000); return; }
+  _asStudent = { id: r.id, name: r.name || 'Student', level: r.level, subject: r.subject, managed: r.managed };
+  /* The teacher's own level and subject are put back on ↩. They are what the
+     teaching notes are matched against as well as what the answers are
+     pitched at, so a paper scanned for a P3 child must not be answered to the
+     P6 standard the teacher happened to leave the picker on. */
+  if (!_stuPrevMeta) _stuPrevMeta = { level: $('scanLevel').value || '', subject: $('scanSubject').value || '' };
+  if (r.level && LEVELS.indexOf(r.level) !== -1) $('scanLevel').value = r.level;
+  if (r.subject && SUBJECT_OK[r.subject]) $('scanSubject').value = r.subject;
+  syncMeta();
+  mbForget();                       // the badge and the book now belong to somebody else
+  mbLoad(true);
+  stuClose();
+  stuSyncBar();
+  renderMbBadge();
+  toast('📸 Scanning for ' + scanForName() + '. Their mistakes go into their book — press ↩ when you are done.', 6500);
+}
+
+function stuStop() {
+  if (!_asStudent) return;
+  if (_scanning) { toast('Finish reading this paper first.', 4000); return; }
+  var was = scanForName();
+  _asStudent = null;
+  if (_stuPrevMeta) {
+    $('scanLevel').value = _stuPrevMeta.level;
+    $('scanSubject').value = _stuPrevMeta.subject;
+    _stuPrevMeta = null;
+    syncMeta();
+  }
+  mbForget();
+  mbLoad(true);
+  stuSyncBar();
+  stuRender();
+  renderMbBadge();
+  toast('Back to your own account. ' + was + '\u2019s book stays with them.', 5000);
+}
+
+/* THE BANNER IS THE SAFETY. Filing a paper into the wrong child's book is the
+   one thing this feature can get wrong, and it is silent — so who the run is
+   for is said at the top of the screen the whole time, not tucked into a
+   menu. */
+function stuSyncBar() {
+  var bar = $('stuBar');
+  if (bar) {
+    bar.classList.toggle('hidden', !_asStudent);
+    var who = $('stuBarWho');
+    if (who) who.textContent = scanForName();
+  }
+  var btn = $('stuBtn');
+  if (btn) {
+    btn.style.display = stuAllowed() ? '' : 'none';
+    var lab = btn.querySelector('.btnLabel');
+    if (lab) lab.textContent = _asStudent ? scanForName() : 'Students';
+    btn.classList.toggle('btnPrimary', !!_asStudent);
+  }
+  if (!stuAllowed()) stuClose();
+}
+
 /* ================= Sign in ================= */
 function renderAuth() {
   var signedIn = !!currentUser;
@@ -7876,6 +8199,12 @@ function renderAuth() {
   // The engine choice belongs to the centre, so every signed-in device reads
   // it — this is the one function every account change comes through.
   if (signedIn && window.aiEngineLoadShared) window.aiEngineLoadShared(true).then(renderEngineLine).catch(function () {});
+  /* An account change drops it, always. The roster is the teacher's alone, so
+     a device signed out and back in as somebody else must not go on filing
+     papers into a child's book. */
+  if (!stuAllowed() && _asStudent) { _asStudent = null; _stuPrevMeta = null; mbForget(); }
+  if (!signedIn) { _stuRows = null; stuClose(); }
+  stuSyncBar();
   renderMbBadge();
   if (!signedIn) { mbClose(); if (window.aiEngineStopShared) window.aiEngineStopShared(); }
   // The ✎ and the 📥 belong to the account, so the cards are repainted when it
@@ -7984,9 +8313,11 @@ auth.onAuthStateChanged(function (user) {
 
 /* ================= Wiring ================= */
 (function fillLevels() {
-  ['scanLevel', 'aeLevel'].forEach(function (id) {
+  ['scanLevel', 'aeLevel', 'stuNewLevel'].forEach(function (id) {
     var sel = $(id);
     if (!sel) return;
+    // The roster's own picker has no "any": a student is at a level.
+    if (id !== 'stuNewLevel') { /* the two scan pickers keep their blank first option from the markup */ }
     LEVELS.forEach(function (l) {
       var o = document.createElement('option');
       o.value = l;
@@ -8000,7 +8331,7 @@ auth.onAuthStateChanged(function (user) {
    the one that says which paper a typed note is about — are filled from
    SUBJECTS, so the four subjects are declared exactly once. */
 (function fillSubjects() {
-  ['scanSubject', 'qnSubject', 'aeSubject'].forEach(function (id) {
+  ['scanSubject', 'qnSubject', 'aeSubject', 'stuNewSubject'].forEach(function (id) {
     var sel = $(id);
     if (!sel) return;
     SUBJECTS.forEach(function (sub) {
@@ -8115,6 +8446,8 @@ $('askText').addEventListener('keydown', function (e) {
 });
 $('vetAllBtn').addEventListener('click', function () { vetOpen(null); });
 $('mbBtn').addEventListener('click', mbOpen);
+$('stuBtn').addEventListener('click', stuOpen);
+$('stuNewName').addEventListener('keydown', function (e) { if (e.key === 'Enter') stuAdd(); });
 $('mbCloseBtn').addEventListener('click', mbClose);
 $('mbSendBtn').addEventListener('click', mbSendPicked);
 $('mbRemoveBtn').addEventListener('click', mbRemovePicked);

@@ -961,6 +961,67 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
 - **`_scanRun` is bumped on every run**, so a reply that arrives after the teacher has started again
   is dropped instead of landing among the new answers.
 
+## 👥 Scanning a paper FOR a student at the centre (v1.27.0)
+
+`STU_COL` / `_asStudent` / **`scanForUid`** / `scanForName` / `stuAllowed` /
+`stuLoad` / `stuOpen` / `stuRowHtml` / `stuAdd` / `stuStart` / `stuStop` /
+`stuSyncBar` (search `SCANNING FOR A STUDENT AT THE CENTRE`), plus the 👥
+button in the header, `#stuModal` and the `#stuBar` banner on the Snap tab.
+
+A student comes in with a paper and the teacher scans it on the centre's own
+device. Every question they got wrong should land in **that student's** mistake
+book — not in the teacher's, where it is of no use to anybody and where thirty
+children's mistakes pile into one heap.
+
+- **THE ROSTER IS THE ONE THE CENTRE ALREADY HAS.** `studentProfiles` is the
+  Ans Key annotator's own collection, admin-readable and admin-writable. A
+  second roster here would be a second list to keep in step, and the first
+  thing anybody would notice is a student who exists in one app and not the
+  other.
+- **NO FIRESTORE RULES CHANGE WAS NEEDED**, and that is not luck — it is what
+  made this worth doing. `users/{uid}/scanMistakes` is already
+  `isOwner(uid) || isAdmin()` and `scan-mistakes/{uid}/…` in Storage already
+  lets `request.auth.token.admin` write. The rules live in `polymathlc/math`
+  and are shared with the whole project, so a deploy from there is a manual
+  assembly job with everything's access as the blast radius: **a feature that
+  needs one is a feature that waits.** The harness pins that no new collection
+  was invented — one would fail closed, silently.
+- **IT IS NOT AN IMPERSONATION, and that is the whole safety story.**
+  `scanForUid()` is the ONE door and it changes exactly THREE things: which
+  book is read, which book is written, and which Storage folder the crops go
+  to. Everything else stays the signed-in teacher's, by name — the **teaching
+  notes** (a global "pretend to be this student" would write the teacher's own
+  notebook into a child's account, or ground the marking on nothing), the
+  **vetting lists**, the **✎ Edit → teach-a-rule** door, and
+  **`scanPapers.owner`**, which the rules pin to `request.auth.uid` at create.
+- **The worksheet stays the teacher's copy**, therefore — theirs to print and
+  hand over. The student's own copy is one they make from their own book on
+  their own device, which is what the book was built for.
+- **A MANAGED STUDENT IS A REAL CASE, not a workaround.** A child who has never
+  signed in has no Firebase account and cannot be given one from here, so they
+  get a `managed_…` profile — the same id shape the Ans Key annotator makes, so
+  one student is one row in both apps. Their book is the CENTRE's record of
+  them. **The panel says which of the two each row is**, because a teacher who
+  thinks a child is getting their mistakes on their own phone and is wrong will
+  find out weeks later.
+- **Only the teacher, checked in the HANDLERS** — `stuOpen`, `stuStart` and
+  `stuAdd` each ask `stuAllowed()` again. This writes into another account's
+  subtree; hiding a button is never the lock. And an account change **drops**
+  it (`renderAuth`), or a device signed out and back in as somebody else goes
+  on filing papers into a child's book.
+- **THE BANNER IS THE SAFETY.** Filing a paper under the wrong child is the one
+  thing this can get wrong and it is silent, so who the run is for is on screen
+  the whole time rather than tucked into a menu — and the 📕 button and the
+  💬 Ask Mr Chung message both name them too.
+- **Switching REREADS the book** (`mbForget()` then `mbLoad(true)`, on both
+  start and stop): a badge left from the last child is a count of somebody
+  else's mistakes sitting under this one's name. And it is **refused mid-run**,
+  or half a paper is filed in one book and half in another.
+- **The student's level and subject are used while scanning for them**, and the
+  teacher's own are put back on ↩. They are what the answers are pitched at AND
+  what the teaching notes are matched against, so a P3 paper must not be
+  answered to whatever the picker was left on.
+
 ## 📄 A PDF is a pile of pages, and 🔑 its own answer key (v1.26.0)
 
 `PDFJS_URL` / `pdfIsPdf` / `pdfjsReady` / `pdfPageScale` / `_pdfPageToFile` /
@@ -1290,6 +1351,20 @@ that same PDF**.
   that goes deep again, or a `nearInk` guard that goes away, rubs the child's
   own pencil working off the picture and sends the teacher the question with
   the work removed — which is the one thing he was being asked to look at.
+- After touching **scanning for a student** (`STU_COL`, `scanForUid`,
+  `scanForName`, `stuAllowed`, `stuLoad`, `stuStart`, `stuStop`, `stuAdd`,
+  `stuRowHtml`, `stuSyncBar`, `_mbCol`, `_mbUpload`'s folder, or `renderAuth`'s
+  drop), run `node tools/scan-tests.mjs`. This writes into ANOTHER ACCOUNT'S
+  subtree, so every failure is somebody else's data: the one door widened past
+  the book puts the teacher's own notebook, vetting lists or worksheet into a
+  child's account; `stuAllowed` relaxed lets any signed-in student file papers
+  under any other; a student that survives an account change goes on filing
+  into a child's book after the device has been signed out and back in; and a
+  switch allowed mid-run files half a paper in one book and half in another.
+  None of it throws and none of it looks wrong on the screen — which is why the
+  banner is pinned too: it is the only thing on screen that says who the run is
+  for. And the harness checks that no NEW collection was invented, because the
+  rules live in `polymathlc/math` and a name they do not know fails closed.
 - After touching **the PDF split or the answer key** (`pdfIsPdf`,
   `pdfjsReady`, `pdfPageScale`, `_pdfPageToFile`, `pdfToFiles`,
   `_filesToPages`, `_pdfBusy`, `SCAN_KEY_*`, `_keyRow`, `keyNumKey`,
