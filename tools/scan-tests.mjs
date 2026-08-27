@@ -3483,5 +3483,61 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      /\[' \+ subjectLabel\(csub\) \+ ' question\]/.test(html));
 }
 
+
+/* =====================================================================
+   📱 ON A PHONE
+   ---------------------------------------------------------------------
+   The way this app breaks on a phone is not a broken row, it is a broken
+   app: when ONE row is wider than the screen, iOS lays the whole document
+   out at that row's width and shrinks the lot to fit — every word on every
+   card goes small, the header title clips mid-word, the last button is cut
+   in half, and the page scrolls sideways. Nothing throws, and on a desktop
+   browser it all looks perfect, which is exactly how it shipped.
+
+   `node tools/mobile-check.mjs` measures the real page in three real phone
+   viewports. These are the structural pins that go with it, so the shape
+   cannot quietly come back before anybody runs a browser.
+   ===================================================================== */
+{
+  /* The row that did it: four buttons in an inline `display:flex;flex:none`,
+     which can neither wrap nor shrink. */
+  ok('the answers own their button row rather than an inline style',
+     /<div class="ansActions">/.test(html) &&
+     !/style="display:flex;gap:10px;flex:none;"/.test(html));
+  ok('…and that row wraps', /\.ansActions \{[^}]*flex-wrap: wrap/.test(html));
+  /* The header is the other one. It wraps as a last resort rather than
+     squeezing the app's own name out of itself. */
+  ok('the header wraps rather than overflowing',
+     /\n  header \{[\s\S]{0,900}?flex-wrap: wrap;[\s\S]{0,200}?\n  \}/.test(html));
+  ok('…with the toolbar as one group that can drop to its own row',
+     /<div class="headTools">/.test(html) &&
+     /\.headTools \{[^}]*margin-left: auto/.test(html));
+  /* Five controls, a logo and "Scan & Answer" do not fit across 393px however
+     they are tuned, and the header was clipping it to "Scan & A…er". */
+  ok('the app wears a short name where the long one will not fit',
+     /<span class="brandFull">Scan &amp; Answer<\/span><span class="brandShort">Scan<\/span>/.test(html) &&
+     /\.brandFull \{ display: none; \}\n\s*\.brandShort \{ display: inline; \}/.test(html));
+  /* Whatever else changes, the version badge stays on screen: it is what the
+     teacher checks the deploy against. */
+  ok('…and the version badge is never the thing hidden',
+     !/\.brandSub \{ display: none/.test(html) && /id="versionTag"/.test(html));
+  /* Apple's own floor, and it is a floor for REAL controls — the chips that
+     are only a status are spans and stay the quiet things they are. */
+  ok('every control a finger lands on is at least 44px',
+     /\.ansEditBtn \{ min-height: 44px;/.test(html) &&
+     /\.ansSend \.btn \{ min-height: 44px; \}/.test(html) &&
+     /button\.mbBookChip \{ min-height: 44px;/.test(html) &&
+     /\.headTools \.btn \{[^}]*height: 44px/.test(html) &&
+     /\.ansActions \.btn \{[^}]*min-height: 46px/.test(html) &&
+     /\.stepNav \.btn \{[^}]*min-height: 46px/.test(html));
+  /* An answer that is WAITING must not look like an answer that is there: the
+     cover sentence in the green answer box read as the answer itself. */
+  ok('a held-back answer is plain paper, not a green answer box',
+     /\.ansHidden \{ background: var\(--bg-soft\); border-style: dashed;/.test(html));
+  /* And the measuring tool itself is part of the change, not a scratch file. */
+  ok('the phone is measured by a tool that is checked in',
+     fs.existsSync(new URL('./mobile-check.mjs', import.meta.url)));
+}
+
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

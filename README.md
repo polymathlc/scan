@@ -18,6 +18,38 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📱 It fits the phone again (v1.28.1)
+
+Adding the 👣 button made the answers' button row four buttons wide — about
+570px of buttons on a 390px screen — and a row that wide does not just spill
+over the edge. iOS lays the **whole page** out at that width and shrinks it to
+fit, so every card went small, the header clipped to *"Scan & A…er"*, and the
+page scrolled sideways with **Print** cut in half.
+
+Fixed properly, and pinned so it cannot come back:
+
+- The answers' buttons **wrap**, and on a phone they become a two-up grid at
+  thumb height — 📥 / 👣 on one line, 📋 / 🖨 on the next.
+- The header is a proper **app toolbar**: one 44px square per control, the
+  mistake-book count sitting *on* the book rather than making it wider than
+  everything beside it, and the whole toolbar drops to its own row on a screen
+  too narrow to hold it. The app wears the short name **Scan** on a phone —
+  five controls, a logo and "Scan & Answer" do not fit across 393px however
+  they are tuned. The **version badge stays**, always.
+- **Everything you press is at least 44px.** ✎ Edit was 27px tall; the vetting
+  and mistake-book buttons were under 20.
+- The **held-back answer** no longer sits in a green *ANSWER* box pretending the
+  cover sentence is the answer — it is plain paper with a dashed edge until the
+  working has been walked through, then it comes back green with the answer in
+  it.
+- Cards, step boxes and modals give back their side padding on small screens
+  without giving up any of their line spacing.
+
+**`node tools/mobile-check.mjs`** is new: it lays the real page out in three
+real phone viewports (iPhone 15 Pro, iPhone SE, Galaxy Fold), measures that
+nothing is wider than the screen, names the element if anything is, checks every
+button against the 44px floor, and writes a screenshot of each to look at.
+
 ## 👣 One step at a time, and every card says what subject it is (v1.28.0)
 
 A worked answer printed in full is read from the bottom up: the student finds

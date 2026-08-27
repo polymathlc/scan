@@ -944,6 +944,44 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   as before.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1)
+
+`tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
+`header { flex-wrap: wrap }` and the two `@media` blocks at 620px and 400px.
+
+- **THE WAY THIS BREAKS ON A PHONE IS NOT A BROKEN ROW, IT IS A BROKEN APP.** When ONE row is wider
+  than the screen, iOS lays the WHOLE document out at that row's width and shrinks the lot to fit:
+  every word on every card goes small, the header title clips mid-word, the last button on the row
+  is cut in half, and the page scrolls sideways. Nothing throws, nothing is logged, and on a desktop
+  browser it looks perfect — which is exactly how it shipped. The one row was the answers' button
+  bar: an inline `display:flex; flex:none`, which can neither wrap nor shrink, holding four buttons
+  that came to about 570px.
+- **SO EVERY ROW OF CONTROLS EITHER WRAPS OR SCROLLS.** `.ansActions` wraps and becomes a two-up
+  grid on a phone; the header wraps as a last resort, with `.headTools` as ONE group so the toolbar
+  drops to a row of its own rather than squeezing the app's own name out of the header.
+- **THE APP WEARS A SHORT NAME WHERE THE LONG ONE WILL NOT FIT.** Five controls, a logo and
+  "Scan & Answer" do not fit across 393px however they are tuned — that is arithmetic, not styling,
+  and the header was clipping it to "Scan & A…er". `.brandShort` is "Scan", which is already the
+  name on the home-screen icon. **The version badge is never the thing hidden**: it is what the
+  teacher checks the deploy against.
+- **44px is the floor for anything a finger lands on**, and it is a floor for real CONTROLS: ✎ Edit
+  was 27px tall and the vetting and mistake-book chips under 20. The chips that are only a STATUS
+  are `<span>`s and stay the small quiet things they are — the same distinction `mbCardChipHtml`
+  already draws.
+- **An answer that is WAITING must not look like an answer that is there.** The step reveal's cover
+  sentence sitting in the green answer box read as the answer itself — *"ANSWER: work through the 2
+  steps below"* — so `.ansHidden` drops to plain paper with a dashed edge and comes back green with
+  the answer in it.
+- **`tools/mobile-check.mjs` MEASURES THE REAL PAGE**, in three real phone viewports, with the real
+  stylesheet and cards built by the real `answerCardHtml`: the document is never wider than the
+  screen, nothing hangs off either edge (and it NAMES the element that does), every button clears
+  44px, the title is not clipped, and the camera dock does not sit on the last answer. It needs
+  `npm i playwright-core` and the Chromium already on the machine, so like `ask-sheet-render.mjs` it
+  is a tool you reach for rather than a gate — **and it writes a screenshot per viewport, because a
+  page that measures clean is not the same as one that reads well. Look at them.**
+- `node tools/scan-tests.mjs` carries the structural half — the classes, the wrap, the short name,
+  the 44px floors — so the shape cannot quietly come back before anybody runs a browser.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -1432,6 +1470,13 @@ that same PDF**.
   that goes deep again, or a `nearInk` guard that goes away, rubs the child's
   own pencil working off the picture and sends the teacher the question with
   the work removed — which is the one thing he was being asked to look at.
+- After touching **anything that lays out a row of controls** (`header`, `.headTools`,
+  `.brandFull`/`.brandShort`, `.ansActions`, `.rowBtns`, `.stepNav`, `.ansSend`, the `@media`
+  blocks, or any new button added to an existing row), run **`node tools/mobile-check.mjs`** and
+  LOOK at the screenshots it writes — then `node tools/scan-tests.mjs`. One row wider than the
+  screen shrinks the whole app to fit on every phone in the centre, and it is invisible on a
+  desktop browser: the page simply looks like somebody chose tiny type. Adding a fourth button to a
+  three-button row is all it takes, and that is exactly how it happened.
 - After touching **the step-by-step reveal or the subject chip** (`SCAN_STEPS_RULE`,
   `SCAN_STEPS_MAX`, `_scanSteps`, `_stepsText`, `_stepsShown`, `stepsBoxHtml`, `stepNext`,
   `stepAll`, `stepReset`, `stepsAnyCard`, `stepsAllOpen`, `stepAllCards`, `renderStepAllBtn`,

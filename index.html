@@ -50,12 +50,19 @@
   /* ---------- Header ---------- */
   header {
     position: sticky; top: 0; z-index: 60;
-    display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+    /* IT WRAPS, and that is the last line of defence rather than the layout.
+       On every phone in use the brand and the toolbar fit on one row; on
+       something narrower than any of them the toolbar drops to a row of its
+       own — which is ugly for a moment and correct, where not wrapping laid
+       the whole document out wider than the screen and shrank the app to fit. */
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     padding: 12px 20px;
     background: var(--bg);
     border-bottom: 1px solid var(--line);
   }
   header .btn { flex: none; }
+  .headTools { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  .brandShort { display: none; }
   /* min-width:0 is what lets the title ellipsis instead of shoving the
      buttons onto a second row. */
   .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; min-width: 0; }
@@ -113,7 +120,19 @@
   .sub { font-size: 0.87rem; color: var(--ink-soft); line-height: 1.65; }
   .hint { font-size: 0.78rem; color: var(--ink-faint); }
   .rowBtns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+  .rowBtns > h2 { min-width: 0; }
   .spacer { flex: 1; }
+  /* THE ANSWERS' OWN BUTTON ROW, AND WHY IT HAS A CLASS NOW. It was an inline
+     `display:flex;flex:none`, which is a row that can neither wrap nor shrink:
+     four buttons on it came to about 570px, so every phone in the centre was
+     laying the whole page out wider than its own screen and shrinking to fit —
+     a clipped title, a half-cut Print button and a page that scrolls sideways.
+     It wraps now, and on a phone the buttons become a two-up grid at thumb
+     height instead of a row nobody can reach the end of. */
+  .ansActions {
+    display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
+    flex: 0 1 auto; min-width: 0;
+  }
 
   /* ---------- Fields ---------- */
   .fields { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
@@ -327,6 +346,13 @@
   /* The answer is the LAST step, so while there are steps still to come it is
      kept behind them rather than sitting at the top of the card giving itself
      away. One press of Show all working opens it, and Print always has it. */
+  /* An answer that is WAITING must not look like an answer that is there. The
+     cover sentence sitting in the green answer box read as the answer itself —
+     "ANSWER: work through the 2 steps below" — so the box drops to plain paper
+     with a dashed edge while it holds nothing yet, and comes back green with
+     the answer in it. */
+  .ansHidden { background: var(--bg-soft); border-style: dashed; border-color: var(--line); }
+  .ansHidden .ansLabel { color: var(--ink-faint); }
   .ansHidden .ansText { display: none; }
   .ansCover { font-size: 0.88rem; color: var(--ink-faint); margin-top: 6px; line-height: 1.7; }
   /* What subject this question IS, said on the card. A maths question read off
@@ -767,12 +793,47 @@
   }
   .howList b { color: var(--ink); }
 
+  /* =====================================================================
+     ON A PHONE
+     ---------------------------------------------------------------------
+     This app is used one-handed, over a worksheet, on a phone — that is the
+     whole design — so the phone is not the narrow case here, it is the case.
+
+     THE PAGE MUST NEVER BE WIDER THAN THE SCREEN. When one row is, iOS lays
+     the whole document out at that width and shrinks it to fit: every word on
+     every card goes small, the title clips, and the page scrolls sideways. It
+     does not look like a broken row — it looks like a broken app. So every
+     row of buttons here either wraps or scrolls, and the check that pins it
+     (tools/mobile-check.mjs) measures the real page in a real phone viewport.
+
+     AND EVERYTHING PRESSED IS THUMB-SIZED. 44px is the floor Apple's own
+     guidance sets and it is the floor here.
+     ===================================================================== */
   @media (max-width: 620px) {
-    header { padding: 10px 14px; gap: 8px; }
+    header { padding: 9px 12px; gap: 8px; }
+    .headTools { gap: 6px; }
     .tabs { padding: 6px 12px 0; }
     .btnLabel { display: none; }
     .brandOrg { display: none; }
-    header .btn { padding: 10px 12px; }
+    .brandFull { display: none; }
+    .brandShort { display: inline; }
+    /* An app toolbar, not five word-buttons with their words taken away: one
+       square per control, all the same size, and the count sitting ON the
+       book rather than making it wider than everything beside it. */
+    .headTools .btn {
+      position: relative; width: 44px; height: 44px; padding: 0;
+      display: grid; place-items: center; font-size: 1.06rem; line-height: 1;
+    }
+    .headTools .btn#signInBtn { width: auto; padding: 0 16px; font-size: 0.88rem; }
+    .mbCount {
+      position: absolute; top: -5px; right: -5px; margin-left: 0;
+      min-width: 19px; height: 19px; font-size: 0.66rem;
+      border: 2px solid var(--bg);
+    }
+    .brandMark { width: 34px; height: 34px; }
+    .brand { gap: 9px; }
+    .brandTitle { font-size: 0.97rem; }
+    .brandSub { font-size: 0.7rem; }
     #whoAmI { display: none; }
     main { padding: 18px 14px 22px; }
     #scanPage { padding-bottom: calc(192px + env(safe-area-inset-bottom, 0px)); }
@@ -783,6 +844,44 @@
     .tnRow { flex-direction: column; gap: 3px; }
     .tnLabel { width: auto; }
     .ansCard { padding: 18px 16px; }
+    /* The four answer buttons as a two-up grid across the card, at thumb
+       height. A row of four is a row whose last button is off the screen. */
+    .rowBtns { gap: 8px; }
+    .ansActions { width: 100%; gap: 8px; }
+    .ansActions .btn {
+      flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 46px;
+      padding: 10px 8px; text-align: center;
+    }
+    /* Room to breathe is not the same as room to spare: the step box keeps its
+       generous line spacing and gives back only the side padding, which is
+       what a 390px screen has none of. */
+    .stepBox { padding: 16px 15px; }
+    .stepNav { gap: 8px; margin-top: 16px; }
+    .stepNav .btn { flex: 1 1 100%; min-height: 46px; text-align: center; }
+    .stepDone { flex: 1 1 100%; }
+    /* EVERY REAL CONTROL IS THUMB-SIZED. ✎ Edit was 27px tall and the vetting
+       and mistake-book chips were under 20 — buttons a finger cannot land on
+       without hitting the card behind them. The chips that are only a STATUS
+       are spans, and stay the small quiet things they are. */
+    .ansEditBtn { min-height: 44px; padding: 0 15px; }
+    .ansSend .btn { min-height: 44px; }
+    button.mbBookChip { min-height: 44px; padding: 0 16px; display: inline-flex; align-items: center; }
+    .modalBack { padding: 12px; }
+    .modalHead { padding: 16px 18px; }
+    .modalBody { padding: 18px; }
+    .modalFoot { padding: 14px 18px; }
+    .modalFoot .btn { flex: 1 1 auto; min-height: 46px; }
+  }
+  /* A small phone — an iPhone SE or a 13 mini — where the title is the first
+     thing to be squeezed out. */
+  @media (max-width: 400px) {
+    header { gap: 6px; padding: 9px 10px; }
+    .headTools { gap: 5px; }
+    .brandMark { width: 31px; height: 31px; }
+    .brandTitle { font-size: 0.92rem; }
+    .ansCard, .card { padding: 16px 14px; }
+    .stepBox { padding: 15px 13px; }
+    .ansBox, .whyBox, .youBox, .fbBox { padding: 13px 14px; }
   }
   @media print {
     header, .tabs, .camBar, .camDock, .noPrint, #toast, .modalBack { display: none !important; }
@@ -813,17 +912,28 @@
            onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22 viewBox=%220 0 40 40%22%3E%3Crect width=%2240%22 height=%2240%22 rx=%228%22 fill=%22%234a7c59%22/%3E%3Ctext x=%2220%22 y=%2229%22 font-family=%22DM Sans,sans-serif%22 font-size=%2224%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EP%3C/text%3E%3C/svg%3E';">
     </div>
     <div class="brandText">
-      <div class="brandTitle">Scan &amp; Answer</div>
+      <!-- The app's own name, and the name it wears on a phone. Five controls,
+           a logo and "Scan & Answer" do not fit across 393px however they are
+           tuned — the header was clipping it to "Scan & A…er", which is the
+           first thing anybody sees. The short form keeps the identity and
+           gives back 70px. -->
+      <div class="brandTitle"><span class="brandFull">Scan &amp; Answer</span><span class="brandShort">Scan</span></div>
       <div class="brandSub"><span class="brandOrg">Polymath Learning Centre · </span><span id="versionTag"></span></div>
     </div>
   </div>
-  <button class="btn" id="stuBtn" title="Scan a paper for one of your students" style="display:none">👥<span class="btnLabel">Students</span></button>
-  <button class="btn" id="mbBtn" title="Your mistake book and learning list" style="display:none">📕<span class="btnLabel">My questions</span><span class="mbCount hidden" id="mbBadge">0</span></button>
-  <button class="btn" id="quickNoteBtn" title="Add a note" style="display:none">✍️<span class="btnLabel">Add a note</span></button>
-  <button class="btn" id="notesBtn" title="Teaching notes" style="display:none">📚<span class="btnLabel">Teaching notes</span></button>
-  <span id="whoAmI" class="hint"></span>
-  <button class="btn" id="signInBtn">Sign in</button>
-  <button class="btn" id="signOutBtn" title="Sign out" style="display:none">🚪<span class="btnLabel">Sign out</span></button>
+  <!-- The toolbar is ONE group, so that on a screen too narrow to hold it
+       beside the brand it drops to a line of its own instead of squeezing the
+       title out of the header. Every button keeps its id: nothing in the code
+       reaches for them by position. -->
+  <div class="headTools">
+    <button class="btn" id="stuBtn" title="Scan a paper for one of your students" style="display:none">👥<span class="btnLabel">Students</span></button>
+    <button class="btn" id="mbBtn" title="Your mistake book and learning list" style="display:none">📕<span class="btnLabel">My questions</span><span class="mbCount hidden" id="mbBadge">0</span></button>
+    <button class="btn" id="quickNoteBtn" title="Add a note" style="display:none">✍️<span class="btnLabel">Add a note</span></button>
+    <button class="btn" id="notesBtn" title="Teaching notes" style="display:none">📚<span class="btnLabel">Teaching notes</span></button>
+    <span id="whoAmI" class="hint"></span>
+    <button class="btn" id="signInBtn">Sign in</button>
+    <button class="btn" id="signOutBtn" title="Sign out" style="display:none">🚪<span class="btnLabel">Sign out</span></button>
+  </div>
 </header>
 
 <!-- Two tabs and nothing else: the one you use, and the one that explains it. -->
@@ -883,7 +993,7 @@
         <div class="rowBtns" style="margin-top:0">
           <h2 id="answersTitle" style="margin:0">The answers</h2>
           <div class="spacer"></div>
-          <div style="display:flex;gap:10px;flex:none;">
+          <div class="ansActions">
             <button class="btn btnScan hidden" id="vetAllBtn" title="Add every question on this paper to a vetting list">📥 Send all to vetting</button>
             <button class="btn hidden" id="reportBtn" title="Write the report on this paper again">📋 Report</button>
             <!-- 👣 The whole paper at once. Every card walks through its own
@@ -1460,7 +1570,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.28.0';
+var APP_VERSION = 'v1.28.1';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
