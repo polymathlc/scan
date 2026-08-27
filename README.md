@@ -18,6 +18,163 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📱 The tab bar, for real this time (v1.28.6)
+
+The previous round said the tab bar was fixed. It was fixed at one width.
+
+The header **wraps** — that is its documented last line of defence when the
+toolbar will not fit — so giving the tabs the header's height as a number
+(68px) was right on a phone and wrong everywhere else. On an iPad in portrait,
+at 621px, and on a 320px fold, the header is 101 or 171px tall and the tab bar
+sat *underneath* it: not merely hidden but unclickable. The header and the tabs
+are now one sticky box, so neither has to know the other's size and there is no
+number left to drift.
+
+Two more of the same shape:
+
+- **The ask box still clipped its placeholder below 375px.** Shortening the
+  text fixed the width it was measured at; the box had no minimum height at
+  all, and it sizes itself from typed content, which a placeholder is not.
+- **Every check the phone tool has ran at scroll 0**, and a full-page
+  screenshot resizes the viewport to the document height — so a sticky overlap
+  could never appear in any picture it wrote. It now scrolls, hit-tests the
+  tab, and writes a second screenshot per viewport from partway down the page.
+
+Also: the report card in the tool's own screenshots had been printing
+"NaN / 3 of the questions attempted" — a fixture bug, but it meant the tool had
+never once shown the number a parent reads.
+
+## 📱 The sticky header, the delete button, and a tool that was measuring a page the app never shows (v1.28.5)
+
+A fifth review round, and most of what it found was in the *checking*, not the app:
+
+- **The sticky header stopped sticking** after about one screenful — `height: 100%`
+  on `body` bounds it — so on a twenty-question paper the header, the version
+  badge, 📕 My questions and Sign out all left the screen for good. And the two
+  tabs were **hidden behind the header** from the first pixel of scroll.
+- **The mistake book's per-row delete was a ✕ identical to the window's close
+  button** — same class, same glyph, same size, both hard against the right
+  edge — and it deleted *immediately*, while its labelled twin in the foot
+  asked first. It is 🗑 now, and it asks. (The 📕 chip on an answer card stays
+  a single tap; that one is a toggle on the card in front of you.)
+- **The verdict and the marks split onto two rows at exactly 390 and 393px** —
+  most of the school — leaving "1/2" alone as an unlabelled fragment.
+- **The ask box clipped its own placeholder** on every phone, on the first
+  screen.
+- **A report that failed printed the raw error**, and a Gemini spending-cap
+  message is one unbroken URL: 456px of it on a 393px screen. The app broke its
+  own layout precisely when it was being used to diagnose a breakage.
+
+And the tool: it was never rendering the camera bar — **the shutter, the gallery
+and ✓, the three controls the app actually is** — so they were exempt from every
+check and the dock measured 59px instead of 161px. Its exemption for scrolling
+rows also exempted `overflow-x: hidden`, which meant the *original* bug with the
+classic band-aid over it passed everything. Both fixed, the How tab and the
+report card are now rendered and measured, and every mutant must break **exactly**
+the set of checks it declares — an over-broad one proves nothing.
+
+## 📱 …and the tablet, and the phone on its side (v1.28.4)
+
+Two more review rounds. The fixes had been done in one place and not the next,
+and the tool that said otherwise had a blind spot each time:
+
+- **A misplaced brace carried thirty phone-only rules up to 900px** — so an
+  iPad, and every phone turned sideways, got the phone's two-up button grid,
+  phone page margins, and a 44px ✎ disc with the word "Edit" spilling out from
+  under it on every card. Every check passed: the layout was *valid*, just the
+  wrong one. Both harnesses now check which rules actually win at 768px.
+- **A phone on its side got the desktop header** — 117px of chrome on the
+  shortest screen the app ever has. The compact header is keyed to height and
+  pointer now, not width alone.
+- **One long unbroken token** — a pasted link in an answer — still laid a card
+  out at 439px on a 393px screen. Every text container wraps now.
+- **The 44px floor was height-only**, so 📎 Attach was 40×44 — on precisely the
+  phones the floor exists for.
+- **A generated build artifact had been committed**, in a directory named
+  `--selftest`. Removed, and the tool now refuses to write anywhere inside the
+  repository.
+
+And the tool got the two checks it was missing: one that notices a *window*
+laid out too wide (a 900px dialog passed everything before), and one that
+notices the phone layout leaking past its breakpoint. `--selftest` now also
+carries a mutant that must stay **green** — a page strip with eight pages in it
+is *meant* to run off the side of itself, and a check that fires on correct
+code is how a tool stops being read.
+
+## 📱 It fits the phone, the tablet and the landscape too (v1.28.2)
+
+Three reviewers went over v1.28.1 and found the same fix had been done in one
+place and not the next:
+
+- **The header toolbar could not wrap either.** A header that wraps whose
+  toolbar cannot is 751px of buttons on a 728px row — so from 621px to about
+  906px (iPad portrait, a phone turned on its side, a half-screen laptop
+  window) the page was still too wide and **Sign out was still off the edge**.
+- **The two-up button grid only existed at four buttons** — the rarest case.
+  A student sees three and 🖨 Print stretched across the whole card; a teacher
+  sees five once 📊 Report appears. Every button is now exactly half the card.
+- **44px is about fingers, not about width.** Keyed to a narrow screen the
+  floor switched off the moment the phone was turned sideways. It is keyed to
+  the pointer now, and it covers *every* control — the mistake book's tick box
+  was 19×19, ✎ Edit's "remember this" 17×17, the three Settings pickers 41px,
+  💬 Ask Mr Chung 30px.
+- **✎ Edit is a square, not a pill.** At 67×44 it no longer fitted the card's
+  head line, so every card grew a row holding nothing but ✎ Edit.
+- **The waiting answer box is gone, not greyed.** A box labelled ANSWER whose
+  contents are not the answer is the same misreading in a quieter colour — and
+  the grey dashed styling leaked onto **paper**, so an unattempted question
+  printed its answer in a "waiting" box while a walked-through one printed
+  green. The card now says *"The last step is the answer"* over the working,
+  and print gets the ordinary answer box.
+
+**And the checking tool was checking nothing.** Two of its five measurements
+could not fail: under mobile emulation `innerWidth` *grows* to the overflowed
+width, so "is the page wider than the screen" was true no matter what — run
+against the broken file it reported all three viewports clean. Both now measure
+what they name, the viewports straddle the breakpoint instead of all sitting
+below it, the harness is signed in as somebody, and
+
+```
+node tools/mobile-check.mjs --selftest
+```
+
+breaks the page in the exact way each check names and requires the check to go
+red. A check that cannot fail is not a check.
+
+## 📱 It fits the phone again (v1.28.1)
+
+Adding the 👣 button made the answers' button row four buttons wide — about
+570px of buttons on a 390px screen — and a row that wide does not just spill
+over the edge. iOS lays the **whole page** out at that width and shrinks it to
+fit, so every card went small, the header clipped to *"Scan & A…er"*, and the
+page scrolled sideways with **Print** cut in half.
+
+Fixed properly, and pinned so it cannot come back:
+
+- The answers' buttons **wrap**, and on a phone they become a two-up grid at
+  thumb height — 📥 / 👣 on one line, 📋 / 🖨 on the next.
+- The header is a proper **app toolbar**: one 44px square per control, the
+  mistake-book count sitting *on* the book rather than making it wider than
+  everything beside it, and the whole toolbar drops to its own row on a screen
+  too narrow to hold it. The app wears the short name **Scan** on a phone —
+  five controls, a logo and "Scan & Answer" do not fit across 393px however
+  they are tuned. The **version badge stays**, always.
+- **Everything you press is at least 44px**, on both axes, in every window.
+  ✎ Edit was 27px tall; the vetting and mistake-book buttons were under 20.
+  (The page strip's ◀ ▶ ✕ are the one deliberate exception — they live inside
+  a 116px thumbnail.)
+- The **held-back answer** no longer sits in a green *ANSWER* box pretending the
+  cover sentence is the answer — it is plain paper with a dashed edge until the
+  working has been walked through, then it comes back green with the answer in
+  it.
+- Cards, step boxes and modals give back their side padding on small screens
+  without giving up any of their line spacing.
+
+**`node tools/mobile-check.mjs`** is new: it lays the real page out in three
+real phone viewports (iPhone 15 Pro, iPhone SE, Galaxy Fold), measures that
+nothing is wider than the screen, names the element if anything is, checks every
+button against the 44px floor, and writes a screenshot of each to look at.
+
 ## 👣 One step at a time, and every card says what subject it is (v1.28.0)
 
 A worked answer printed in full is read from the bottom up: the student finds
@@ -225,7 +382,7 @@ blank is never counted against you, and an answer the AI would not commit to a v
 out rather than marked wrong.
 
 A paper with nothing written on it gets no report — there is nothing to report on, only answers.
-The report goes out with **Copy** and **Print**, and **📋 Report** writes it again.
+The report goes out with **Copy** and **Print**, and **📊 Report** writes it again.
 
 ## 📕 Your mistake book
 

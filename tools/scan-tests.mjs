@@ -1794,7 +1794,16 @@ ok('a run still being read cannot be sent', /if \(_scanning\) \{ toast\(/.test(h
 /* The same two gates the ✎ carries. A card can still be folded into the one
    before it a second later, and half a question is worse than none. */
 ok('the button is not drawn on a card while the run is still arriving',
-   /function _vetCardFootHtml[\s\S]{0,520}if \(_scanning \|\| !isAdmin\(currentUser\)\) return '';/.test(html));
+   /function _vetFootBtns[\s\S]{0,520}if \(_scanning \|\| !isAdmin\(currentUser\)\) return '';/.test(html));
+/* The BUTTONS and the ROW round them are separate, because the answer card
+   puts them in a row it shares with the 📕/📗 chips. One function regexing the
+   other's HTML back apart was the version before this, and a drifted class
+   order would have silently re-nested the whole wrapper — restoring the
+   double-margin ragged foot it was written to remove. */
+ok('…and the row round them is the caller\'s, not baked into them',
+   /function _vetCardFootHtml\(it, i\) \{\n  var btns = _vetFootBtns\(it, i\);/.test(html) &&
+   /var vet = _vetFootBtns\(it, i\);/.test(html) &&
+   !/_ansFootInner/.test(html));
 
 /* ---------- NO ALGEBRA ----------
    This centre teaches the methods the PSLE is marked on. An answer that
@@ -3329,8 +3338,8 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
   ok('…and every step does, whatever the screen was showing',
      /\.stepRow\.hid \{ display: flex !important; \}/.test(html));
   ok('…as does the answer that was being held back',
-     /\.ansHidden \.ansText \{ display: block !important; \}/.test(html) &&
-     /\.stepNav, \.ansCover \{ display: none !important; \}/.test(html));
+     /\.ansHidden \{ display: block !important; \}/.test(html) &&
+     /\.stepNav, \.stepLead \{ display: none !important; \}/.test(html));
 
   /* ---- the presses ---- */
   const live = [{ steps: st, stepsShown: 0 }, { steps: [], stepsShown: 0 }];
@@ -3383,9 +3392,8 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      marking against. The cover, and the class that hides the answer under it,
      are drawn ONLY on that branch — a card that wears one and not the other
      either gives the answer away or loses it. */
-  ok('…and the cover and the hidden answer are the same branch',
-     /\(hideAns \? ' ansHidden' : ''\)/.test(html) &&
-     /\(hideAns\n\s*\? '<div class="ansCover">/.test(html));
+  ok('…and the answer box is the only thing that branch touches',
+     /\(hideAns \? ' ansHidden' : ''\)/.test(html));
   ok('the cover says where the answer is', /the last one is the answer/.test(html));
   /* "Why" IS THE WHOLE SOLUTION at full detail — the working line by line
      ending with the answer stated. Left under a walk-through nobody has
@@ -3465,7 +3473,7 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      and the card never once said it was a maths question. */
   ok('every answer card wears the subject the question was read as',
      /var sw = itemSubjectWhy\(it\);/.test(html) &&
-     /subjectLabel\(sw\.key\)\) \+ ' question<\/span>'/.test(html));
+     /subjectLabel\(sw\.key\)\) \+ '<span class="subjWord"> question<\/span><\/span>'/.test(html));
   /* "What this question reads as" and "the subject you set on another tab" are
      very different claims to put in front of somebody. */
   ok('…and says which of the two claims it is making',
@@ -3481,6 +3489,239 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      /subject: itemSubject\(it\),/.test(html));
   ok('the subject goes out with Copy as well',
      /\[' \+ subjectLabel\(csub\) \+ ' question\]/.test(html));
+}
+
+
+/* =====================================================================
+   📱 ON A PHONE
+   ---------------------------------------------------------------------
+   The way this app breaks on a phone is not a broken row, it is a broken
+   app: when ONE row is wider than the screen, iOS lays the whole document
+   out at that row's width and shrinks the lot to fit — every word on every
+   card goes small, the header title clips mid-word, the last button is cut
+   in half, and the page scrolls sideways. Nothing throws, and on a desktop
+   browser it all looks perfect, which is exactly how it shipped.
+
+   `node tools/mobile-check.mjs` measures the real page in three real phone
+   viewports. These are the structural pins that go with it, so the shape
+   cannot quietly come back before anybody runs a browser.
+   ===================================================================== */
+{
+  /* The row that did it: four buttons in an inline `display:flex;flex:none`,
+     which can neither wrap nor shrink. */
+  ok('the answers own their button row rather than an inline style',
+     /<div class="ansActions">/.test(html) &&
+     !/style="display:flex;gap:10px;flex:none;"/.test(html));
+  ok('…and that row wraps', /\.ansActions \{[^}]*flex-wrap: wrap/.test(html));
+  /* `flex: 1 1` GROWS, so the two-up grid only ever existed at exactly four
+     buttons — the rarest case. A student sees three and 🖨 Print stretched
+     across the whole card; a teacher sees five once 📋 Report appears. */
+  ok('…and every button in it is half the card, never more',
+     /\.ansActions \.btn \{[^}]*flex: 0 1 calc\(50% - 4px\)/.test(html) &&
+     /\.ansActions \{[^}]*justify-content: flex-start/.test(html));
+  /* The header is the other one. It wraps as a last resort rather than
+     squeezing the app's own name out of itself. */
+  /* Anchored INSIDE the rule. `[\s\S]` crosses `}`, so the old pattern was
+     satisfied by a `flex-wrap: wrap` anywhere in the next 900 characters —
+     it passed with `header { flex-wrap: nowrap }` and the wrap sitting in
+     `.headTools` below it. `[^}]*` is the shape the pins beside it use. */
+  ok('the header itself wraps rather than overflowing',
+     /\n  header \{[^}]*flex-wrap: wrap;/.test(html));
+  /* AND SO DOES THE TOOLBAR — a header that wraps whose toolbar cannot is the
+     same bug one pixel above the breakpoint: 751px of buttons on a 728px row,
+     which is iPad portrait, a phone in landscape and a half-screen window. */
+  ok('…and so does the toolbar inside it',
+     /<div class="headTools">/.test(html) &&
+     /\.headTools \{[^}]*flex-wrap: wrap/.test(html) &&
+     /\.headTools \{[^}]*margin-left: auto/.test(html));
+  ok('…and the signed-in address gives way before the buttons do',
+     /#whoAmI \{[^}]*text-overflow: ellipsis/.test(html));
+  /* Five controls, a logo and "Scan & Answer" do not fit across 393px however
+     they are tuned, and the header was clipping it to "Scan & A…er".
+
+     BRACE-MATCHED, NOT REGEX-MATCHED: a one-line `@media` (the two
+     reduced-motion rules) has no `\n  }` of its own, so a lazy pattern runs
+     straight past it and swallows the next block whole. */
+  const mediaBlocks = (function () {
+    const out = {};
+    const re = /\n  @media ([^{]+)\{/g;
+    let m;
+    while ((m = re.exec(html))) {
+      let i = m.index + m[0].length, depth = 1;
+      while (i < html.length && depth > 0) {
+        if (html[i] === '{') depth++;
+        else if (html[i] === '}') depth--;
+        i++;
+      }
+      out[m[1].trim()] = html.slice(m.index + m[0].length, i - 1);
+    }
+    return out;
+  })();
+  const headBlock = mediaBlocks['(max-width: 620px), (max-height: 500px) and (pointer: coarse)'] || '';
+  const headSmall = mediaBlocks['(max-width: 400px)'] || '';
+  /* THE HEADER AND THE TABS ARE ONE STICKY BOX. Two separately-sticky boxes
+     need the second to know the first's height, and the header WRAPS — so any
+     number written down is right at one width and leaves the tab bar
+     unreachable behind the header everywhere else, which is what shipped
+     twice. Nothing to write down, nothing to drift. */
+  ok('the header and the tabs stick as one box',
+     /<div class="topBar">/.test(html) &&
+     /\.topBar \{ position: sticky; top: 0; z-index: 60; \}/.test(html));
+  ok('…so neither is given the other\'s height as a constant',
+     !/\.tabs \{[^}]*top:\s*\d+px/.test(html) &&
+     !/\n  header \{[^}]*position: sticky/.test(html));
+  /* `height: 100%` fixes body at one viewport, and a sticky box cannot travel
+     outside its containing block — the header left the screen for good after
+     about one screenful of a twenty-question paper. */
+  ok('…and the page can grow past one screenful',
+     /html, body \{ min-height: 100%; \}/.test(html));
+  /* The ask box holds its own placeholder: `rows="1"` with no floor is 46px
+     whatever the placeholder needs, and `askGrow()` sizes from `scrollHeight`,
+     which ignores placeholder text entirely. */
+  ok('the ask box has a floor that fits its own invitation',
+     /\.askRow textarea \{ min-height: 72px; \}/.test(headSmall));
+  /* WHICH BLOCK A RULE LIVES IN IS THE THING THAT SHIPPED BROKEN, and no
+     regex over the whole file can see it: a misplaced brace moved thirty
+     phone-only declarations up into a 900px block and every pin still matched,
+     because the rule TEXT was unchanged. So the blocks are read out and asked
+     what is inside them. `mobile-check` carries the measured half — it asks
+     the browser which rules actually won at 768px. */
+  {
+    const phone = mediaBlocks['(max-width: 620px)'] || '';
+    const land = mediaBlocks['(max-width: 900px)'] || '';
+    ok('the phone LAYOUT lives in the phone block',
+       /\.ansActions \.btn \{/.test(phone) && /\.stepNav \.btn \{/.test(phone) &&
+       /main \{ padding: [^;]+; \}/.test(phone));
+    /* One rule, and nothing else. Written in the middle of the phone block its
+       opening brace closed that block early and carried the two-up button grid
+       and a 44px ✎ square up to 900px — an iPad showing a phone's layout, with
+       nothing overflowing and every check green. */
+    ok('…and the landscape block holds the one rule it is for',
+       /#whoAmI \{ display: none; \}/.test(land) &&
+       land.replace(/#whoAmI \{ display: none; \}/, '').trim() === '');
+    /* The square and the hidden word are two halves of one decision. Split
+       across two queries, a width that hid the word without squaring the
+       button printed "Edit" in 1.15rem bold spilling out from under a 44px
+       disc on every card. */
+    const head = headBlock;
+    ok('✎ Edit is squared in the same breath as the word in it is hidden',
+       /\.btnLabel \{ display: none; \}/.test(head) && /\.ansEditBtn \{/.test(head));
+    /* And a phone on its SIDE is 852px wide and 393px tall — keyed to width
+       alone it took the desktop header on the shortest viewport in the app. */
+    ok('…and a phone on its side gets the compact head too',
+       /max-height: 500px\) and \(pointer: coarse\)/.test(html));
+  }
+  /* PINNED TO THE BLOCK, not to each other. Side by side these two match
+     anywhere — moved into base CSS the app wears "Scan" on a 1280px desktop
+     and the full name nowhere at all, and every check stayed green. */
+  ok('the app wears a short name where the long one will not fit',
+     /<span class="brandFull">Scan &amp; Answer<\/span><span class="brandShort">Scan<\/span>/.test(html) &&
+     /\.brandFull \{ display: none; \}/.test(headBlock) &&
+     /\.brandShort \{ display: inline; \}/.test(headBlock) &&
+     /\n  \.brandShort \{ display: none; \}/.test(html));
+  /* AND THE MUTATION TEST IS PINNED BY ITS MECHANISM AND ITS POPULATION, not
+     by the string "--selftest" appearing somewhere in the file — which is
+     satisfied by the tool's own header COMMENT. Replacing the branch with
+     `if (false)` and emptying the mutant list left the old pin green, two
+     lines below the comment that had deleted another pin for exactly that. */
+  {
+    const mc = fs.readFileSync(new URL('./mobile-check.mjs', import.meta.url), 'utf8');
+    const mutants = (mc.match(/^\s*\{ check: /gm) || []).length;
+    const mustPass = (mc.match(/^\s*\{ why: /gm) || []).length;
+    ok('the phone check mutation-tests itself',
+       /if \(process\.argv\.includes\('--selftest'\)\) \{/.test(mc) &&
+       /const MUTANTS = \[/.test(mc) && mutants >= 12,
+       mutants + ' mutants');
+    /* …in both directions: a check that fires on correct code is how a tool
+       stops being read, so at least one page must be required to stay GREEN. */
+    ok('…including pages that must stay green',
+       /const MUST_PASS = \[/.test(mc) && mustPass >= 1, mustPass + ' must-pass pages');
+    /* And a mutant must break exactly what it declares, or an over-broad one
+       proves nothing about the check it is filed under. */
+    ok('…and a mutant must break exactly what it says it breaks',
+       /const expected = \[m\.check\]\.concat\(m\.also \|\| \[\]\)/.test(mc));
+  }
+  /* The version badge staying on screen is asserted where it can be MEASURED —
+     `mobile-check.mjs` reads its box in every viewport. Pinning it here as
+     "this one literal string is absent" named something it did not test,
+     which is this repo's own standing argument against a check. */
+  /* Apple's own floor, and it is a floor for REAL controls — the chips that
+     are only a status are spans and stay the quiet things they are. */
+  /* THE FLOOR IS KEYED TO THE POINTER, NOT TO THE WIDTH. Keyed to width it
+     switched off the moment the same phone was turned on its side — an iPhone
+     in landscape is 852px, so ✎ Edit went straight back to 27px on the very
+     device it was written for. And it is EVERY control: the first pass raised
+     the six selectors the harness then went looking for and left the mistake
+     book's own tick box at 19×19 and the Settings pickers at 41px. */
+  ok('the 44px floor is about fingers, not about width',
+     /@media \(pointer: coarse\), \(any-pointer: coarse\) \{/.test(html) &&
+     /* Anchored with `[^{}]*` so adding a selector to either list does not fail
+        a correct file — the round-four trap in another guise. */
+     /button:not\(\.shotBtn\)[^{}]*summary[^{}]*\{[^}]*min-height: 44px;[^}]*min-width: 44px;/.test(html) &&
+     /select,[^{}]*input\[type="password"\][^{}]*\{[^}]*min-height: 44px;/.test(html) &&
+     /input\[type="checkbox"\][^{}]*\{[^}]*width: 22px; height: 22px;/.test(html));
+  /* A tick box is pressed by the label round it. The mistake book's had none
+     at all — a bare 19px input with an aria-label. */
+  ok('…and the one control the mistake book turns on has a real target',
+     /<label class="mbPickBox">/.test(html) &&
+     /\.mbPickBox \{ width: 44px; height: 44px;/.test(html));
+  ok('…while ✎ Edit is a square rather than a pill that owns a whole row',
+     /\.ansEditBtn \{[^}]*width: 44px; height: 44px;/.test(html) &&
+     /✎<span class="btnLabel">Edit<\/span>/.test(html));
+  /* …and it is taken OUT of the wrapping head row, where as a sibling it could
+     author a row of its own with nothing else on it. */
+  ok('…and it cannot author a row of its own',
+     /\.ansEditBtn \{[^}]*position: absolute;/.test(html) &&
+     /\.ansHead \{[^}]*position: relative;[^}]*padding-right: 52px;/.test(html));
+  /* THE VERDICT AND THE MARKS ARE ONE FACT. As two siblings in a wrapping row
+     they split at exactly 390 and 393px — most of the school — leaving "1/2"
+     alone on a row as an unlabelled fragment. */
+  ok('the verdict and the marks wrap together or not at all',
+     /<span class="mark">/.test(html) &&
+     /\.mark \{[^}]*white-space: nowrap;/.test(html));
+  /* 🗑, NOT ✕: as a ✕ the row's DELETE was byte-identical to the window's own
+     close button, and it was the one that deleted immediately while its
+     labelled twin in the foot asked first. */
+  ok('the mistake book\'s row delete is not disguised as a close button',
+     /onclick="mbRemoveRow\([^"]*\)">🗑<\/button>/.test(html) &&
+     /async function mbRemoveRow\(id\) \{[\s\S]{0,400}?confirm\(/.test(html));
+  /* …and the confirm is NOT inside `mbRemove`, which the answer card's 📕 chip
+     also calls — that one is deliberately a single tap. */
+  ok('…and the card\'s own 📕 chip stays a single tap',
+     !/async function mbRemove\(id\) \{[\s\S]{0,200}?confirm\(/.test(html));
+  /* A SINGLE UNBROKEN TOKEN IS THE SAME BUG FROM THE OTHER END: `pre-wrap`
+     does not break a run with no spaces in it, so one pasted url in an answer
+     lays the card out at 439px on a 393px screen and shrinks the whole app to
+     fit — no row of buttons involved. `.mbLink` has carried the same guard
+     since the mistake book shipped. */
+  ok('one long unbroken token cannot widen the page',
+     /* ANCHORED INSIDE THE RULE, like the header pin beside it. `[\s\S]{0,N}`
+        crosses `}`, so the declaration it found need not be in this rule at
+        all — the guard could be deleted and put on an unrelated selector and
+        this still passed, with the page laying out at 439px on a 393px
+        screen. And N is a trap in the other direction too: growing the
+        selector list pushed the declaration out of the window and failed a
+        correct file. */
+     /\.ansQ, \.ansText[^{}]*\{[^}]*overflow-wrap: anywhere;/.test(html) &&
+     /\.repLead, \.repGapText[^{}]*\{[^}]*overflow-wrap: anywhere;/.test(html));
+  /* AN ANSWER THAT IS WAITING IS NOT DRAWN AT ALL. Greying the box was half a
+     fix — a student still reading a container labelled ANSWER whose contents
+     were not the answer — and the grey dashed styling then leaked onto PAPER,
+     where an unattempted question printed its answer in a "waiting" box while
+     a walked-through one printed green. Screen: gone. Paper: the ordinary
+     answer box, with no second styling to disagree with it. */
+  ok('a held-back answer is not drawn on the screen at all',
+     /\.ansHidden \{ display: none; \}/.test(html) &&
+     !/\.ansHidden \{[^}]*dashed/.test(html));
+  ok('…and prints as the ordinary answer box',
+     /\.ansHidden \{ display: block !important; \}/.test(html));
+  /* What the box used to say is said over the working it names. */
+  ok('…with the card saying where the answer went',
+     /class="stepLead noPrint">The last step is the answer\./.test(html) &&
+     /stepsBoxHtml\(it, i, hideAns\)/.test(html));
+  /* And the measuring tool itself is part of the change, not a scratch file. */
+  ok('the phone is measured by a tool that is checked in',
+     fs.existsSync(new URL('./mobile-check.mjs', import.meta.url)));
 }
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');

@@ -379,7 +379,7 @@ step, and ship a change to the shape in both repos together**:
   has nothing to report on, and one marked question is the feedback card again in longer words. An
   answer to a typed question (`kind: 'ask'`) was never on a paper and is never a script.
 - **A failed call still leaves a real report** — the score is on screen the moment the run ends and
-  only the WORDS are waited for. 📋 Report rewrites it.
+  only the WORDS are waited for. 📊 Report rewrites it.
 - **A question reference the model invented is dropped** (`_reportRefs`, matched the way the option
   labels are, so "7(a)", "7a" and "(7a)" are one question): a reference to a question that is not
   on this paper points the student at nothing.
@@ -944,6 +944,158 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   as before.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.6)
+
+`tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
+`header { flex-wrap: wrap }`, and the `@media` blocks at 620px, 400px, 900px and — the one this
+section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
+
+- **THE WAY THIS BREAKS ON A PHONE IS NOT A BROKEN ROW, IT IS A BROKEN APP.** When ONE row is wider
+  than the screen, iOS lays the WHOLE document out at that row's width and shrinks the lot to fit:
+  every word on every card goes small, the header title clips mid-word, the last button on the row
+  is cut in half, and the page scrolls sideways. Nothing throws, nothing is logged, and on a desktop
+  browser it looks perfect — which is exactly how it shipped. The one row was the answers' button
+  bar: an inline `display:flex; flex:none`, which can neither wrap nor shrink, holding four buttons
+  that came to about 570px.
+- **SO EVERY ROW OF CONTROLS EITHER WRAPS OR SCROLLS, WITH NO EXCEPTIONS — THE EXCEPTION IS WHAT
+  SHIPPED.** `.ansActions` wraps; the header wraps; and `.headTools` wraps too, which the first pass
+  missed: a header that wraps whose TOOLBAR cannot is 751px of buttons on a 728px row, so from
+  621px to about 906px — iPad portrait, a phone in landscape, a half-screen laptop window — the
+  document was still wider than the screen and **Sign out was still off the edge**. `#whoAmI` is
+  the term that gives way first, because a signed-in address is as long as somebody's email.
+- **HALF THE CARD EACH, AND NEVER MORE.** `.ansActions .btn` is `flex: 0 1`, not `1 1`: `1 1` GROWS,
+  so the tidy two-up grid only ever existed at exactly four buttons, which is the rarest case. A
+  student sees three (never 📥) and 🖨 Print stretched across the whole card — the least useful
+  button on a phone as the loudest thing on the answers — and a teacher sees five the moment 📊
+  Report appears.
+- **THE APP WEARS A SHORT NAME WHERE THE LONG ONE WILL NOT FIT.** Five controls, a logo and
+  "Scan & Answer" do not fit across 393px however they are tuned — that is arithmetic, not styling,
+  and the header was clipping it to "Scan & A…er". `.brandShort` is "Scan", which is already the
+  name on the home-screen icon. **The version badge is never the thing hidden**: it is what the
+  teacher checks the deploy against.
+- **44px IS ABOUT FINGERS, NOT ABOUT WIDTH.** Keyed to a narrow screen the floor switched off the
+  moment the same phone was turned on its side — an iPhone in landscape is 852px — so it is keyed
+  to **`@media (pointer: coarse)`**, separately from the LAYOUT rules: a 1280px touchscreen wants
+  thumb-sized controls, not a phone's two-up button grid.
+  **And it is EVERY control, not a hand-written list of six.** The first pass raised exactly the six
+  selectors the harness then went looking for and left the two most student-facing windows in the
+  app untouched: the 📕 mistake book's own tick box was 19×19, ✎ Edit's *remember this* 17×17, the
+  three Settings pickers 41px, 💬 Ask Mr Chung 30px, the camera overlay's Cancel and Done 42px. A
+  floor with a list of exceptions is not a floor. **`.shotBtn` is the one deliberate exception** and
+  it is written down: the strip's ◀ ▶ ✕ live inside a 116px thumbnail, and a 44px bar under a 96px
+  picture is a control bar bigger than the thing it controls.
+  A tick box is pressed by the **label** round it — the mistake book's had none at all, so
+  `.mbPickBox` is one. The chips that are only a STATUS are `<span>`s and stay small, the same
+  distinction `mbCardChipHtml` already draws.
+- **✎ Edit is a 44px SQUARE, not a 44px pill.** Given the tap target and left as a word it was 67×44,
+  too wide for the card's head line — so every card grew an orphan row holding nothing but ✎ Edit
+  floating right, and a teacher-only utility became the most weighted thing in the top third of
+  every card. The word goes the way every other `.btnLabel` goes on a phone.
+- **AN ANSWER THAT IS WAITING IS NOT DRAWN AT ALL.** Greying the box was half a fix: a student was
+  still looking at a container labelled **ANSWER** whose contents were not the answer — the same
+  misreading in a quieter colour — and 150px of it above the step box that should be leading. Worse,
+  the "waiting" styling leaked onto **PAPER**: an unattempted question printed its answer in a grey
+  dashed box while a walked-through one printed green, so one answer key had two answer styles for
+  no reason a reader could see. `.ansHidden` is now `display: none` on screen and the ordinary green
+  box in print, with no second styling left to disagree with it. What the box used to say is said by
+  `.stepLead`, over the working it names.
+- **WHICH MEDIA BLOCK A RULE LIVES IN IS THE THING THAT SHIPS BROKEN, and no regex over the file can
+  see it.** A `@media (max-width: 900px)` written in the middle of the phone block closed that block
+  early and carried **thirty phone-only declarations up to 900px**: an iPad and every phone in
+  landscape got the two-up button grid, phone padding, and a 44px ✎ square with the word "Edit"
+  spilling out from under it on every card. **Every check passed** — the layout was valid, just the
+  wrong one, applied 280px too far. So `scan-tests` brace-matches the blocks and asks what is inside
+  them (a one-line `@media` has no `\n  }` of its own, which is why a lazy regex swallows the next
+  block whole), and `mobile-check` asks the BROWSER which rules actually won at 768px.
+- **THE COMPACT HEAD IS NOT KEYED TO WIDTH ALONE.** A phone in landscape is 852px wide and 393px
+  TALL, so keyed to width it took the desktop header — two rows of word-buttons, 117px of chrome —
+  on the shortest viewport the app ever has. `(max-height: 500px) and (pointer: coarse)` is the
+  other half, and it means "a phone on its side" rather than "a short desktop window".
+- **`.btnLabel` AND `.ansEditBtn` LIVE IN THE SAME BLOCK ON PURPOSE.** The square and the hidden
+  word are two halves of one decision; split across two queries, a width that hid the word without
+  squaring the button printed "Edit" in 1.15rem bold across the card from under a 44px disc.
+- **A ROW THAT SCROLLS IS NOT A ROW THAT OVERFLOWS.** The house rule is "wraps OR scrolls", and the
+  page strip and the camera strip are `overflow-x: auto` by design — a twelve-page paper is MEANT to
+  run off the side of its own strip. The overflow scan therefore skips an element whose damage is
+  contained by a scroll-clipping ancestor, **walking the whole chain**: a thumbnail is clipped first
+  by `.shot`, which is itself off the side of the strip, and stopping there reported every page in
+  an ordinary run. A check that fires on correct code is how a tool stops being read — which is why
+  `--selftest` also carries a mutant that must stay GREEN.
+- **THE THREE CONTROLS THE APP IS WERE NEVER MEASURED.** `showTab()` unhides `camDock` and `camBar`
+  together; the harness unhid only the dock, so the gallery button, the shutter and ✓ sat at
+  `display: none` through every check — and the dock measured 59px instead of 161px, which is 102px
+  of false headroom under the dock check. The tool's own header claimed the camera surface was
+  exactly what it existed to measure. **A harness that renders less than the app claims coverage it
+  does not have**, and the fix is to render it, not to narrow the sentence.
+- **`overflow-x: hidden` IS NOT "SCROLLS".** The exemption written for the page strip took `hidden`
+  with it — so the ORIGINAL shipped defect, with `main { overflow-x: hidden }` painted over it,
+  passed every check: four buttons off the side of the card with no way to reach them, reported
+  clean. The house rule says wraps **or scrolls**; clipped-and-unreachable is the bug, not the cure.
+- **A CHECK CANNOT FAIL IF THE THING IT MEASURES IS NOT DRAWN.** `getComputedStyle` on a child of a
+  `display: none` ANCESTOR reports the child's own `display`, so hiding `.brandTitle` outright still
+  selected `.brandShort`, measured a zero-width Range and passed — a header with no name in it at
+  all, green. Every measurement now requires a real box (`getBoundingClientRect().width > 0`).
+- **THE SHORT-NAME RULES ARE PINNED TO THEIR BLOCK, NOT TO EACH OTHER.** Side by side they match
+  anywhere: moved into base CSS, the app wore "Scan" on a 1280px desktop and the full name nowhere,
+  and every check stayed green. This is the same class as the misplaced brace — where a rule LIVES
+  is the thing that ships broken.
+- **A MUTANT MUST BREAK EXACTLY WHAT IT DECLARES.** Asserting only that the named check went red
+  lets an over-broad mutant pass: a page wrecked enough to redden half the suite proves nothing
+  about the one check it is filed under. Each mutant lists its full expected red set in `also`, and
+  anything more or fewer is a failure — which catches an over-broad mutant and a check that has
+  quietly stopped noticing, in one assertion.
+- **THE HEADER AND THE TABS ARE ONE STICKY BOX** (`.topBar`), and that is the whole point: two
+  separately-sticky boxes need the second to know the first's height, and **the header's height is
+  not a constant — it WRAPS**. Giving the tabs `top: 68px` fixed exactly the widths where the header
+  happens to be one row and left the tab bar *unreachable behind it* — `elementFromPoint` returning
+  `.headTools` — at 621px, at 768px and at 320px, where the header is 101 or 171px. It shipped that
+  way twice. Nothing is written down now, so nothing can drift; and `html, body` is `min-height`,
+  not `height`, because `height: 100%` fixes body at one viewport and a sticky box cannot travel
+  outside its containing block — the header left the screen for good after one screenful.
+- **THE ASK BOX HOLDS ITS OWN PLACEHOLDER.** `rows="1"` with no floor is 46px whatever the
+  placeholder needs, and `askGrow()` sizes from `scrollHeight`, which ignores placeholder text
+  entirely — so below 375px the invitation wrapped to two lines inside a one-line box and was cut
+  through its x-height, on the home screen, above the shutter. **Shortening the string fixed the one
+  width it was measured at**; the box is what has to give.
+- **EVERY OTHER CHECK MEASURES AT SCROLL 0**, and a `fullPage` screenshot resizes the viewport to the
+  document height — so nothing is ever scrolled in it and a sticky overlap is *guaranteed* invisible
+  in the picture the docs tell you to look at. That is how the tab bar shipped broken twice with
+  seven clean viewports. The tab-bar check scrolls and HIT-TESTS the tab, and a second screenshot
+  per viewport is taken scrolled at the real size.
+- **`tools/mobile-check.mjs` MEASURES THE REAL PAGE** — the Snap tab with a paper on it, signed in,
+  and every window opened in turn with real rows in it: the cards come from the real
+  `answerCardHtml`, the 📕 book's rows from the real `mbRowHtml` and `mbTabsHtml`, and
+  `itemSubjectWhy` is cut out of the file rather than written again, because a harness is not an
+  exemption from the one-door rule. **A window opened EMPTY measures its own ✕ and nothing a student
+  touches** — which is exactly where the controls under the floor were hiding, so "every window" has
+  to mean a window with something in it. The windows whose bodies this app never renders without
+  Firebase (the notes list, the roster, the vetting picker) are opened for their chrome and that is
+  all they are claimed to cover. It needs `npm i playwright-core` and the Chromium already on the machine,
+  so like `ask-sheet-render.mjs` it is a tool you reach for rather than a gate — **and it writes a
+  screenshot per viewport, because a page that measures clean is not the same as one that reads
+  well. Look at them.**
+- **THE VIEWPORTS MUST STRADDLE THE BREAKPOINT.** The first list was 393, 375 and 320 — all three
+  BELOW the 620px media query, so the tool only ever exercised the code that had just been
+  rewritten. It printed *"every viewport is clean"* while the header was 771px wide on an iPad. The
+  list now includes **621** (the first pixel the phone rules do not apply to), a phone in landscape,
+  iPad portrait and a 1280px desktop regression guard — and the harness is **signed in as
+  somebody**, because an empty `#whoAmI` measured the header 136px narrower than it ever is in front
+  of a teacher.
+- **TWO OF ITS FIRST FIVE CHECKS COULD NOT FAIL, and they were the two the documentation led with.**
+  Under mobile emulation `window.innerWidth` GROWS to the overflowed layout width, so
+  `scrollWidth <= innerWidth` is true however broken the page is — run against the file before the
+  fix, it reported all three viewports clean while the document was 585px in a 393px screen. And
+  `.brandTitle.scrollWidth > clientWidth` is false unconditionally, because a column flex box lays
+  the title out at its own content width. Both now measure the thing they name: the width **asked
+  for**, and the name against the room it was **given** (both ways it loses — ellipsised when the
+  brand can shrink, overlapping the toolbar when it cannot).
+- **SO EVERY CHECK IS MUTATION-TESTED.** `node tools/mobile-check.mjs --selftest` breaks the page in
+  the exact way each check names and requires the check to go red. **A check that cannot fail is not
+  a check, and the only way to know which kind you have is to try** — the self-test caught the
+  rewritten title check still passing, twice, before it was right. Add a check, add its mutant.
+- `node tools/scan-tests.mjs` carries the structural half — the classes, the wrap, the short name,
+  the 44px floors — so the shape cannot quietly come back before anybody runs a browser.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -1432,6 +1584,14 @@ that same PDF**.
   that goes deep again, or a `nearInk` guard that goes away, rubs the child's
   own pencil working off the picture and sends the teacher the question with
   the work removed — which is the one thing he was being asked to look at.
+- After touching **anything that lays out a row of controls** (`header`, `.headTools`,
+  `.brandFull`/`.brandShort`, `.ansActions`, `.rowBtns`, `.stepNav`, `.ansSend`, the `@media`
+  blocks, or any new button added to an existing row), run **`node tools/mobile-check.mjs`** and
+  LOOK at the screenshots it writes — then `node tools/scan-tests.mjs`. One row wider than the
+  screen shrinks the whole app to fit on every phone in the centre, and it is invisible on a
+  desktop browser: the page simply looks like somebody chose tiny type. Adding a fourth button to a
+  three-button row is all it takes, and that is exactly how it happened. **Add a check to that tool
+  and add its mutant** (`--selftest`), or you have added a tick rather than a check.
 - After touching **the step-by-step reveal or the subject chip** (`SCAN_STEPS_RULE`,
   `SCAN_STEPS_MAX`, `_scanSteps`, `_stepsText`, `_stepsShown`, `stepsBoxHtml`, `stepNext`,
   `stepAll`, `stepReset`, `stepsAnyCard`, `stepsAllOpen`, `stepAllCards`, `renderStepAllBtn`,
