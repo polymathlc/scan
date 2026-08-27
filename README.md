@@ -18,6 +18,28 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📱 The worksheet button that ate the window (v1.28.7)
+
+Opening **📕 Your questions** on a phone showed two enormous buttons filling the
+whole window, with "The link goes to chungzhikai@gmail.com" printed down the
+left edge one letter per line, and nothing else reachable.
+
+Two changes from the previous rounds, each correct on its own, collided:
+
+- `.sub` was given `overflow-wrap: anywhere` so a pasted link could not widen
+  the page — which also means a long email can wrap **anywhere**, so its
+  narrowest possible width is one character.
+- The modal foot's buttons were allowed to grow to fill their row.
+
+A flex row stretches its children to the tallest one by default. The buttons
+took all the width, the note was crushed into a 38-line column, and the buttons
+grew to match it.
+
+Fixed on the row itself — the foot no longer stretches anything, the note takes
+its own line rather than being squeezed, and the buttons are half the row each.
+And the phone tool now has the check that was missing: every check it had asked
+whether a control was too *small*; none asked whether one had become absurd.
+
 ## 📱 The tab bar, for real this time (v1.28.6)
 
 The previous round said the tab bar was fixed. It was fixed at one width.

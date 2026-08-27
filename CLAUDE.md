@@ -944,7 +944,7 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   as before.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
-## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.6)
+## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.7)
 
 `tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
 `header { flex-wrap: wrap }`, and the `@media` blocks at 620px, 400px, 900px and — the one this
@@ -1044,6 +1044,19 @@ section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
   about the one check it is filed under. Each mutant lists its full expected red set in `also`, and
   anything more or fewer is a failure — which catches an over-broad mutant and a check that has
   quietly stopped noticing, in one assertion.
+- **A FLEX ROW STRETCHES ITS CHILDREN, AND THAT IS HOW A BUTTON BECOMES A SLAB.** A modal foot
+  holds a note and two buttons; `align-items` defaults to `stretch`, so anything that makes the note
+  tall makes every button beside it that tall. It shipped that way: `.sub` gained `overflow-wrap:
+  anywhere` — which turns a long email's min-content into **one character** — while
+  `.modalFoot .btn` was allowed to GROW, so the note was crushed into a 38-line column one letter
+  wide and 📤 Make a worksheet filled the phone. **Neither change is wrong on its own**, which is
+  why the guard is on the ROW (`align-items: center`) rather than on either of them, and why the
+  note gives way by taking its own line rather than by shrinking one character at a time.
+- **EVERY CHECK ASKED WHETHER A CONTROL WAS TOO SMALL AND NONE ASKED WHETHER ONE HAD GONE ABSURD.**
+  A 120px ceiling on any button, in the page and in every open window, is the whole fix — the
+  tallest real control in the app is the 78px camera shutter. It measured clean before only because
+  the harness left `#mbFootNote` empty: **the text is written by `mbSyncFoot()`**, and with nothing
+  in it there was nothing tall on the row. Seed what the app writes, or the row is not the app's row.
 - **THE HEADER AND THE TABS ARE ONE STICKY BOX** (`.topBar`), and that is the whole point: two
   separately-sticky boxes need the second to know the first's height, and **the header's height is
   not a constant — it WRAPS**. Giving the tabs `top: 68px` fixed exactly the widths where the header
