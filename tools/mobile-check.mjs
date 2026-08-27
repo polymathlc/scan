@@ -11,11 +11,20 @@
    So this takes the REAL markup and the REAL stylesheet out of index.html,
    puts a real answer card on the page (built by the real `answerCardHtml`,
    cut out of the file the same way tools/scan-tests.mjs cuts its sections),
-   and measures the page in three phone viewports:
+   and measures the page across seven viewports — three phones, the first
+   pixel above the phone breakpoint, a phone in landscape, an iPad in portrait
+   and a desktop regression row:
 
      • the document is never wider than the screen        ← the shrink-to-fit
-     • nothing pressed is under 44px                      ← Apple's own floor
+     • …and nor is any WINDOW, opened one at a time
+     • nothing pressed is under 44px, in any window       ← Apple's own floor
      • the header title is not clipped                    ← "Scan & A…er"
+     • the version badge is on the screen                 ← the deploy check
+     • the dock does not sit on the last answer
+
+   AND EVERY ONE OF THEM IS MUTATION-TESTED (`--selftest`): two of the first
+   five could not fail at all, and they were the two the documentation led
+   with. A check that cannot fail is not a check.
 
    No network: every <script> is stripped and the logo is swapped for the
    inline SVG the header already falls back to, so this runs offline and the
@@ -30,6 +39,19 @@ import fs from 'fs';
 import path from 'path';
 
 const OUT = process.argv.slice(2).filter((a) => !a.startsWith('--'))[0] || '/tmp/mobile-check';
+/* A CHECK TOOL DOES NOT WRITE INTO THE TREE IT CHECKS. Before the argument
+   parsing above learned to skip flags, `--selftest` was read as the output
+   directory — so a run created a folder literally called `--selftest` holding
+   two near-copies of index.html, and they were committed. Stale duplicates of
+   the app rot silently, and the folder's name breaks every shell tool that
+   takes options. Parsing is one guard; this is the one that cannot be argued
+   with. */
+const REPO = path.resolve(new URL('..', import.meta.url).pathname);
+if (!path.relative(REPO, path.resolve(OUT)).startsWith('..')) {
+  console.error('refusing to write inside the repository: ' + path.resolve(OUT) +
+                '\nthis tool writes copies of index.html — give it a path outside ' + REPO);
+  process.exit(2);
+}
 const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 let chromium;
@@ -60,6 +82,14 @@ function renderGroundingLine(){} function renderEngineLine(){} function renderAs
 function reportAsText(){return '';}
 /* The real chip's own markup — it is a BUTTON, and it was 19px tall. */
 function mbCardChipHtml(){return '<button class="mbBookChip" onclick="void 0">📕 Keep this mistake</button>';}
+var _mistakes = [], _mbSel = {}, _mbTab = 'mistake';
+var MB_LIST_MISTAKE = 'mistake', MB_LIST_LEARNING = 'learning', MB_CLEAR_WINS = 2;
+function mbListOf(m){return m && m.list === MB_LIST_LEARNING ? MB_LIST_LEARNING : MB_LIST_MISTAKE;}
+function mbIsLearning(m){return mbListOf(m) === MB_LIST_LEARNING;}
+function mbInList(k){return _mistakes.filter(function(m){return mbListOf(m) === k;});}
+function mbAskRoute(){return 'share';}   // a phone that CAN share a file: 📎 is drawn
+var _askBusy = false;
+function levelLabel2(){return '';}
 var document={getElementById:function(){return null;},createElement:function(){return {getContext:function(){return {};}};}};
 var window={}; var localStorage={getItem:function(){return null;},setItem:function(){}};
 var location={href:'x',hostname:'y'}; var navigator={}; var storage=null;
@@ -70,12 +100,21 @@ var db={collection:function(){return {doc:function(){return {collection:function
    CLAUDE.md says never to add, and a harness is not an exemption. */
 const api = new Function(prelude +
   cut('/* ---- WHICH LIST A QUESTION BELONGS IN ----', '/* Split a run into one batch per destination list') +
+  /* THE MISTAKE BOOK'S OWN ROWS. Opening that window with an empty body
+     measured its ✕ and its foot and NOTHING a student touches — no row, no
+     tick box, no 📕/📗 tab, no 💬 Ask, no 📎 — which is exactly where the
+     controls under the floor were. `mbRowHtml` and `mbTabsHtml` are cut out
+     of the file like everything else so the window is measured with something
+     in it. */
+  cut('function mbRowHtml(m) {', '/* Switching tabs CLEARS the ticks.') +
   cut('/* ================= Tolerant JSON parse', '/* ================= Teaching notes & AI style training') +
   cut('/* ================= Teaching notes & AI style training', '/* ================= Uploading notes') +
   cut('/* =====================================================================\n   THE SCAN', '/* ---- Showing the answers ----') +
   cut('/* ---- Showing the answers ----', '/* =====================================================================\n   📋 THE REPORT') +
   `\n  var _vetCardFootHtml = function () { return '<div class="ansSend noPrint"><button class="btn btnScan">📥 Send to Maths vetting</button></div>'; };
-  return { answerCardHtml: answerCardHtml, setAnswers: function (v) { _answers = v; }, setMeta: function (v) { wsMeta = v; } };`
+  return { answerCardHtml: answerCardHtml, mbRowHtml: mbRowHtml, mbTabsHtml: mbTabsHtml,
+           setAnswers: function (v) { _answers = v; }, setMeta: function (v) { wsMeta = v; },
+           setBook: function (v) { _mistakes = v; } };`
 )();
 api.setMeta({ level: 'P5', subject: '' });
 
@@ -111,6 +150,21 @@ const paper = [
 api.setAnswers(paper);
 const cards = paper.map(function (it, i) { return api.answerCardHtml(it, i); }).join('');
 
+/* The 📕 window with something in it. Every control the round-one floor
+   missed lives on one of these rows — the tick box, the 📕/📗 tabs, 💬 Ask
+   Mr Chung and its 📎 — and an empty body measured none of them. */
+const BOOK = [
+  { id: 'm1', list: 'mistake', streak: 1, at: '2026-08-20', subject: 'math', level: 'P5',
+    number: '16(b)', question: 'Find the number in the 20th and 21st figures of the pattern.',
+    studentAnswer: '400 and 440', answer: '400 and 441', img: '' },
+  { id: 'm2', list: 'mistake', streak: 0, at: '2026-08-21', subject: 'science', level: 'P5',
+    number: '17', question: 'Which of the following best explains why the puddle dried up on a hot day?',
+    studentAnswer: '(1)', answer: '(2) The water evaporated into water vapour.', img: '' }
+];
+api.setBook(BOOK);
+const bookBody = api.mbTabsHtml() +
+  '<div class="mbList">' + BOOK.map(api.mbRowHtml).join('') + '</div>';
+
 /* ---- the real page, with nothing that needs the network ---- */
 const SVG_LOGO = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22 viewBox=%220 0 40 40%22%3E%3Crect width=%2240%22 height=%2240%22 rx=%228%22 fill=%22%234a7c59%22/%3E%3Ctext x=%2220%22 y=%2229%22 font-size=%2224%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EP%3C/text%3E%3C/svg%3E";
 let page = src
@@ -127,6 +181,8 @@ let page = src
   .replace('<button class="btn btnScan hidden" id="vetAllBtn"', '<button class="btn btnScan" id="vetAllBtn"')
   .replace('<button class="btn hidden" id="stepAllBtn"', '<button class="btn" id="stepAllBtn"')
   .replace('<div id="answersList"></div>', '<div id="answersList">' + cards + '</div>')
+  .replace('<div class="modalBody" id="mbBody"></div>',
+           '<div class="modalBody" id="mbBody">' + bookBody + '</div>')
   // the dock is what the Snap tab is laid out around, so it has to be up
   .replace('<div class="camDock hidden" id="camDock">', '<div class="camDock" id="camDock">')
   .replace('<span class="mbCount hidden" id="mbBadge">0</span>', '<span class="mbCount" id="mbBadge">22</span>')
@@ -232,18 +288,21 @@ async function measure(url, vp) {
      them a real control, most of them in the two windows a student uses most.
      A floor with a list of exceptions is not a floor, so the modals are
      opened and measured too. */
+  /* `camLive` is the camera overlay — the app's primary one-handed control
+     surface — and it is NOT a `.modalBack`, so listing only the modals left it
+     out of every measurement. */
   const MODALS = vp.desktop ? [] : ['mbModal', 'notesModal', 'quickNoteModal', 'ansEditModal',
-                  'noteEditModal', 'stuModal', 'vetModal'];
+                  'noteEditModal', 'stuModal', 'vetModal', 'camLive'];
   /* The floor is about FINGERS: on a fine pointer there is nothing to check. */
   const states = vp.desktop ? [] : [{ name: '', open: '' }].concat(MODALS.map((m) => ({ name: m, open: m })));
-  const small = [];
+  const small = [], wideWin = [];
   for (const st of states) {
     const found = await p.evaluate((arg) => {
       const [min, openId] = arg;
-      document.querySelectorAll('.modalBack').forEach((m) => m.classList.remove('open'));
+      document.querySelectorAll('.modalBack, .camLive').forEach((m) => m.classList.remove('open'));
       if (openId) document.getElementById(openId).classList.add('open');
       const out = [];
-      const sel = 'button, [role="button"], .tab, select, a[href], ' +
+      const sel = 'button, [role="button"], .tab, select, summary, a[href], ' +
                   'input[type="checkbox"], input[type="radio"], input[type="file"]';
       document.querySelectorAll(sel).forEach((el) => {
         const cs = getComputedStyle(el);
@@ -274,8 +333,38 @@ async function measure(url, vp) {
       return out;
     }, [TAP_MIN, st.open]);
     found.forEach((f) => { if (small.indexOf(f) < 0) small.push(f); });
+
+    /* …AND THE OVERFLOW SCAN RUNS IN EVERY WINDOW TOO. Checks ① and ② above
+       measure the page with every modal at `display: none`, so they skip the
+       modal rules entirely — a `.modalCard` 900px wide passed all of them.
+       The windows are already being opened for the floor; measuring them
+       while they are open is the same loop. */
+    if (st.open) {
+      const over = await p.evaluate((arg) => {
+        const [limit, openId] = arg;
+        const out = [];
+        const root = document.getElementById(openId);
+        root.querySelectorAll('*').forEach((el) => {
+          const cs = getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return;
+          const r = el.getBoundingClientRect();
+          if (r.width === 0) return;
+          if (r.right > limit + 1 || r.left < -1) {
+            out.push(openId + ' ' + (el.id ? '#' + el.id : el.tagName.toLowerCase()) +
+                     ' [' + Math.round(r.left) + '→' + Math.round(r.right) + ']');
+          }
+        });
+        if (document.documentElement.scrollWidth > limit + 1) {
+          out.push(openId + ' widens the page to ' + document.documentElement.scrollWidth + 'px');
+        }
+        return out;
+      }, [vp.width, st.open]);
+      over.forEach((o) => { if (wideWin.indexOf(o) < 0) wideWin.push(o); });
+    }
   }
-  await p.evaluate(() => document.querySelectorAll('.modalBack').forEach((m) => m.classList.remove('open')));
+  if (!vp.desktop) ok('no window lays itself out wider than the screen',
+     wideWin.length === 0, wideWin.slice(0, 6).join(' | '));
+  await p.evaluate(() => document.querySelectorAll('.modalBack, .camLive').forEach((m) => m.classList.remove('open')));
   if (!vp.desktop) ok('every control is at least ' + TAP_MIN + 'px, in every window',
      small.length === 0, small.slice(0, 10).join(' | ') +
      (small.length > 10 ? '  (+' + (small.length - 10) + ' more)' : ''));
@@ -384,7 +473,29 @@ const MUTANTS = [
     css: '#versionTag { display: none !important; }' },
   { check: 'the camera dock does not sit on top of the last answer',
     why: 'the padding that clears the dock taken away',
-    css: '#scanPage { padding-bottom: 0 !important; }' }
+    css: '#scanPage { padding-bottom: 0 !important; }' },
+  /* A control that exists ONLY inside a window. Without this the modal loop
+     could quietly stop working — a renamed `.open`, a null getElementById —
+     and every check would stay green. */
+  { check: 'every control is at least 44px, in every window',
+    why: "the ✎ window's own tick-box label shrunk — a control no other check can see",
+    css: '.aeCheck label { min-height: 0 !important; height: 12px !important; }' },
+  /* …and the same for a window laid out too wide, which every check missed
+     until the scan was run with the windows open. */
+  { check: 'no window lays itself out wider than the screen',
+    why: 'a vetting window 900px wide',
+    /* `min-width`, not `width`: a `.modalCard` is a flex item, so a plain
+       `width: 900px` is only its BASE size and `flex-shrink` pulls it straight
+       back to the screen — the mutant looked broken and laid out fine. */
+    css: '#vetModal .modalCard { min-width: 900px !important; max-width: none !important; }' },
+  /* THE HEADLINE FAILURE, FROM CONTENT RATHER THAN FROM A CONTROL ROW: one
+     token with no spaces in it, which `pre-wrap` will not break. */
+  { check: 'the page is no wider than the screen',
+    why: 'one unbroken token in an answer, with the wrap guard removed',
+    css: '.ansQ, .ansText, .stepDo, .stepWhy, .youText, .whyText, .fbText ' +
+         '{ overflow-wrap: normal !important; word-break: normal !important; }',
+    seed: 'https://firebasestorage.googleapis.com/v0/b/mathgen--app.appspot.com/o/' +
+          'scan-mistakes%2Fuid_example%2Fm_abc123_question.jpg?alt=media&token=00000000-0000-0000-0000-000000000000' }
 ];
 
 if (process.argv.includes('--selftest')) {
@@ -392,9 +503,14 @@ if (process.argv.includes('--selftest')) {
   console.log('SELF-TEST — each check is given a page broken in the way it names.\n');
   let bad = 0;
   for (const m of MUTANTS) {
-    const mutated = page
+    let mutated = page
       .replace('</head>', '<style>' + (m.css || '') + '</style></head>')
       .replace('</body>', (m.body || '') + '</body>');
+    /* Some defects are in the CONTENT, not the stylesheet. */
+    /* Into a field that is actually on the SCREEN: card one's answer is behind
+       its steps (`.ansHidden`), so seeding there tested nothing. The marked
+       card shows its answer at once. */
+    if (m.seed) mutated = mutated.replace('400 and 441', m.seed);
     const f = path.join(OUT, 'mutant.html');
     fs.writeFileSync(f, mutated);
     const r = await measure('file://' + f, vp);

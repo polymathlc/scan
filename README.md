@@ -76,8 +76,10 @@ Fixed properly, and pinned so it cannot come back:
   too narrow to hold it. The app wears the short name **Scan** on a phone —
   five controls, a logo and "Scan & Answer" do not fit across 393px however
   they are tuned. The **version badge stays**, always.
-- **Everything you press is at least 44px.** ✎ Edit was 27px tall; the vetting
-  and mistake-book buttons were under 20.
+- **Everything you press is at least 44px**, on both axes, in every window.
+  ✎ Edit was 27px tall; the vetting and mistake-book buttons were under 20.
+  (The page strip's ◀ ▶ ✕ are the one deliberate exception — they live inside
+  a 116px thumbnail.)
 - The **held-back answer** no longer sits in a green *ANSWER* box pretending the
   cover sentence is the answer — it is plain paper with a dashed edge until the
   working has been walked through, then it comes back green with the answer in

@@ -3464,7 +3464,7 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      and the card never once said it was a maths question. */
   ok('every answer card wears the subject the question was read as',
      /var sw = itemSubjectWhy\(it\);/.test(html) &&
-     /subjectLabel\(sw\.key\)\) \+ ' question<\/span>'/.test(html));
+     /subjectLabel\(sw\.key\)\) \+ '<span class="subjWord"> question<\/span><\/span>'/.test(html));
   /* "What this question reads as" and "the subject you set on another tab" are
      very different claims to put in front of somebody. */
   ok('…and says which of the two claims it is making',
@@ -3549,8 +3549,8 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      the six selectors the harness then went looking for and left the mistake
      book's own tick box at 19×19 and the Settings pickers at 41px. */
   ok('the 44px floor is about fingers, not about width',
-     /@media \(pointer: coarse\) \{/.test(html) &&
-     /button:not\(\.shotBtn\), \.tab, \.mbTab, \.camLiveBtn \{ min-height: 44px; \}/.test(html) &&
+     /@media \(pointer: coarse\), \(any-pointer: coarse\) \{/.test(html) &&
+     /button:not\(\.shotBtn\), \.tab, \.mbTab, \.camLiveBtn, summary \{\n\s*min-height: 44px; min-width: 44px;/.test(html) &&
      /select, input\[type="text"\][^{]*\{ min-height: 44px; \}/.test(html) &&
      /input\[type="checkbox"\] \{ width: 22px; height: 22px; \}/.test(html));
   /* A tick box is pressed by the label round it. The mistake book's had none
@@ -3561,6 +3561,13 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
   ok('…while ✎ Edit is a square rather than a pill that owns a whole row',
      /\.ansEditBtn \{\n\s*width: 44px; height: 44px;/.test(html) &&
      /✎<span class="btnLabel">Edit<\/span>/.test(html));
+  /* A SINGLE UNBROKEN TOKEN IS THE SAME BUG FROM THE OTHER END: `pre-wrap`
+     does not break a run with no spaces in it, so one pasted url in an answer
+     lays the card out at 439px on a 393px screen and shrinks the whole app to
+     fit — no row of buttons involved. `.mbLink` has carried the same guard
+     since the mistake book shipped. */
+  ok('one long unbroken token cannot widen the page',
+     /\.ansQ, \.ansText[\s\S]{0,240}overflow-wrap: anywhere;/.test(html));
   /* AN ANSWER THAT IS WAITING IS NOT DRAWN AT ALL. Greying the box was half a
      fix — a student still reading a container labelled ANSWER whose contents
      were not the answer — and the grey dashed styling then leaked onto PAPER,

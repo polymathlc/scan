@@ -305,6 +305,21 @@
   .progFill { height: 100%; width: 0; background: var(--accent-deep); border-radius: 999px; transition: width .3s ease; }
   .progText { font-size: 0.84rem; color: var(--ink-soft); margin-top: 10px; }
 
+  /* A SINGLE UNBROKEN TOKEN IS THE SAME BUG FROM THE OTHER END. `pre-wrap`
+     keeps the model's line breaks and does NOT break a run with no spaces in
+     it, so one long token — a url pasted into a question, an OCR read of a
+     child's handwriting that came back as one run — lays the card out wider
+     than the screen and shrinks the whole app to fit, exactly as a row of
+     buttons did. A plain Firebase download url in an answer is enough: 439px
+     on a 393px screen. `.mbLink` has carried the same guard for this reason
+     since the mistake book shipped. CJK needs none of it — it breaks between
+     characters — and `anywhere` breaks only where a line would otherwise
+     overflow, so ordinary prose is untouched. */
+  .ansQ, .ansText, .ansOpts li, .stepDo, .stepWhy, .stepLead,
+  .fbText, .youText, .whyText, .keyNoteText, .mbQ, .mbYou, .mbAns {
+    overflow-wrap: anywhere;
+  }
+
   /* ---------- Answers ---------- */
   .ansCard {
     background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
@@ -860,6 +875,13 @@
     .brandTitle { font-size: 0.97rem; }
     .brandSub { font-size: 0.7rem; }
     #whoAmI { display: none; }
+  }
+  /* A phone in landscape is 852px, so it misses the block above and shows the
+     address — which is the one term long enough to push Sign out onto a
+     second header row on a viewport only 393px tall. It is the least useful
+     thing in the header and the first that should go. */
+  @media (max-width: 900px) {
+    #whoAmI { display: none; }
     main { padding: 18px 14px 22px; }
     #scanPage { padding-bottom: calc(192px + env(safe-area-inset-bottom, 0px)); }
     .camBar { padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); }
@@ -897,9 +919,15 @@
        teacher-only utility became the most weighted thing in the top third of
        every card. The word goes the same way every other `.btnLabel` on a
        phone does. */
+    /* Given the 44px target it must still READ as a button: at `--ink-faint`
+       on `--bg-soft` it wore the same fill, border and colour as the subject
+       chip beside it, and a 16px pencil in a 44px disc scanned as a pale
+       decorative blob rather than the one thing on the head row you can
+       press. */
     .ansEditBtn {
       width: 44px; height: 44px; padding: 0; margin-left: auto;
-      display: grid; place-items: center; font-size: 1rem;
+      display: grid; place-items: center;
+      font-size: 1.15rem; color: var(--ink-soft);
     }
     .ansSend .btn { min-height: 44px; }
     button.mbBookChip { min-height: 44px; padding: 0 16px; display: inline-flex; align-items: center; }
@@ -918,6 +946,11 @@
     .headTools { gap: 5px; }
     .brandMark { width: 31px; height: 31px; }
     .brandTitle { font-size: 0.92rem; }
+    /* The chip gives up the word "question" so the head row can hold the ✎
+       instead of growing an empty row beneath it to carry the pencil alone.
+       360px is an ordinary Android width and a blank worksheet — every card
+       unmarked, every card wearing this chip — is the app's commonest run. */
+    .subjChip .subjWord { display: none; }
     .ansCard, .card { padding: 16px 14px; }
     .stepBox { padding: 15px 13px; }
     .ansBox, .whyBox, .youBox, .fbBox { padding: 13px 14px; }
@@ -945,8 +978,15 @@
      control bar bigger than the thing it controls. They are a compact
      affordance beside a picture you can also just tap.
      ===================================================================== */
-  @media (pointer: coarse) {
-    button:not(.shotBtn), .tab, .mbTab, .camLiveBtn { min-height: 44px; }
+  @media (pointer: coarse), (any-pointer: coarse) {
+    /* min-WIDTH as well as height, or an icon-only button clears the floor on
+       one axis and misses it on the other: 📎 Attach was 40×44, drawn only
+       where the phone can really share a file — which is to say only on the
+       device the floor exists for. And `summary` is a real control: it is the
+       only way to open a note's key facts, and it was 20px. */
+    button:not(.shotBtn), .tab, .mbTab, .camLiveBtn, summary {
+      min-height: 44px; min-width: 44px;
+    }
     select, input[type="text"], input[type="email"], input[type="search"] { min-height: 44px; }
     input[type="checkbox"] { width: 22px; height: 22px; }
     /* A tick box is pressed by the LABEL round it far more often than by the
@@ -1067,7 +1107,7 @@
           <div class="spacer"></div>
           <div class="ansActions">
             <button class="btn btnScan hidden" id="vetAllBtn" title="Add every question on this paper to a vetting list">📥 Send all to vetting</button>
-            <button class="btn hidden" id="reportBtn" title="Write the report on this paper again">📋 Report</button>
+            <button class="btn hidden" id="reportBtn" title="Write the report on this paper again">📊 Report</button>
             <!-- 👣 The whole paper at once. Every card walks through its own
                  working a step at a time; this is the one press that opens
                  all of them — for a teacher checking a script, and for the
@@ -1132,7 +1172,7 @@
         partly right answer worth half. A question you left blank is never counted against you, and an answer the AI
         would not commit to a verdict on is left out rather than marked wrong.</p>
       <p class="sub" style="margin-top:10px">A paper with nothing written on it gets no report — there is nothing to report
-        on, only answers. The report goes out with <b>Copy</b> and <b>Print</b>; press <b>📋 Report</b> to have it written
+        on, only answers. The report goes out with <b>Copy</b> and <b>Print</b>; press <b>📊 Report</b> to have it written
         again.</p>
       <h3 style="margin-top:22px">📕 Your mistake book</h3>
       <p class="sub" style="margin-top:6px">Every question you get <b>wrong</b> or <b>partly right</b> on a scanned
@@ -1642,7 +1682,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.28.2';
+var APP_VERSION = 'v1.28.3';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -4965,7 +5005,7 @@ function answerCardHtml(it, i) {
       escHtml(sw.from === 'question'
         ? 'What this question itself reads as.'
         : 'The subject you set in Settings — this question did not say.') +
-      '">' + escHtml(subjectLabel(sw.key)) + ' question</span>');
+      '">' + escHtml(subjectLabel(sw.key)) + '<span class="subjWord"> question</span></span>');
   }
   if (it.marked) head.push('<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>');
   if (it.marked && it.marks) head.push('<span class="ansMarks">' + escHtml(it.marks) + '</span>');
@@ -5825,7 +5865,7 @@ function reportCardHtml() {
   var basis = reportBasisText(s);
 
   var head = '<div class="repHead"><div class="repHeadText">' +
-      '<div class="repTitle">📋 Report</div>' +
+      '<div class="repTitle">📊 Report</div>' +
       (score ? '<div class="repScore">' + escHtml(score) + '</div>' : '') +
       '<div class="repCounts">' + escHtml(reportCountsText(s)) + '</div>' +
     '</div>' +
@@ -5837,7 +5877,7 @@ function reportCardHtml() {
     body = '<div class="repPending">✨ Writing the report on the whole paper…</div>';
   } else if (_report.status === 'failed') {
     body = '<div class="repFail">The written half of the report could not be written — ' + escHtml(_report.err) +
-      '. The marks above are counted here and are not affected. Press 📋 Report to try again.</div>';
+      '. The marks above are counted here and are not affected. Press 📊 Report to try again.</div>';
   } else if (w) {
     if (w.headline) body += '<p class="repLead">' + escHtml(w.headline) + '</p>';
     if (w.strengths.length) {
@@ -5870,7 +5910,7 @@ function renderReport() {
   if (!b) return;
   b.classList.toggle('hidden', !reportEligible(_answers));
   b.disabled = _scanning || !!(_report && _report.status === 'writing');
-  b.textContent = (_report && _report.status === 'done') ? '📋 Rewrite report' : '📋 Report';
+  b.textContent = (_report && _report.status === 'done') ? '📊 Rewrite report' : '📊 Report';
 }
 
 function reportAsText() {

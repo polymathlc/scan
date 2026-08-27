@@ -947,7 +947,8 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
 ## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened in v1.28.2)
 
 `tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
-`header { flex-wrap: wrap }` and the two `@media` blocks at 620px and 400px.
+`header { flex-wrap: wrap }`, and the `@media` blocks at 620px, 400px, 900px and — the one this
+section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
 
 - **THE WAY THIS BREAKS ON A PHONE IS NOT A BROKEN ROW, IT IS A BROKEN APP.** When ONE row is wider
   than the screen, iOS lays the WHOLE document out at that row's width and shrinks the lot to fit:
@@ -999,9 +1000,14 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   box in print, with no second styling left to disagree with it. What the box used to say is said by
   `.stepLead`, over the working it names.
 - **`tools/mobile-check.mjs` MEASURES THE REAL PAGE** — the Snap tab with a paper on it, signed in,
-  every modal opened in turn — with the real stylesheet and cards built by the real `answerCardHtml`
-  (and `itemSubjectWhy` cut out of the file rather than written again: a harness is not an exemption
-  from the one-door rule). It needs `npm i playwright-core` and the Chromium already on the machine,
+  and every window opened in turn with real rows in it: the cards come from the real
+  `answerCardHtml`, the 📕 book's rows from the real `mbRowHtml` and `mbTabsHtml`, and
+  `itemSubjectWhy` is cut out of the file rather than written again, because a harness is not an
+  exemption from the one-door rule. **A window opened EMPTY measures its own ✕ and nothing a student
+  touches** — which is exactly where the controls under the floor were hiding, so "every window" has
+  to mean a window with something in it. The windows whose bodies this app never renders without
+  Firebase (the notes list, the roster, the vetting picker) are opened for their chrome and that is
+  all they are claimed to cover. It needs `npm i playwright-core` and the Chromium already on the machine,
   so like `ask-sheet-render.mjs` it is a tool you reach for rather than a gate — **and it writes a
   screenshot per viewport, because a page that measures clean is not the same as one that reads
   well. Look at them.**
