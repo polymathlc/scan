@@ -18,6 +18,46 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📱 It fits the phone, the tablet and the landscape too (v1.28.2)
+
+Three reviewers went over v1.28.1 and found the same fix had been done in one
+place and not the next:
+
+- **The header toolbar could not wrap either.** A header that wraps whose
+  toolbar cannot is 751px of buttons on a 728px row — so from 621px to about
+  906px (iPad portrait, a phone turned on its side, a half-screen laptop
+  window) the page was still too wide and **Sign out was still off the edge**.
+- **The two-up button grid only existed at four buttons** — the rarest case.
+  A student sees three and 🖨 Print stretched across the whole card; a teacher
+  sees five once 📋 Report appears. Every button is now exactly half the card.
+- **44px is about fingers, not about width.** Keyed to a narrow screen the
+  floor switched off the moment the phone was turned sideways. It is keyed to
+  the pointer now, and it covers *every* control — the mistake book's tick box
+  was 19×19, ✎ Edit's "remember this" 17×17, the three Settings pickers 41px,
+  💬 Ask Mr Chung 30px.
+- **✎ Edit is a square, not a pill.** At 67×44 it no longer fitted the card's
+  head line, so every card grew a row holding nothing but ✎ Edit.
+- **The waiting answer box is gone, not greyed.** A box labelled ANSWER whose
+  contents are not the answer is the same misreading in a quieter colour — and
+  the grey dashed styling leaked onto **paper**, so an unattempted question
+  printed its answer in a "waiting" box while a walked-through one printed
+  green. The card now says *"The last step is the answer"* over the working,
+  and print gets the ordinary answer box.
+
+**And the checking tool was checking nothing.** Two of its five measurements
+could not fail: under mobile emulation `innerWidth` *grows* to the overflowed
+width, so "is the page wider than the screen" was true no matter what — run
+against the broken file it reported all three viewports clean. Both now measure
+what they name, the viewports straddle the breakpoint instead of all sitting
+below it, the harness is signed in as somebody, and
+
+```
+node tools/mobile-check.mjs --selftest
+```
+
+breaks the page in the exact way each check names and requires the check to go
+red. A check that cannot fail is not a check.
+
 ## 📱 It fits the phone again (v1.28.1)
 
 Adding the 👣 button made the answers' button row four buttons wide — about

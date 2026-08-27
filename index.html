@@ -61,10 +61,24 @@
     border-bottom: 1px solid var(--line);
   }
   header .btn { flex: none; }
-  .headTools { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  /* IT WRAPS TOO, and that is not belt-and-braces — it is the same bug. A
+     header that wraps whose TOOLBAR cannot is a toolbar 751px wide sitting on
+     a row of 728px, so from 621px to about 906px — iPad portrait, a phone in
+     landscape, a half-screen laptop window — the document was still wider
+     than the screen and Sign out was still off the edge. Every row of
+     controls in this file wraps; there are no exceptions, because the
+     exception is what shipped. */
+  .headTools {
+    display: flex; align-items: center; gap: 10px;
+    margin-left: auto; flex-wrap: wrap; justify-content: flex-end;
+  }
+  /* A signed-in address is as long as somebody's email, and it was the term
+     that pushed the toolbar over on a tablet. It gives way first. */
+  #whoAmI { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .brandShort { display: none; }
-  /* min-width:0 is what lets the title ellipsis instead of shoving the
-     buttons onto a second row. */
+  /* min-width:0 is what lets the title give way first, so a long name shortens
+     rather than pushing the toolbar off the row. Wrapping is what happens when
+     there is nothing left to give — see `header` above. */
   .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; min-width: 0; }
   .brandTitle, .brandSub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* The mark is a BOX AND NOTHING ELSE — no tile behind the logo. It used to
@@ -321,6 +335,9 @@
     background: #FBFAF7; border: 1px solid var(--line);
   }
   .stepHead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  /* What the answer box used to say, said where it belongs: over the working
+     it is telling the student to do. */
+  .stepLead { font-size: 0.86rem; color: var(--ink-soft); line-height: 1.7; margin-top: 10px; }
   .stepLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
   .stepCount { font-size: 0.74rem; color: var(--ink-faint); margin-left: auto; }
   .stepList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
@@ -346,15 +363,14 @@
   /* The answer is the LAST step, so while there are steps still to come it is
      kept behind them rather than sitting at the top of the card giving itself
      away. One press of Show all working opens it, and Print always has it. */
-  /* An answer that is WAITING must not look like an answer that is there. The
-     cover sentence sitting in the green answer box read as the answer itself —
-     "ANSWER: work through the 2 steps below" — so the box drops to plain paper
-     with a dashed edge while it holds nothing yet, and comes back green with
-     the answer in it. */
-  .ansHidden { background: var(--bg-soft); border-style: dashed; border-color: var(--line); }
-  .ansHidden .ansLabel { color: var(--ink-faint); }
-  .ansHidden .ansText { display: none; }
-  .ansCover { font-size: 0.88rem; color: var(--ink-faint); margin-top: 6px; line-height: 1.7; }
+  /* AN ANSWER THAT IS WAITING IS NOT DRAWN AT ALL. Greying the box was half a
+     fix: a student was still looking at a container labelled ANSWER whose
+     contents were not the answer, which is the same misreading in a quieter
+     colour — and 150px of it above the step box that should be leading. The
+     box stays in the markup for Print and nothing else, so there is no
+     "waiting" styling left to leak onto paper: what prints is the ordinary
+     green answer box, exactly as on a card that was walked through. */
+  .ansHidden { display: none; }
   /* What subject this question IS, said on the card. A maths question read off
      a mixed pile is answered to the maths standard, marked to it and filed in
      the maths list — and until now the card never once said so. */
@@ -629,7 +645,8 @@
   .mbRow.picked { border-color: var(--accent-deep); background: #FFFBF3; }
   /* Tailwind is not here, but a bare checkbox still needs saying: this is the
      one control the whole window turns on. */
-  .mbPick { flex: none; width: 19px; height: 19px; margin-top: 3px; accent-color: var(--accent-deep); appearance: auto; -webkit-appearance: checkbox; }
+  .mbPickBox { flex: none; display: grid; place-items: center; margin-top: 3px; cursor: pointer; }
+  .mbPick { width: 19px; height: 19px; accent-color: var(--accent-deep); appearance: auto; -webkit-appearance: checkbox; }
   .mbMain { flex: 1; min-width: 0; }
   .mbChips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px; align-items: center; }
   .mbChip {
@@ -710,7 +727,11 @@
   .modalBack.open { display: flex; }
   .modalCard {
     background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow-modal);
-    width: 100%; max-width: 480px; max-height: 88vh; display: flex; flex-direction: column;
+    /* 88vh on iOS Safari is 88% of the LARGE viewport — the one without the
+       URL bar — so a centred modal can push its foot, and the Save button on
+       it, below the glass. `dvh` is the one that follows the bar. */
+    width: 100%; max-width: 480px; max-height: 88vh; max-height: min(88vh, 88dvh);
+    display: flex; flex-direction: column;
   }
   .modalCard.wide { max-width: 780px; }
   .modalHead {
@@ -825,8 +846,12 @@
       display: grid; place-items: center; font-size: 1.06rem; line-height: 1;
     }
     .headTools .btn#signInBtn { width: auto; padding: 0 16px; font-size: 0.88rem; }
-    .mbCount {
-      position: absolute; top: -5px; right: -5px; margin-left: 0;
+    /* Scoped to the toolbar: `position:absolute` on a .mbCount anywhere else
+       would take its position from whatever happened to be positioned above
+       it. The badge sits ON the book, and -2px keeps it clear of the button
+       beside it rather than reading as something between the two. */
+    .headTools .mbCount {
+      position: absolute; top: -5px; right: -2px; margin-left: 0;
       min-width: 19px; height: 19px; font-size: 0.66rem;
       border: 2px solid var(--bg);
     }
@@ -847,9 +872,16 @@
     /* The four answer buttons as a two-up grid across the card, at thumb
        height. A row of four is a row whose last button is off the screen. */
     .rowBtns { gap: 8px; }
-    .ansActions { width: 100%; gap: 8px; }
+    /* HALF THE CARD EACH, AND NEVER MORE. `flex: 1 1` GROWS, so the tidy 2×2
+       only ever existed at exactly four buttons — which is the rarest case: a
+       student sees three (never 📥) and 🖨 Print stretched across the whole
+       card, twice the size of Copy, making the least useful button on a phone
+       the loudest thing on the answers; a teacher sees five as soon as 📋
+       Report appears. `0 1` holds every button to half, and an odd one sits at
+       the left of its own row where it reads as one of a set. */
+    .ansActions { width: 100%; gap: 8px; justify-content: flex-start; }
     .ansActions .btn {
-      flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 46px;
+      flex: 0 1 calc(50% - 4px); min-width: 0; min-height: 54px;
       padding: 10px 8px; text-align: center;
     }
     /* Room to breathe is not the same as room to spare: the step box keeps its
@@ -859,11 +891,16 @@
     .stepNav { gap: 8px; margin-top: 16px; }
     .stepNav .btn { flex: 1 1 100%; min-height: 46px; text-align: center; }
     .stepDone { flex: 1 1 100%; }
-    /* EVERY REAL CONTROL IS THUMB-SIZED. ✎ Edit was 27px tall and the vetting
-       and mistake-book chips were under 20 — buttons a finger cannot land on
-       without hitting the card behind them. The chips that are only a STATUS
-       are spans, and stay the small quiet things they are. */
-    .ansEditBtn { min-height: 44px; padding: 0 15px; }
+    /* ✎ Edit is a 44px SQUARE here, not a 44px pill. Given the tap target and
+       left as a word it was 67×44 — too wide for the head line, so every card
+       grew an orphan row holding nothing but ✎ Edit floating right, and a
+       teacher-only utility became the most weighted thing in the top third of
+       every card. The word goes the same way every other `.btnLabel` on a
+       phone does. */
+    .ansEditBtn {
+      width: 44px; height: 44px; padding: 0; margin-left: auto;
+      display: grid; place-items: center; font-size: 1rem;
+    }
     .ansSend .btn { min-height: 44px; }
     button.mbBookChip { min-height: 44px; padding: 0 16px; display: inline-flex; align-items: center; }
     .modalBack { padding: 12px; }
@@ -872,8 +909,10 @@
     .modalFoot { padding: 14px 18px; }
     .modalFoot .btn { flex: 1 1 auto; min-height: 46px; }
   }
-  /* A small phone — an iPhone SE or a 13 mini — where the title is the first
-     thing to be squeezed out. */
+  /* 400px catches every iPhone in service — the 15 Pro is 393 and the 14, 13
+     and 12 are 390 — so this is the DEFAULT phone, not an edge case. It gives
+     back a couple of pixels of side padding and nothing else: the line
+     spacing and the type size are the last things to go, never the first. */
   @media (max-width: 400px) {
     header { gap: 6px; padding: 9px 10px; }
     .headTools { gap: 5px; }
@@ -882,6 +921,39 @@
     .ansCard, .card { padding: 16px 14px; }
     .stepBox { padding: 15px 13px; }
     .ansBox, .whyBox, .youBox, .fbBox { padding: 13px 14px; }
+  }
+  /* =====================================================================
+     44px IS ABOUT FINGERS, NOT ABOUT WIDTH
+     ---------------------------------------------------------------------
+     The floor above is keyed to a narrow screen, which switches it off the
+     moment the same phone is turned on its side — an iPhone in landscape is
+     852px, so ✎ Edit went straight back to 27px on the very device the floor
+     was written for. `pointer: coarse` is the honest test, and it is keyed
+     separately from the LAYOUT rules on purpose: a 1280px touchscreen wants
+     thumb-sized controls, not a phone's two-up button grid.
+
+     AND IT IS EVERY CONTROL, not a hand-written list of six. The first pass
+     raised exactly the six selectors the harness then went looking for, and
+     left the two most student-facing windows in the app untouched: the 📕
+     mistake book's own tick box was 19×19, ✎ Edit's "remember this" 17×17,
+     the three Settings pickers 41px, 💬 Ask Mr Chung 30px, and the camera
+     overlay's Cancel and Done 42px. A floor with a list of exceptions is not
+     a floor.
+
+     `.shotBtn` is the one deliberate exception: the page strip's ◀ ▶ ✕ live
+     inside a 116px thumbnail, and a 44px bar under a 96px picture is a
+     control bar bigger than the thing it controls. They are a compact
+     affordance beside a picture you can also just tap.
+     ===================================================================== */
+  @media (pointer: coarse) {
+    button:not(.shotBtn), .tab, .mbTab, .camLiveBtn { min-height: 44px; }
+    select, input[type="text"], input[type="email"], input[type="search"] { min-height: 44px; }
+    input[type="checkbox"] { width: 22px; height: 22px; }
+    /* A tick box is pressed by the LABEL round it far more often than by the
+       box itself — so the label is what carries the target, and the box stays
+       the small tidy thing it looks like. */
+    .aeCheck label { min-height: 44px; display: flex; align-items: center; }
+    .mbPickBox { width: 44px; height: 44px; margin-top: -3px; }
   }
   @media print {
     header, .tabs, .camBar, .camDock, .noPrint, #toast, .modalBack { display: none !important; }
@@ -892,8 +964,8 @@
        go on to the paper whatever the screen was showing. */
     .stepRow.hid { display: flex !important; }
     .stepList { margin-top: 16px; }
-    .stepNav, .ansCover { display: none !important; }
-    .ansHidden .ansText { display: block !important; }
+    .stepNav, .stepLead { display: none !important; }
+    .ansHidden { display: block !important; }
     .whyBox.hidWhy { display: block !important; }
     .reportCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
   }
@@ -1570,7 +1642,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.28.1';
+var APP_VERSION = 'v1.28.2';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -4749,7 +4821,7 @@ function verdictFace(v) {
    Show all working on each card: a student who wants the answer can always
    have it, and the point is that taking it is a choice rather than the
    default. ↺ Start again closes the card back up for a second go. */
-function stepsBoxHtml(it, i) {
+function stepsBoxHtml(it, i, leads) {
   var steps = (it && it.steps) || [];
   if (!steps.length) return '';
   var shown = _stepsShown(it);
@@ -4774,6 +4846,9 @@ function stepsBoxHtml(it, i) {
         '<span class="stepLabel">Working — one step at a time</span>' +
         '<span class="stepCount noPrint">' + shown + ' of ' + steps.length + ' shown</span>' +
       '</div>' +
+      // The answer is waiting behind these, and the card says so HERE rather
+      // than in an answer box holding no answer.
+      (leads ? '<div class="stepLead noPrint">The last step is the answer.</div>' : '') +
       '<ol class="stepList' + (shown ? ' on' : '') + '">' + rows + '</ol>' +
       '<div class="stepNav noPrint">' + nav + '</div>' +
     '</div>';
@@ -4928,7 +5003,8 @@ function answerCardHtml(it, i) {
   // arriving, and this card could be folded into the one before it a second
   // later.
   if (!_scanning && isAdmin(currentUser)) {
-    head.push('<button class="ansEditBtn noPrint" onclick="answerEditOpen(' + i + ')">✎ Edit</button>');
+    head.push('<button class="ansEditBtn noPrint" title="Fix this answer, and teach the rule behind it" ' +
+      'aria-label="Edit this answer" onclick="answerEditOpen(' + i + ')">✎<span class="btnLabel">Edit</span></button>');
   }
   // The answer box is labelled for what it IS. On an unmarked question it is
   // "Answer"; on a marked one the student already has an answer of their own
@@ -4944,10 +5020,6 @@ function answerCardHtml(it, i) {
     (ans ? '<div class="ansBox' + (hideAns ? ' ansHidden' : '') + '">' +
       '<div class="ansLabel">' + (it.marked ? 'Correct answer' : 'Answer') + '</div>' +
       '<div class="ansText">' + escHtml(ans) + '</div>' +
-      (hideAns
-        ? '<div class="ansCover">Work through the ' + stepCount + ' step' + (stepCount === 1 ? '' : 's') +
-          ' below — the last one is the answer.</div>'
-        : '') +
       '</div>' : '') +
     (it.marked && it.feedback
       ? '<div class="fbBox"><div class="fbLabel">Feedback</div><div class="fbText">' + escHtml(it.feedback) + '</div></div>'
@@ -4958,7 +5030,7 @@ function answerCardHtml(it, i) {
       ? '<div class="keyNoteBox"><div class="keyNoteLabel">⚠ The key and the working differ</div>' +
         '<div class="keyNoteText">' + escHtml(it.keyNote) + '</div></div>'
       : '') +
-    stepsBoxHtml(it, i) +
+    stepsBoxHtml(it, i, hideAns) +
     (it.explanation ? '<div class="whyBox' + (hideWhy ? ' hidWhy' : '') + '">' +
       '<div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
     _vetCardFootHtml(it, i) +
@@ -7083,8 +7155,11 @@ function mbRowHtml(m) {
   chips.push('<span class="mbChip">' + escHtml(String(m.at || '').slice(0, 10)) + '</span>');
   if (m.imgNote) chips.push('<span class="mbChip">⚠ ' + escHtml(m.imgNote) + '</span>');
   return '<div class="mbRow' + (picked ? ' picked' : '') + '">' +
-    '<input class="mbPick" type="checkbox" ' + (picked ? 'checked ' : '') +
-      'onchange="mbTogglePick(\'' + m.id + '\')" aria-label="Choose this question">' +
+    /* The tick box is the one control this whole window turns on, and it was
+       19px square. A label AROUND it is a 44px target that toggles it — the
+       box itself stays the small tidy thing it looks like. */
+    '<label class="mbPickBox"><input class="mbPick" type="checkbox" ' + (picked ? 'checked ' : '') +
+      'onchange="mbTogglePick(\'' + m.id + '\')" aria-label="Choose this question"></label>' +
     '<div class="mbMain">' +
       '<div class="mbChips">' + chips.join('') + '</div>' +
       '<div class="mbQ">' + escHtml(m.question || '(no wording)') + '</div>' +

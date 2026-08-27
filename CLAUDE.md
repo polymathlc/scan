@@ -944,7 +944,7 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   as before.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
-## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1)
+## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened in v1.28.2)
 
 `tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
 `header { flex-wrap: wrap }` and the two `@media` blocks at 620px and 400px.
@@ -956,29 +956,74 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   browser it looks perfect — which is exactly how it shipped. The one row was the answers' button
   bar: an inline `display:flex; flex:none`, which can neither wrap nor shrink, holding four buttons
   that came to about 570px.
-- **SO EVERY ROW OF CONTROLS EITHER WRAPS OR SCROLLS.** `.ansActions` wraps and becomes a two-up
-  grid on a phone; the header wraps as a last resort, with `.headTools` as ONE group so the toolbar
-  drops to a row of its own rather than squeezing the app's own name out of the header.
+- **SO EVERY ROW OF CONTROLS EITHER WRAPS OR SCROLLS, WITH NO EXCEPTIONS — THE EXCEPTION IS WHAT
+  SHIPPED.** `.ansActions` wraps; the header wraps; and `.headTools` wraps too, which the first pass
+  missed: a header that wraps whose TOOLBAR cannot is 751px of buttons on a 728px row, so from
+  621px to about 906px — iPad portrait, a phone in landscape, a half-screen laptop window — the
+  document was still wider than the screen and **Sign out was still off the edge**. `#whoAmI` is
+  the term that gives way first, because a signed-in address is as long as somebody's email.
+- **HALF THE CARD EACH, AND NEVER MORE.** `.ansActions .btn` is `flex: 0 1`, not `1 1`: `1 1` GROWS,
+  so the tidy two-up grid only ever existed at exactly four buttons, which is the rarest case. A
+  student sees three (never 📥) and 🖨 Print stretched across the whole card — the least useful
+  button on a phone as the loudest thing on the answers — and a teacher sees five the moment 📋
+  Report appears.
 - **THE APP WEARS A SHORT NAME WHERE THE LONG ONE WILL NOT FIT.** Five controls, a logo and
   "Scan & Answer" do not fit across 393px however they are tuned — that is arithmetic, not styling,
   and the header was clipping it to "Scan & A…er". `.brandShort` is "Scan", which is already the
   name on the home-screen icon. **The version badge is never the thing hidden**: it is what the
   teacher checks the deploy against.
-- **44px is the floor for anything a finger lands on**, and it is a floor for real CONTROLS: ✎ Edit
-  was 27px tall and the vetting and mistake-book chips under 20. The chips that are only a STATUS
-  are `<span>`s and stay the small quiet things they are — the same distinction `mbCardChipHtml`
-  already draws.
-- **An answer that is WAITING must not look like an answer that is there.** The step reveal's cover
-  sentence sitting in the green answer box read as the answer itself — *"ANSWER: work through the 2
-  steps below"* — so `.ansHidden` drops to plain paper with a dashed edge and comes back green with
-  the answer in it.
-- **`tools/mobile-check.mjs` MEASURES THE REAL PAGE**, in three real phone viewports, with the real
-  stylesheet and cards built by the real `answerCardHtml`: the document is never wider than the
-  screen, nothing hangs off either edge (and it NAMES the element that does), every button clears
-  44px, the title is not clipped, and the camera dock does not sit on the last answer. It needs
-  `npm i playwright-core` and the Chromium already on the machine, so like `ask-sheet-render.mjs` it
-  is a tool you reach for rather than a gate — **and it writes a screenshot per viewport, because a
-  page that measures clean is not the same as one that reads well. Look at them.**
+- **44px IS ABOUT FINGERS, NOT ABOUT WIDTH.** Keyed to a narrow screen the floor switched off the
+  moment the same phone was turned on its side — an iPhone in landscape is 852px — so it is keyed
+  to **`@media (pointer: coarse)`**, separately from the LAYOUT rules: a 1280px touchscreen wants
+  thumb-sized controls, not a phone's two-up button grid.
+  **And it is EVERY control, not a hand-written list of six.** The first pass raised exactly the six
+  selectors the harness then went looking for and left the two most student-facing windows in the
+  app untouched: the 📕 mistake book's own tick box was 19×19, ✎ Edit's *remember this* 17×17, the
+  three Settings pickers 41px, 💬 Ask Mr Chung 30px, the camera overlay's Cancel and Done 42px. A
+  floor with a list of exceptions is not a floor. **`.shotBtn` is the one deliberate exception** and
+  it is written down: the strip's ◀ ▶ ✕ live inside a 116px thumbnail, and a 44px bar under a 96px
+  picture is a control bar bigger than the thing it controls.
+  A tick box is pressed by the **label** round it — the mistake book's had none at all, so
+  `.mbPickBox` is one. The chips that are only a STATUS are `<span>`s and stay small, the same
+  distinction `mbCardChipHtml` already draws.
+- **✎ Edit is a 44px SQUARE, not a 44px pill.** Given the tap target and left as a word it was 67×44,
+  too wide for the card's head line — so every card grew an orphan row holding nothing but ✎ Edit
+  floating right, and a teacher-only utility became the most weighted thing in the top third of
+  every card. The word goes the way every other `.btnLabel` goes on a phone.
+- **AN ANSWER THAT IS WAITING IS NOT DRAWN AT ALL.** Greying the box was half a fix: a student was
+  still looking at a container labelled **ANSWER** whose contents were not the answer — the same
+  misreading in a quieter colour — and 150px of it above the step box that should be leading. Worse,
+  the "waiting" styling leaked onto **PAPER**: an unattempted question printed its answer in a grey
+  dashed box while a walked-through one printed green, so one answer key had two answer styles for
+  no reason a reader could see. `.ansHidden` is now `display: none` on screen and the ordinary green
+  box in print, with no second styling left to disagree with it. What the box used to say is said by
+  `.stepLead`, over the working it names.
+- **`tools/mobile-check.mjs` MEASURES THE REAL PAGE** — the Snap tab with a paper on it, signed in,
+  every modal opened in turn — with the real stylesheet and cards built by the real `answerCardHtml`
+  (and `itemSubjectWhy` cut out of the file rather than written again: a harness is not an exemption
+  from the one-door rule). It needs `npm i playwright-core` and the Chromium already on the machine,
+  so like `ask-sheet-render.mjs` it is a tool you reach for rather than a gate — **and it writes a
+  screenshot per viewport, because a page that measures clean is not the same as one that reads
+  well. Look at them.**
+- **THE VIEWPORTS MUST STRADDLE THE BREAKPOINT.** The first list was 393, 375 and 320 — all three
+  BELOW the 620px media query, so the tool only ever exercised the code that had just been
+  rewritten. It printed *"every viewport is clean"* while the header was 771px wide on an iPad. The
+  list now includes **621** (the first pixel the phone rules do not apply to), a phone in landscape,
+  iPad portrait and a 1280px desktop regression guard — and the harness is **signed in as
+  somebody**, because an empty `#whoAmI` measured the header 136px narrower than it ever is in front
+  of a teacher.
+- **TWO OF ITS FIRST FIVE CHECKS COULD NOT FAIL, and they were the two the documentation led with.**
+  Under mobile emulation `window.innerWidth` GROWS to the overflowed layout width, so
+  `scrollWidth <= innerWidth` is true however broken the page is — run against the file before the
+  fix, it reported all three viewports clean while the document was 585px in a 393px screen. And
+  `.brandTitle.scrollWidth > clientWidth` is false unconditionally, because a column flex box lays
+  the title out at its own content width. Both now measure the thing they name: the width **asked
+  for**, and the name against the room it was **given** (both ways it loses — ellipsised when the
+  brand can shrink, overlapping the toolbar when it cannot).
+- **SO EVERY CHECK IS MUTATION-TESTED.** `node tools/mobile-check.mjs --selftest` breaks the page in
+  the exact way each check names and requires the check to go red. **A check that cannot fail is not
+  a check, and the only way to know which kind you have is to try** — the self-test caught the
+  rewritten title check still passing, twice, before it was right. Add a check, add its mutant.
 - `node tools/scan-tests.mjs` carries the structural half — the classes, the wrap, the short name,
   the 44px floors — so the shape cannot quietly come back before anybody runs a browser.
 
@@ -1476,7 +1521,8 @@ that same PDF**.
   LOOK at the screenshots it writes — then `node tools/scan-tests.mjs`. One row wider than the
   screen shrinks the whole app to fit on every phone in the centre, and it is invisible on a
   desktop browser: the page simply looks like somebody chose tiny type. Adding a fourth button to a
-  three-button row is all it takes, and that is exactly how it happened.
+  three-button row is all it takes, and that is exactly how it happened. **Add a check to that tool
+  and add its mutant** (`--selftest`), or you have added a tick rather than a check.
 - After touching **the step-by-step reveal or the subject chip** (`SCAN_STEPS_RULE`,
   `SCAN_STEPS_MAX`, `_scanSteps`, `_stepsText`, `_stepsShown`, `stepsBoxHtml`, `stepNext`,
   `stepAll`, `stepReset`, `stepsAnyCard`, `stepsAllOpen`, `stepAllCards`, `renderStepAllBtn`,

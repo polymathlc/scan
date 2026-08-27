@@ -3329,8 +3329,8 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
   ok('…and every step does, whatever the screen was showing',
      /\.stepRow\.hid \{ display: flex !important; \}/.test(html));
   ok('…as does the answer that was being held back',
-     /\.ansHidden \.ansText \{ display: block !important; \}/.test(html) &&
-     /\.stepNav, \.ansCover \{ display: none !important; \}/.test(html));
+     /\.ansHidden \{ display: block !important; \}/.test(html) &&
+     /\.stepNav, \.stepLead \{ display: none !important; \}/.test(html));
 
   /* ---- the presses ---- */
   const live = [{ steps: st, stepsShown: 0 }, { steps: [], stepsShown: 0 }];
@@ -3383,9 +3383,8 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      marking against. The cover, and the class that hides the answer under it,
      are drawn ONLY on that branch — a card that wears one and not the other
      either gives the answer away or loses it. */
-  ok('…and the cover and the hidden answer are the same branch',
-     /\(hideAns \? ' ansHidden' : ''\)/.test(html) &&
-     /\(hideAns\n\s*\? '<div class="ansCover">/.test(html));
+  ok('…and the answer box is the only thing that branch touches',
+     /\(hideAns \? ' ansHidden' : ''\)/.test(html));
   ok('the cover says where the answer is', /the last one is the answer/.test(html));
   /* "Why" IS THE WHOLE SOLUTION at full detail — the working line by line
      ending with the answer stated. Left under a walk-through nobody has
@@ -3505,35 +3504,78 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      /<div class="ansActions">/.test(html) &&
      !/style="display:flex;gap:10px;flex:none;"/.test(html));
   ok('…and that row wraps', /\.ansActions \{[^}]*flex-wrap: wrap/.test(html));
+  /* `flex: 1 1` GROWS, so the two-up grid only ever existed at exactly four
+     buttons — the rarest case. A student sees three and 🖨 Print stretched
+     across the whole card; a teacher sees five once 📋 Report appears. */
+  ok('…and every button in it is half the card, never more',
+     /\.ansActions \.btn \{[^}]*flex: 0 1 calc\(50% - 4px\)/.test(html) &&
+     /\.ansActions \{[^}]*justify-content: flex-start/.test(html));
   /* The header is the other one. It wraps as a last resort rather than
      squeezing the app's own name out of itself. */
-  ok('the header wraps rather than overflowing',
-     /\n  header \{[\s\S]{0,900}?flex-wrap: wrap;[\s\S]{0,200}?\n  \}/.test(html));
-  ok('…with the toolbar as one group that can drop to its own row',
+  /* Anchored INSIDE the rule. `[\s\S]` crosses `}`, so the old pattern was
+     satisfied by a `flex-wrap: wrap` anywhere in the next 900 characters —
+     it passed with `header { flex-wrap: nowrap }` and the wrap sitting in
+     `.headTools` below it. `[^}]*` is the shape the pins beside it use. */
+  ok('the header itself wraps rather than overflowing',
+     /\n  header \{[^}]*flex-wrap: wrap;/.test(html));
+  /* AND SO DOES THE TOOLBAR — a header that wraps whose toolbar cannot is the
+     same bug one pixel above the breakpoint: 751px of buttons on a 728px row,
+     which is iPad portrait, a phone in landscape and a half-screen window. */
+  ok('…and so does the toolbar inside it',
      /<div class="headTools">/.test(html) &&
+     /\.headTools \{[^}]*flex-wrap: wrap/.test(html) &&
      /\.headTools \{[^}]*margin-left: auto/.test(html));
+  ok('…and the signed-in address gives way before the buttons do',
+     /#whoAmI \{[^}]*text-overflow: ellipsis/.test(html));
   /* Five controls, a logo and "Scan & Answer" do not fit across 393px however
      they are tuned, and the header was clipping it to "Scan & A…er". */
   ok('the app wears a short name where the long one will not fit',
      /<span class="brandFull">Scan &amp; Answer<\/span><span class="brandShort">Scan<\/span>/.test(html) &&
      /\.brandFull \{ display: none; \}\n\s*\.brandShort \{ display: inline; \}/.test(html));
-  /* Whatever else changes, the version badge stays on screen: it is what the
-     teacher checks the deploy against. */
-  ok('…and the version badge is never the thing hidden',
-     !/\.brandSub \{ display: none/.test(html) && /id="versionTag"/.test(html));
+  /* And the tool proves the checks behind all of this can FAIL: two of the
+     first five could not, and they were the two the documentation led with. */
+  ok('the phone check mutation-tests itself',
+     /--selftest/.test(fs.readFileSync(new URL('./mobile-check.mjs', import.meta.url), 'utf8')));
+  /* The version badge staying on screen is asserted where it can be MEASURED —
+     `mobile-check.mjs` reads its box in every viewport. Pinning it here as
+     "this one literal string is absent" named something it did not test,
+     which is this repo's own standing argument against a check. */
   /* Apple's own floor, and it is a floor for REAL controls — the chips that
      are only a status are spans and stay the quiet things they are. */
-  ok('every control a finger lands on is at least 44px',
-     /\.ansEditBtn \{ min-height: 44px;/.test(html) &&
-     /\.ansSend \.btn \{ min-height: 44px; \}/.test(html) &&
-     /button\.mbBookChip \{ min-height: 44px;/.test(html) &&
-     /\.headTools \.btn \{[^}]*height: 44px/.test(html) &&
-     /\.ansActions \.btn \{[^}]*min-height: 46px/.test(html) &&
-     /\.stepNav \.btn \{[^}]*min-height: 46px/.test(html));
-  /* An answer that is WAITING must not look like an answer that is there: the
-     cover sentence in the green answer box read as the answer itself. */
-  ok('a held-back answer is plain paper, not a green answer box',
-     /\.ansHidden \{ background: var\(--bg-soft\); border-style: dashed;/.test(html));
+  /* THE FLOOR IS KEYED TO THE POINTER, NOT TO THE WIDTH. Keyed to width it
+     switched off the moment the same phone was turned on its side — an iPhone
+     in landscape is 852px, so ✎ Edit went straight back to 27px on the very
+     device it was written for. And it is EVERY control: the first pass raised
+     the six selectors the harness then went looking for and left the mistake
+     book's own tick box at 19×19 and the Settings pickers at 41px. */
+  ok('the 44px floor is about fingers, not about width',
+     /@media \(pointer: coarse\) \{/.test(html) &&
+     /button:not\(\.shotBtn\), \.tab, \.mbTab, \.camLiveBtn \{ min-height: 44px; \}/.test(html) &&
+     /select, input\[type="text"\][^{]*\{ min-height: 44px; \}/.test(html) &&
+     /input\[type="checkbox"\] \{ width: 22px; height: 22px; \}/.test(html));
+  /* A tick box is pressed by the label round it. The mistake book's had none
+     at all — a bare 19px input with an aria-label. */
+  ok('…and the one control the mistake book turns on has a real target',
+     /<label class="mbPickBox">/.test(html) &&
+     /\.mbPickBox \{ width: 44px; height: 44px;/.test(html));
+  ok('…while ✎ Edit is a square rather than a pill that owns a whole row',
+     /\.ansEditBtn \{\n\s*width: 44px; height: 44px;/.test(html) &&
+     /✎<span class="btnLabel">Edit<\/span>/.test(html));
+  /* AN ANSWER THAT IS WAITING IS NOT DRAWN AT ALL. Greying the box was half a
+     fix — a student still reading a container labelled ANSWER whose contents
+     were not the answer — and the grey dashed styling then leaked onto PAPER,
+     where an unattempted question printed its answer in a "waiting" box while
+     a walked-through one printed green. Screen: gone. Paper: the ordinary
+     answer box, with no second styling to disagree with it. */
+  ok('a held-back answer is not drawn on the screen at all',
+     /\.ansHidden \{ display: none; \}/.test(html) &&
+     !/\.ansHidden \{[^}]*dashed/.test(html));
+  ok('…and prints as the ordinary answer box',
+     /\.ansHidden \{ display: block !important; \}/.test(html));
+  /* What the box used to say is said over the working it names. */
+  ok('…with the card saying where the answer went',
+     /class="stepLead noPrint">The last step is the answer\./.test(html) &&
+     /stepsBoxHtml\(it, i, hideAns\)/.test(html));
   /* And the measuring tool itself is part of the change, not a scratch file. */
   ok('the phone is measured by a tool that is checked in',
      fs.existsSync(new URL('./mobile-check.mjs', import.meta.url)));
