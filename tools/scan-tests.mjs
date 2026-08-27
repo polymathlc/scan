@@ -26,6 +26,14 @@ const json = section(
 const scan = section(
   '/* =====================================================================\n   THE SCAN',
   '/* ---- Showing the answers ----');
+/* 👣 The working, handed over one step at a time. It is loaded on its own,
+   out of the answers section, because everything around it paints the DOM: a
+   reveal that quietly shows every step at once is a card that has given the
+   answer away with nothing anywhere to say so, and one that shows none of
+   them on Print is a worksheet with no working on it. */
+const steps = section(
+  '/* =====================================================================\n   👣 ONE STEP AT A TIME',
+  'function answerCardHtml(');
 /* 📋 The report on the whole script. Every number on that card is counted
    HERE, in plain code, from the verdicts already on the answer cards — so a
    score that drifts is the app contradicting itself in front of a parent,
@@ -98,6 +106,9 @@ function subjectLabel(s) {
 function levelLabel(l) { return l === 'S1' ? 'Sec 1' : (l || ''); }
 function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function $(id) { return null; }
+/* The ONE painter. The step reveal repaints through it, so the harness needs
+   it to exist — what it draws is pinned separately, off stepsBoxHtml. */
+function renderAnswers() {}
 function toast() {}
 function confirm() { return true; }
 var document = { getElementById: () => null, createElement: () => ({ getContext: () => ({}) }) };
@@ -115,7 +126,7 @@ var db = { collection: () => ({ doc: () => ({
 }) }) };
 `;
 
-const api = new Function(prelude + json + grounding + scan + report + book + vet + authFns + `
+const api = new Function(prelude + json + grounding + scan + steps + report + book + vet + authFns + `
   return {
     set notes(v) { teachingNotes = v; },
     set style(v) { aiStyle = v; },
@@ -124,6 +135,8 @@ const api = new Function(prelude + json + grounding + scan + report + book + vet
     noteAppliesHere, noteSubjects, notesRelevant, notesBlock, guidanceBlock, styleBlock,
     aiGrounding, groundingSummary, notesKeywordList,
     _parseAIJson, _scanNewItem, _scanFoldRows, _scanStr, _scanPrompt, scanSubjectRule,
+    _scanSteps, _stepsText, _stepsShown, SCAN_STEPS_MAX, SCAN_STEPS_RULE,
+    stepsBoxHtml, stepNext, stepAll, stepReset, stepsAnyCard, stepsAllOpen, stepAllCards,
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
     _ansEditApply, _ansEditNote, _ansTrim, _ansNoteTitle, _ansOptionFrom,
     pdfIsPdf, pdfPageScale, PDF_MIN_SCALE, PDF_MAX_SCALE, PDFJS_URL, PDFJS_WORKER,
@@ -3186,6 +3199,289 @@ ok('the sheet is what travels, not the crop',
    /var file = _askDataUrlToFile\(pic, 'question\.jpg'\)/.test(html));
 ok('…and on a device that cannot share files, the LINK points at the sheet too',
    /_mbUpload\(pic, 'ask_' \+ m\.id/.test(html));
+
+
+/* =====================================================================
+   👣 ONE STEP AT A TIME — and 🏷 the subject said on the card
+   ---------------------------------------------------------------------
+   Every way this goes wrong is silent and the card looks finished either
+   way. A reveal that shows every step at once has handed the whole solution
+   to a student who pressed Next once. A reveal that shows none of them on
+   PAPER prints a worksheet with no working on it. An answer left sitting
+   above the working is the only line that gets read, so the steps below it
+   are never read at all. Steps kept on an answer the teacher has just
+   rewritten walk a student to the answer that is no longer on the card. And
+   algebra that was rewritten out of the explanation and left in the steps is
+   algebra in the one place the student is walked through line by line.
+   ===================================================================== */
+{
+  const st = api._scanSteps({ steps: [
+    { do: '5 units = 200', why: 'The whole is 5 equal parts.' },
+    { do: '1 unit = 200 ÷ 5 = 40', why: 'Divide to get one part.' },
+    { why: 'And that is the answer: $40.' },
+    { do: '', why: '' },
+    'not an object'
+  ] });
+  ok('the steps come through the one door', st.length === 3);
+  ok('…a step keeps its working and its reason apart',
+     st[0].do === '5 units = 200' && st[0].why === 'The whole is 5 equal parts.');
+  /* Half a step is still something to walk through; an empty numbered row is
+     not, and neither is a string where an object was asked for. */
+  ok('…a step that came back with only its reason is shown as the step',
+     st[2].do === 'And that is the answer: $40.' && st[2].why === '');
+  ok('…and an empty step is dropped rather than drawn blank', st.length === 3);
+
+  /* A model that returns forty steps for one sum would otherwise put forty
+     presses of Next between a student and their answer. */
+  const many = api._scanSteps({ steps: Array.from({ length: 40 }, (_, n) => ({ do: 's' + n })) });
+  ok('the number of steps is capped in CODE, not just asked for',
+     many.length === api.SCAN_STEPS_MAX && api.SCAN_STEPS_MAX > 0);
+  ok('a question with no steps at all is fine', api._scanSteps({}).length === 0);
+
+  /* `stepsShown` is the only thing the reveal moves, and it is clamped on the
+     way out: a card opened to five steps and then edited down to two must not
+     claim to be showing five. */
+  ok('what is shown is never more than what there is',
+     api._stepsShown({ steps: st, stepsShown: 99 }) === 3 &&
+     api._stepsShown({ steps: st, stepsShown: -1 }) === 0 &&
+     api._stepsShown({ steps: st }) === 0 &&
+     api._stepsShown({ steps: st, stepsShown: 2 }) === 2);
+
+  /* ---- what the model is asked for ---- */
+  ok('the scan asks for the steps', api.SCAN_SYS.includes(api.SCAN_STEPS_RULE));
+  ok('…and so does the ask with no paper at all', api.SCAN_ASK_SYS.includes(api.SCAN_STEPS_RULE));
+  ok('the shape names the field on both', /"steps":\[\{"do"/.test(api.SCAN_SYS) &&
+     /"steps":\[\{"do"/.test(api.SCAN_ASK_SYS));
+  /* A P5 word problem IS its steps. A maths card with the whole solution in
+     one paragraph is the exact thing this feature exists to stop. */
+  ok('maths always gets steps, and never one step holding the whole sum',
+     /EVERY MATHEMATICS question[\s\S]{0,120}at least two/.test(api.SCAN_STEPS_RULE) &&
+     /never one step holding the whole solution/.test(api.SCAN_STEPS_RULE));
+  /* A walk-through that stops one line short leaves the student where they
+     started — the last step is the last thing they are shown. */
+  ok('…and the last step ends at the answer',
+     /THE LAST STEP ENDS AT THE FINAL ANSWER/.test(api.SCAN_STEPS_RULE));
+  /* The steps are the SAME working as the explanation. A card whose steps and
+     whose "Why" disagree is the app contradicting itself about the question
+     it has just answered — and Copy, Print and the report all read "Why". */
+  ok('…and they are the same working as the explanation, not a second answer',
+     /SAME working/.test(api.SCAN_STEPS_RULE));
+  /* "Answer only" must turn the walk-through off too, or a teacher who asked
+     for the answer alone gets a card that hands over five presses of working. */
+  ok('"answer only" asks for no steps either',
+     /"steps" is an empty array/.test(api.SCAN_DETAIL_RULE.short));
+
+  /* ---- the item carries them, on both paths ---- */
+  const pageIt = api._scanNewItem({
+    number: '7', page: 1, question: 'Q', answer: '$40', subject: 'math',
+    steps: [{ do: '5 units = 200', why: 'a' }, { do: '1 unit = 40', why: 'b' }]
+  }, 0, 1);
+  ok('a scanned question carries its steps', pageIt.steps.length === 2 && pageIt.stepsShown === 0);
+  const askIt = api._askNewItem({
+    heading: 'Fractions', answer: '3/4', explanation: 'w',
+    steps: [{ do: 'a', why: 'b' }]
+  });
+  ok('…and so does a typed question with no paper behind it',
+     askIt.steps.length === 1 && askIt.stepsShown === 0);
+
+  /* A question stitched across a batch boundary takes its steps from the half
+     that could see the whole question — the same half its answer comes from. */
+  {
+    const into = [];
+    api._scanFoldRows([{ number: '9', page: 1, question: 'first half', answer: '',
+                         steps: [{ do: 'half a walk-through' }] }], 0, 1, into);
+    api._scanFoldRows([{ continuation: true, page: 1, question: 'second half', answer: '12 cm',
+                         steps: [{ do: 'the whole one, step 1' }, { do: '= 12 cm' }] }], 1, 1, into);
+    ok('a question stitched over a page break gets ONE walk-through, the whole one',
+       into.length === 1 && into[0].steps.length === 2 &&
+       into[0].steps[1].do === '= 12 cm' && into[0].stepsShown === 0);
+  }
+
+  /* ---- the card ---- */
+  const card = api.stepsBoxHtml({ steps: st, stepsShown: 1 }, 3);
+  ok('only what has been revealed is displayed…',
+     (card.match(/class="stepRow"/g) || []).length === 1 &&
+     (card.match(/class="stepRow hid"/g) || []).length === 2);
+  /* …and every step is in the markup from the moment the card is drawn.
+     Nothing is fetched between presses, so nothing can be lost between them —
+     and it is what lets Print put the whole worked answer on paper without
+     touching what is on the screen. */
+  ok('…but every step is in the markup all along',
+     card.includes('5 units = 200') && card.includes('1 unit = 200 ÷ 5 = 40') &&
+     card.includes('And that is the answer: $40.'));
+  ok('the card says how far through it is', /1 of 3 shown/.test(card));
+  ok('Next step is offered, and so is the whole thing at once',
+     /stepNext\(3\)/.test(card) && /stepAll\(3\)/.test(card));
+  ok('a card nobody has started says so on the button',
+     /Show me the first step/.test(api.stepsBoxHtml({ steps: st, stepsShown: 0 }, 0)));
+  const done = api.stepsBoxHtml({ steps: st, stepsShown: 3 }, 0);
+  ok('a finished walk-through offers a second go, not another Next',
+     /stepReset\(0\)/.test(done) && !/stepNext\(/.test(done));
+  ok('a question with nothing to work through draws no box at all',
+     api.stepsBoxHtml({ steps: [] }, 0) === '');
+  /* A "<" in a maths step is a less-than sign, not the start of a tag. */
+  ok('a step crosses into the card escaped',
+     /&lt;/.test(api.stepsBoxHtml({ steps: [{ do: '3 < 5', why: '' }], stepsShown: 1 }, 0)));
+  /* The nav is a button nobody can press on paper, and "1 of 3 shown" is a
+     lie on a sheet that prints all three. */
+  ok('the buttons and the counter never reach paper',
+     /class="stepNav noPrint"/.test(card) && /class="stepCount noPrint"/.test(card));
+  ok('…and every step does, whatever the screen was showing',
+     /\.stepRow\.hid \{ display: flex !important; \}/.test(html));
+  ok('…as does the answer that was being held back',
+     /\.ansHidden \.ansText \{ display: block !important; \}/.test(html) &&
+     /\.stepNav, \.ansCover \{ display: none !important; \}/.test(html));
+
+  /* ---- the presses ---- */
+  const live = [{ steps: st, stepsShown: 0 }, { steps: [], stepsShown: 0 }];
+  api.answers = live;
+  api.stepNext(0);
+  ok('Next step reveals exactly one more', api._stepsShown(live[0]) === 1);
+  api.stepNext(0); api.stepNext(0); api.stepNext(0); api.stepNext(0);
+  ok('…and stops at the last one', api._stepsShown(live[0]) === 3);
+  api.stepReset(0);
+  ok('↺ closes it back up', api._stepsShown(live[0]) === 0);
+  api.stepAll(0);
+  ok('Show all working opens the whole card in one press', api._stepsShown(live[0]) === 3);
+  /* These are inline handlers on rendered HTML, so a stale card can reach them
+     after a new run has replaced the answers. */
+  ok('a press on a card that is no longer there is not a crash', (() => {
+    try { api.stepNext(99); api.stepAll(99); api.stepReset(99); return true; }
+    catch (e) { return false; }
+  })());
+
+  /* ---- and the whole paper at once ---- */
+  ok('the paper knows it has working to show', api.stepsAnyCard() === true);
+  const paper = [{ steps: st, stepsShown: 0 }, { steps: [{ do: 'x' }], stepsShown: 0 }];
+  api.answers = paper;
+  ok('…and that it is not open yet', api.stepsAllOpen() === false);
+  api.stepAllCards();
+  ok('one press opens every card', api.stepsAllOpen() === true &&
+     api._stepsShown(paper[0]) === 3 && api._stepsShown(paper[1]) === 1);
+  /* A teacher who has opened every card wants one press to put them all away
+     again — not a button that does nothing the second time. */
+  api.stepAllCards();
+  ok('…and pressing it again closes them all',
+     api._stepsShown(paper[0]) === 0 && api._stepsShown(paper[1]) === 0);
+  api.answers = [{ steps: [], stepsShown: 0 }];
+  ok('a paper with nothing to walk through offers no button',
+     api.stepsAnyCard() === false && api.stepsAllOpen() === false);
+  ok('…which is what hides it', /b\.classList\.toggle\('hidden', !any\)/.test(html));
+  ok('the button is really wired to the whole paper',
+     /\$\('stepAllBtn'\)\.addEventListener\('click', stepAllCards\)/.test(html));
+  ok('…and it is repainted by the ONE painter',
+     /renderStepAllBtn\(\);\n  renderVetAllBtn\(\);/.test(html));
+
+  /* ---- the answer is the last step ---- */
+  /* An answer printed above the working is the only line that gets read, so on
+     a question NOBODY HAS ANSWERED YET it waits behind the steps. */
+  ok('a blank question keeps its answer behind the working',
+     /var hideAns = !it\.marked && hideWhy;/.test(html));
+  /* …and on a MARKED one it is shown at once: the student has committed to an
+     answer, the verdict chip has already told them how it went, and a teacher
+     marking a script must not click through twenty cards to see what they are
+     marking against. The cover, and the class that hides the answer under it,
+     are drawn ONLY on that branch — a card that wears one and not the other
+     either gives the answer away or loses it. */
+  ok('…and the cover and the hidden answer are the same branch',
+     /\(hideAns \? ' ansHidden' : ''\)/.test(html) &&
+     /\(hideAns\n\s*\? '<div class="ansCover">/.test(html));
+  ok('the cover says where the answer is', /the last one is the answer/.test(html));
+  /* "Why" IS THE WHOLE SOLUTION at full detail — the working line by line
+     ending with the answer stated. Left under a walk-through nobody has
+     started, it hands over in one paragraph exactly what the steps hand over
+     one at a time, and the reveal is decoration. It waits with them on a
+     MARKED card too: the mark, the correct answer and the feedback are all
+     still there, and only the worked solution waits. */
+  ok('…and the whole worked solution waits with the steps',
+     /var hideWhy = stepCount > 0 && _stepsShown\(it\) < stepCount;/.test(html) &&
+     /var hideAns = !it\.marked && hideWhy;/.test(html) &&
+     /'<div class="whyBox' \+ \(hideWhy \? ' hidWhy' : ''\)/.test(html));
+  ok('…but reaches paper all the same',
+     /\.whyBox\.hidWhy \{ display: none; \}/.test(html) &&
+     /\.whyBox\.hidWhy \{ display: block !important; \}/.test(html));
+
+  /* ---- Copy carries the whole thing ---- */
+  ok('every step goes out with Copy, whatever the screen was showing',
+     /Working, step by step:/.test(html) &&
+     /lines\.push\('     ' \+ \(n \+ 1\) \+ '\. ' \+ st\.do/.test(html));
+
+  /* ---- algebra cannot hide in the steps ---- */
+  const algIt = { subject: 'math', question: 'A number problem.', answer: '40',
+                  explanation: 'Five units make 200, so one unit is 40.', feedback: '',
+                  steps: [{ do: 'Let x be the number', why: '5x = 200' }] };
+  ok('algebra left in the STEPS is still algebra', api._itemUsesAlgebra(algIt) === true);
+  ok('…and a clean walk-through is not', api._itemUsesAlgebra({
+    subject: 'math', question: 'A number problem.', answer: '40',
+    explanation: 'Five units make 200, so one unit is 40.',
+    steps: [{ do: '5 units = 200', why: 'The whole is 5 equal parts.' }]
+  }) === false);
+  /* A rewrite that put the explanation right and left the steps alone would
+     leave the algebra in the one place the student is walked through it. */
+  ok('the rewrite is asked for the steps too',
+     /Rewrite the "steps" the same way/.test(html) &&
+     /'\\nSTEPS: ' \+ _stepsText\(it\)/.test(html));
+  {
+    const bad = [{ subject: 'math', question: 'q', answer: '40', explanation: 'let x be 5x = 200',
+                   feedback: '', steps: [{ do: 'Let x be the number', why: '' }] }];
+    api._applyAlgebraFix(bad, [{ i: 0, answer: '40', explanation: 'Five units make 200, so one unit is 40.',
+                                 steps: [{ do: '5 units = 200', why: 'The whole is 5 parts.' },
+                                         { do: '1 unit = 40', why: 'Divide by 5.' }] }]);
+    ok('a rewritten walk-through replaces the algebraic one',
+       bad[0].steps.length === 2 && bad[0].steps[0].do === '5 units = 200');
+    ok('…and the card it was opened on is closed again, not left mid-way through',
+       bad[0].stepsShown === 0);
+  }
+  {
+    const bad2 = [{ subject: 'math', question: 'q', answer: '40', explanation: 'let x be 5x = 200',
+                    feedback: '', steps: [{ do: 'clean enough', why: '' }] }];
+    api._applyAlgebraFix(bad2, [{ i: 0, answer: '40', explanation: 'Five units make 200.',
+                                  steps: [{ do: 'Let x be the number', why: '' }] }]);
+    ok('a second algebraic walk-through is refused, and the first one kept',
+       bad2[0].steps.length === 1 && bad2[0].steps[0].do === 'clean enough');
+  }
+
+  /* ---- ✎ Edit ---- */
+  /* The steps were written to arrive at an answer that is no longer on the
+     card: walking a student through them now ends one line short of the
+     answer printed above it. */
+  {
+    const it = { answer: '40', explanation: 'w', marked: false, options: [], option: '',
+                 steps: [{ do: '1 unit = 40', why: '' }], stepsShown: 1 };
+    api._ansEditApply(it, { answer: '45', explanation: 'w' });
+    ok('an answer the teacher has rewritten drops the walk-through to the old one',
+       it.steps.length === 0 && it.stepsShown === 0);
+  }
+  {
+    const it = { answer: '40', explanation: 'w', marked: false, options: [], option: '',
+                 steps: [{ do: '1 unit = 40', why: '' }], stepsShown: 1 };
+    api._ansEditApply(it, { answer: '40', explanation: 'a fuller reason' });
+    ok('…and one whose answer is unchanged keeps it', it.steps.length === 1);
+  }
+
+  /* ---- 🏷 the subject, said on the card ---- */
+  /* A maths question read off a mixed pile is answered to the maths standard,
+     marked to it, held to the no-algebra rule and filed in the maths list —
+     and the card never once said it was a maths question. */
+  ok('every answer card wears the subject the question was read as',
+     /var sw = itemSubjectWhy\(it\);/.test(html) &&
+     /subjectLabel\(sw\.key\)\) \+ ' question<\/span>'/.test(html));
+  /* "What this question reads as" and "the subject you set on another tab" are
+     very different claims to put in front of somebody. */
+  ok('…and says which of the two claims it is making',
+     /What this question itself reads as\./.test(html) &&
+     /The subject you set in Settings/.test(html));
+  ok('the chip is drawn through the ONE door, not a second reading',
+     !/it\.subject \|\| wsMeta\.subject/.test(html));
+  /* The mistake book was filing every question under the PICKER, so a maths
+     question off a mixed pile came back in the book chipped as Science and
+     printed on a worksheet titled Science. `itemSubject` falls back to the
+     picker itself, so a paper that is all one subject is filed as before. */
+  ok('…and the book files a question under its own subject too',
+     /subject: itemSubject\(it\),/.test(html));
+  ok('the subject goes out with Copy as well',
+     /\[' \+ subjectLabel\(csub\) \+ ' question\]/.test(html));
+}
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

@@ -2,7 +2,8 @@
 
 Photograph a worksheet or an exam paper — or pick pictures out of the gallery — and every question
 printed on them is read: whatever the student has already written is **marked**, whatever is still
-blank is **answered**, in the teacher's own words — the whole paper comes back as a **report**, and
+blank is **answered**, in the teacher's own words, with **the working handed over one step at a
+time** — the whole paper comes back as a **report**, and
 every question the student got wrong is kept in their own **mistake book** to try again later. Science, Mathematics, English and Chinese.
 Type or dictate a question alongside the photo — or with no photo at all.
 
@@ -16,6 +17,43 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | English Learning Portal | `polymathlc/english` | the English bank and practice |
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
+
+## 👣 One step at a time, and every card says what subject it is (v1.28.0)
+
+A worked answer printed in full is read from the bottom up: the student finds
+the final number, writes it down and learns nothing. So every card that has
+real working now hands it over **one step at a time**.
+
+Press **Show me the first step**, read the line of working and the sentence
+under it saying why it is done, then press **Next step** — and keep going. Each
+step is a line a student could have written themselves, and **the last one is
+the answer**. On a question that is still blank the answer waits behind the
+steps, because an answer printed above the working is the only line that gets
+read; on one the student has already answered it is shown straight away, since
+the mark is already on the card and a script being marked must not have to be
+clicked through. The full **Why** waits with the steps on both.
+
+**Show all working** on a card opens that one. **👣 Show all working** at the top
+of the answers opens the whole paper at once, and presses again to close it back
+up for a second go. **Copy** and **Print** always carry every step, whatever is
+on the screen at the time — a printed answer key is the whole worked answer.
+
+Every maths question is broken into at least two steps, and the no-algebra rule
+holds inside them: a walk-through that reached for "let x be" is rewritten with
+the rest of the answer, because the steps are the one place a student reads
+line by line.
+
+Set *How much explanation* to **Answer only** and there are no steps at all.
+
+**And every answer card now wears the subject it was read as** — *Mathematics
+question*, *Science question*. It was already worked out per question, and it
+already decided which standard the answer was held to, whether the no-algebra
+rule applied and which vetting list 📥 offered — the card simply never said so.
+A mixed pile of pages now says on each card which subject that question was
+answered and marked to, and where the question did not say, the chip says the
+subject came from Settings instead. The **mistake book** files a question under
+its own subject too, so a maths question off a mixed pile stops coming back
+chipped as Science.
 
 ## No square behind the logo (v1.27.2)
 
@@ -306,7 +344,9 @@ Answering a printed algebra question another way is answering a different questi
 Science, Mathematics, English and Chinese, each held to its own standard: a maths answer needs its
 working and its unit, a science answer has to name the process, an English comprehension answer is
 full sentences in the student's own words, and a Chinese paper is answered, explained and marked
-**in Chinese**. Leave the subject picker on *Any* and the paper decides for itself.
+**in Chinese**. Leave the subject picker on *Any* and the paper decides for itself. Every answer card
+says which of the four the question was read as, so a mixed pile of pages says on each card which
+standard it was held to.
 
 ## The answers are the teacher's, not the model's
 

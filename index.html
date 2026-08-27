@@ -290,9 +290,60 @@
   .ansBox { margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm); background: #F4FAF4; border: 1px solid #CFE7D0; }
   .ansLabel { font-size: 0.72rem; font-weight: 700; color: #2C6B30; letter-spacing: .03em; text-transform: uppercase; }
   .ansText { font-size: 0.95rem; font-weight: 600; margin-top: 4px; white-space: pre-wrap; }
+  /* ---------- 👣 One step at a time ----------
+     The working is on the card in full, but it is handed over ONE step at a
+     time: a student who is given the whole solution reads the last line and
+     stops. Every step is in the markup from the moment the card is drawn and
+     the unrevealed ones are simply not displayed — that is what lets Print
+     put the whole worked answer on paper without touching what is on screen,
+     and what keeps the reveal from ever being able to lose a step. */
+  .stepBox {
+    margin-top: 16px; padding: 18px 20px; border-radius: var(--radius-sm);
+    background: #FBFAF7; border: 1px solid var(--line);
+  }
+  .stepHead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .stepLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
+  .stepCount { font-size: 0.74rem; color: var(--ink-faint); margin-left: auto; }
+  .stepList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  .stepList.on { margin-top: 16px; }
+  .stepRow { display: flex; gap: 14px; align-items: flex-start; }
+  .stepRow.hid { display: none; }
+  .stepN {
+    flex: none; width: 26px; height: 26px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.74rem; font-weight: 700; color: #7A5410;
+    background: #FDF4E3; border: 1px solid #E7BD72;
+  }
+  .stepBody { flex: 1 1 auto; min-width: 0; }
+  .stepDo { font-size: 0.92rem; font-weight: 600; line-height: 1.65; white-space: pre-wrap; }
+  .stepWhy { font-size: 0.86rem; color: var(--ink-soft); line-height: 1.7; margin-top: 6px; white-space: pre-wrap; }
+  .stepNav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+  .stepDone { font-size: 0.8rem; color: var(--ink-faint); }
+  /* The one button on the card that is meant to be pressed again and again,
+     wearing the app's own accent the same way 📥 wears the portals' purple —
+     a tint with dark ink on it, never white on amber. */
+  .btnStep { background: #FDF4E3; border-color: #E7BD72; color: #7A5410; font-weight: 700; }
+  .btnStep:hover:not(:disabled) { background: #FBEBCF; }
+  /* The answer is the LAST step, so while there are steps still to come it is
+     kept behind them rather than sitting at the top of the card giving itself
+     away. One press of Show all working opens it, and Print always has it. */
+  .ansHidden .ansText { display: none; }
+  .ansCover { font-size: 0.88rem; color: var(--ink-faint); margin-top: 6px; line-height: 1.7; }
+  /* What subject this question IS, said on the card. A maths question read off
+     a mixed pile is answered to the maths standard, marked to it and filed in
+     the maths list — and until now the card never once said so. */
+  .subjChip {
+    font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+    background: var(--bg-soft); color: var(--ink-soft); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 12px;
+  }
   .whyBox { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--line); }
   .whyLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
   .whyText { font-size: 0.88rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
+  /* "Why" is the whole worked solution written out in one go, so it waits with
+     the steps rather than giving away what they are handing over one at a
+     time. Print reveals it, like every step. */
+  .whyBox.hidWhy { display: none; }
 
   /* ---------- Marking ----------
      A marked card wears its verdict on the edge, so a page of them reads as a
@@ -738,6 +789,13 @@
     body { background: #fff; }
     main { max-width: none; padding: 0; }
     .ansCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
+    /* A printed worksheet is not clicked through: every step and the answer
+       go on to the paper whatever the screen was showing. */
+    .stepRow.hid { display: flex !important; }
+    .stepList { margin-top: 16px; }
+    .stepNav, .ansCover { display: none !important; }
+    .ansHidden .ansText { display: block !important; }
+    .whyBox.hidWhy { display: block !important; }
     .reportCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
   }
 </style>
@@ -828,6 +886,11 @@
           <div style="display:flex;gap:10px;flex:none;">
             <button class="btn btnScan hidden" id="vetAllBtn" title="Add every question on this paper to a vetting list">📥 Send all to vetting</button>
             <button class="btn hidden" id="reportBtn" title="Write the report on this paper again">📋 Report</button>
+            <!-- 👣 The whole paper at once. Every card walks through its own
+                 working a step at a time; this is the one press that opens
+                 all of them — for a teacher checking a script, and for the
+                 student who has finished working through it. -->
+            <button class="btn hidden" id="stepAllBtn" title="Show every step of the working on every card">👣 Show all working</button>
             <button class="btn" id="copyAnswersBtn">📋 Copy</button>
             <button class="btn" id="printAnswersBtn">🖨 Print</button>
           </div>
@@ -942,9 +1005,29 @@
         “simplify 3x + 5x” — is answered as the paper asks. If an answer still uses algebra after that, the card
         says <b>⚠ uses algebra</b> rather than hiding it, so it can be put right with ✎ Edit.</p>
 
-      <h3 style="margin-top:22px">Four subjects</h3>
+      <h3 style="margin-top:22px">👣 One step at a time</h3>
+      <p class="sub" style="margin-top:6px">Every card that has real working to show hands it over <b>one step at a
+        time</b>. Press <b>Show me the first step</b>, read the line of working and the sentence under it saying why
+        it is done, then press <b>Next step</b> — and keep going. Each step is a line a student could have written
+        themselves, and the last one is the answer.</p>
+      <p class="sub" style="margin-top:10px">On a question that is still <b>blank</b> the answer waits behind the
+        steps, because an answer printed above the working is the only line that gets read. On a question the
+        student has already answered it is shown straight away — the mark is already on the card, and a script
+        being marked must not have to be clicked through. The full <b>Why</b> waits with the steps on both, since
+        it is the same solution written out in one go.</p>
+      <p class="sub" style="margin-top:10px"><b>Show all working</b> on a card opens that one; <b>👣 Show all
+        working</b> at the top of the answers opens the whole paper at once, and presses again to close it back
+        up for a second go. <b>Copy</b> and <b>Print</b> always carry every step, whatever is on the screen at the
+        time. Set <i>How much explanation</i> to <i>Answer only</i> on the Settings card below and there are no
+        steps at all.</p>
+
+      <h3 style="margin-top:22px">Four subjects, and every card says which</h3>
       <p class="sub" style="margin-top:6px">Science, Mathematics, English and Chinese. A Chinese paper is answered and marked
         in Chinese; an English comprehension gets an answer in full sentences, and a maths question gets the working line by line.</p>
+      <p class="sub" style="margin-top:10px">Every answer card wears the subject it was read as — <b>Mathematics
+        question</b>, <b>Science question</b> — worked out from the question itself, so a mixed pile of pages says
+        on each card which standard that question was answered and marked to. Where a question did not say, the
+        subject on the Settings card below is used and the chip says so.</p>
       <p class="sub" style="margin-top:14px">Nothing is saved anywhere. Your paper lives in this tab and leaves through <b>Copy</b> or <b>Print</b>.</p>
     </div>
 
@@ -1044,8 +1127,12 @@
           <select id="scanDetail">
             <option value="full">Answer + full working</option>
             <option value="normal">Answer + short reason</option>
-            <option value="short">Answer only</option>
+            <option value="short">Answer only — no steps</option>
           </select>
+          <!-- 👣 The step-by-step walk-through IS the working, so a run asked
+               for the answer alone has none to walk through. Said here, or
+               "Answer only" quietly turns the feature off. -->
+          <p class="hint" style="margin-top:6px">The first two hand the working over one step at a time on the card.</p>
         </div>
         <div class="field">
           <label for="scanLevel">Level <span class="hint">(optional)</span></label>
@@ -1373,7 +1460,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.27.2';
+var APP_VERSION = 'v1.28.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2468,6 +2555,39 @@ var SCAN_BOX_RULE =
   'one whose picture you cannot locate, and for a picture that is really the whole page — a wrong rectangle is ' +
   'worse than none, because it keeps the wrong picture and nothing anywhere says so. ';
 
+/* ---- 👣 THE WORKING, BROKEN INTO STEPS ----
+   A worked answer printed in full is read from the bottom up: the student
+   finds the final number, writes it down, and learns nothing. So the SAME
+   working is asked for a second time, cut into the steps a student would
+   actually do in order — one line of working and one line saying why it is
+   done — and the card hands them over one press at a time.
+
+   IT IS THE SAME WORKING, NOT A SECOND OPINION. "explanation" is still
+   written in full: it is what Copy, Print, the report and the ✎ window all
+   read, and a card whose steps and whose explanation disagree is the app
+   contradicting itself about the question it has just answered.
+
+   MATHS ALWAYS GETS THEM. A P5 word problem IS its steps — units, model,
+   conversion, the sum — and a maths card with the whole solution in one
+   paragraph is the exact thing this feature exists to stop. An English
+   one-word cloze answer has nothing to walk through and correctly returns
+   none.
+
+   THE LAST STEP ENDS AT THE ANSWER, because it is the last thing the student
+   will be shown: a walk-through that stops one line short leaves them back
+   where they started. */
+var SCAN_STEPS_MAX = 12;
+var SCAN_STEPS_RULE =
+  '"steps" is that SAME working cut into the order a student would do it, so it can be handed to them one step ' +
+  'at a time: [{"do":"the line of working itself, with the numbers substituted in","why":"one short sentence ' +
+  'saying why that line is done, in language the student\'s level can follow"}]. EVERY MATHEMATICS question ' +
+  'gets steps — at least two, and never one step holding the whole solution — and so does every other question ' +
+  'that has real working or real reasoning to show. THE LAST STEP ENDS AT THE FINAL ANSWER, stated in full with ' +
+  'its unit, because it is the last thing the student is shown. Keep each "do" to a single line. Return an empty ' +
+  'array only for a question whose answer is one word or one ticked option with nothing to work through. Never ' +
+  'more than ' + SCAN_STEPS_MAX + ' steps. The steps are the SAME working as "explanation", set out for walking ' +
+  'through — not a different answer, and not a replacement for it. ';
+
 var SCAN_SYS =
   'You are an experienced Singapore tuition teacher (P3 to Secondary 1) working through the photographs of a ' +
   'Science, Mathematics, English or Chinese worksheet or exam paper that are attached. You do TWO things at once, ' +
@@ -2475,7 +2595,8 @@ var SCAN_SYS =
   'the question is still blank you ANSWER it. Reply with STRICT JSON only, no markdown, exactly ' +
   'this shape: {"questions":[{"continuation":false,"number":"16","page":1,"type":"mcq","question":"the printed ' +
   'wording","options":[{"label":"1","text":"…"}],"option":"2","answer":"(2) the option\'s wording",' +
-  '"explanation":"why this is the answer","hasWriting":true,' +
+  '"explanation":"why this is the answer","steps":[{"do":"a line of working","why":"why that line"}],' +
+  '"hasWriting":true,' +
   '"studentAnswer":"what the student wrote, or an empty string",' +
   '"verdict":"correct | partial | wrong, or an empty string when nothing was written",' +
   '"marks":"2/3 when the paper prints a mark allocation, otherwise an empty string",' +
@@ -2506,6 +2627,7 @@ var SCAN_SYS =
   'Work every question out properly before you answer it: set the working out step by step, then check the ' +
   'arithmetic back against the numbers printed on the page. A quick wrong answer is worse than no answer. ' +
   SCAN_SUBJECT_FIELD_RULE +
+  SCAN_STEPS_RULE +
   SCAN_MARK_RULE +
   /* Where the answer came from. A teacher checking a mark has to know whether
      it was taken off the paper's own key or worked out by a model, so the
@@ -2544,7 +2666,9 @@ var SCAN_ASK_SYS =
   'spoken a question to you. NOTHING was photographed — there is only what they asked — so answer it from what ' +
   'they said alone and do exactly what they asked, nothing else. Reply with STRICT JSON only, no markdown, ' +
   'exactly this shape: {"answers":[{"heading":"a short line naming what this part is","answer":"the answer ' +
-  'itself","explanation":"the working or the reasoning","studentAnswer":"","verdict":"","marks":"",' +
+  'itself","explanation":"the working or the reasoning",' +
+  '"steps":[{"do":"a line of working","why":"why that line"}],' +
+  '"studentAnswer":"","verdict":"","marks":"",' +
   '"feedback":"","subject":"science | math | english | chinese"}]}. ' +
   'Rules: ONE entry when they asked one thing. When they asked for SEVERAL things — five practice questions, a ' +
   'list of formulas, three worked examples — return ONE ENTRY PER THING, in the order asked, so they come back ' +
@@ -2557,6 +2681,7 @@ var SCAN_ASK_SYS =
   'theirs in order to mark it. ' +
   'Answer in the language they asked in: a question asked in Chinese is answered in Chinese. ' +
   SCAN_SUBJECT_FIELD_RULE +
+  SCAN_STEPS_RULE +
   'If what they sent is not something you can act on — a greeting, or a few stray words — say so in one entry, ' +
   'kindly, and say what to send instead. Never turn a school question away for having no picture with it. ' +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
@@ -2624,7 +2749,8 @@ function scanSubjectRule() {
 }
 
 var SCAN_DETAIL_RULE = {
-  short: '"explanation" is an empty string for every question — the answer alone is wanted this time.',
+  short: '"explanation" is an empty string for every question, and "steps" is an empty array for every question — ' +
+         'the answer alone is wanted this time.',
   normal: '"explanation" is 2 to 4 sentences saying WHY, in plain language the student\'s level can follow, with ' +
           'the working when there is working to show; one or two sentences is enough for a multiple-choice question.',
   full: '"explanation" is a full worked explanation — every question gets one, none is ever left empty. Name the ' +
@@ -3521,6 +3647,55 @@ function _scanSubject(r) {
 }
 
 /* =====================================================================
+   👣 THE STEPS — the working, handed over one at a time
+   ---------------------------------------------------------------------
+   `_scanSteps` is the ONE door the model's steps come through, used by
+   `_scanNewItem` and `_askNewItem` alike, exactly as `_markFields` is the one
+   door for the marking fields. Two readers of the same field is how one path
+   ends up capping the steps and the other does not.
+
+   A STEP WITH NOTHING IN IT IS DROPPED, and a step that came back with only
+   its reason is shown as the step: half a step is still something to walk
+   through, and an empty numbered row is not.
+
+   THE COUNT IS CAPPED HERE, not asked for and hoped. `SCAN_STEPS_MAX` is in
+   the prompt as well, but a model that returns forty steps for one sum would
+   otherwise put forty presses of Next between a student and their answer.
+
+   `stepsShown` IS THE ONLY THING THE REVEAL MOVES. Every step is in the
+   markup from the moment the card is drawn — this number says how many of
+   them are displayed, and it is CLAMPED on the way out (`_stepsShown`)
+   because a card that was opened and then edited down to fewer steps must not
+   claim to be showing steps it no longer has. */
+function _scanSteps(r) {
+  var rows = (r && Array.isArray(r.steps)) ? r.steps : [];
+  var out = [];
+  rows.forEach(function (s) {
+    if (out.length >= SCAN_STEPS_MAX) return;
+    var did = _scanStr(s && (s.do || s.step || s.working), 400);
+    var why = _scanStr(s && (s.why || s.explanation || s.reason), 400);
+    if (!did && !why) return;
+    out.push({ do: did || why, why: did ? why : '' });
+  });
+  return out;
+}
+/* Every word of a walk-through as one string — what the algebra check reads,
+   so a "let x be" that was rewritten out of the explanation cannot go on
+   living in the steps where nothing was ever looking. */
+function _stepsText(it) {
+  return ((it && it.steps) || []).map(function (s) {
+    return [s.do, s.why].filter(Boolean).join(' ');
+  }).join('\n');
+}
+/* How many of this card's steps are on screen, never more than it has. */
+function _stepsShown(it) {
+  var n = ((it && it.steps) || []).length;
+  var shown = parseInt(it && it.stepsShown, 10);
+  if (!(shown > 0)) return 0;
+  return shown > n ? n : shown;
+}
+
+/* =====================================================================
    IS THIS ANSWER ALGEBRA?   (plain code, never an AI call)
    ---------------------------------------------------------------------
    The same answer must always get the same verdict, so this is a reader
@@ -3594,7 +3769,7 @@ function _itemUsesAlgebra(it) {
   if (!it || !_itemIsMathish(it)) return false;
   if (_itemAsksAlgebra(it)) return false;      // the paper printed it; the paper wins
   return _textUsesAlgebra(it.answer) || _textUsesAlgebra(it.explanation) ||
-         _textUsesAlgebra(it.feedback);
+         _textUsesAlgebra(it.feedback) || _textUsesAlgebra(_stepsText(it));
 }
 
 /* One part of a reply to an ask that came with no paper. It is filed as an
@@ -3619,6 +3794,8 @@ function _askNewItem(r) {
     option: '',
     answer: answer,
     explanation: explanation,
+    steps: _scanSteps(r),
+    stepsShown: 0,
     marked: mk.marked,
     wrote: mk.wrote,
     studentAnswer: mk.studentAnswer,
@@ -3674,6 +3851,9 @@ function _scanNewItem(r, batchStart, batchLen) {
     option: option,
     answer: answer,
     explanation: _scanStr(r.explanation, 2400),
+    // The same working, cut into the steps the card hands over one at a time.
+    steps: _scanSteps(r),
+    stepsShown: 0,
     marked: mk.marked,
     wrote: mk.wrote,
     studentAnswer: mk.studentAnswer,
@@ -3720,6 +3900,10 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
       if (it.option && !prev.option) prev.option = it.option;
       if (it.answer) prev.answer = it.answer;
       if (it.explanation) prev.explanation = it.explanation;
+      // The steps come from THIS half for the same reason the answer does:
+      // only now can the whole question be seen, so half a question's
+      // walk-through is replaced by the whole one's rather than kept.
+      if (it.steps.length) { prev.steps = it.steps; prev.stepsShown = 0; }
       if (it.type === 'mcq') prev.type = 'mcq';
       // A question stitched across a batch boundary takes its figure from
       // whichever half could draw a rectangle round one.
@@ -3783,7 +3967,13 @@ var SCAN_ALGEBRA_SYS =
   'THE FINAL ANSWER MUST NOT CHANGE — only the method used to reach it. If the working already has no algebra in ' +
   'it, hand it back unchanged. Reply with STRICT JSON only, no markdown, exactly this shape: ' +
   '{"answers":[{"i":0,"answer":"the same final answer","explanation":"the working, with no algebra in it",' +
+  '"steps":[{"do":"a line of that working","why":"why that line"}],' +
   '"feedback":"the same feedback rewritten the same way, or an empty string"}]}. ' +
+  /* The steps are the same working set out for walking through, so a rewrite
+     that put the explanation right and left the steps alone would leave the
+     algebra exactly where the student is walked through it. */
+  'Rewrite the "steps" the same way and keep them in step with the new working — same number of steps or fewer, ' +
+  'the last one still ending at the unchanged final answer. ' +
   'One entry per question given to you, "i" being the number printed against it. ' +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
 
@@ -3793,6 +3983,7 @@ function _algebraPrompt(bad) {
       return '#' + i + '\nQUESTION: ' + _scanStr(it.question, 1400) +
         '\nFINAL ANSWER (keep this): ' + _scanStr(it.answer, 900) +
         '\nWORKING: ' + _scanStr(it.explanation, 2400) +
+        (it.steps && it.steps.length ? '\nSTEPS: ' + _stepsText(it) : '') +
         (it.feedback ? '\nFEEDBACK: ' + _scanStr(it.feedback, 1200) : '');
     }).join('\n\n');
 }
@@ -3810,6 +4001,11 @@ function _applyAlgebraFix(bad, rows) {
     var fb = _scanStr(r.feedback, 1200);
     if (answer && !_textUsesAlgebra(answer)) it.answer = answer;
     if (expl && !_textUsesAlgebra(expl)) it.explanation = expl;
+    // A walk-through is only worth taking when it is really free of algebra —
+    // and a card whose steps were opened is closed again, because they are no
+    // longer the steps the student was part way through.
+    var st = _scanSteps(r);
+    if (st.length && !_textUsesAlgebra(_stepsText({ steps: st }))) { it.steps = st; it.stepsShown = 0; }
     if (it.feedback && fb && !_textUsesAlgebra(fb)) it.feedback = fb;
     if (!_itemUsesAlgebra(it)) { it.rewritten = true; fixed++; }
   });
@@ -4301,7 +4497,12 @@ function _ansEditApply(it, patch) {
      card would claim the paper's key said something it did not, which is the
      one thing that badge must never do. The disagreement note goes with it —
      it was about an answer that is no longer on the card. */
-  if (it.answer !== wasAnswer) { it.answerSource = ''; it.keyNote = ''; }
+  /* …and the walk-through goes with it. The steps were written to arrive at
+     the answer that has just been replaced, so walking a student through them
+     now would end one line short of the answer printed above — a worked
+     solution that contradicts its own card. No steps is better than steps to
+     somewhere else; the teacher's own working is in Why, where they typed it. */
+  if (it.answer !== wasAnswer) { it.answerSource = ''; it.keyNote = ''; it.steps = []; it.stepsShown = 0; }
   it.explanation = _ansTrim(patch.explanation, ANS_WHY_MAX);
   if (it.marked) {
     var v = String(patch.verdict == null ? '' : patch.verdict).toLowerCase().trim();
@@ -4416,6 +4617,118 @@ function verdictFace(v) {
   return VERDICT_FACE[v] || { cls: 'mBlank', chip: '✎ Marked', word: 'marked' };
 }
 
+/* =====================================================================
+   👣 ONE STEP AT A TIME
+   ---------------------------------------------------------------------
+   THE WHOLE WORKING IS IN THE MARKUP FROM THE MOMENT THE CARD IS DRAWN, and
+   the steps still to come are simply not displayed. Nothing is fetched, and
+   nothing can be lost between presses: `stepsShown` moves, the steps do not.
+   It is also what lets 🖨 Print put the entire worked answer on paper without
+   touching what is on the screen, and what keeps 📋 Copy honest — a copied
+   card carries every step whatever the reader had got to.
+
+   THE ANSWER IS THE LAST STEP, so on a question NOBODY HAS ANSWERED YET it is
+   held behind them: an answer sitting at the top of the card is read first and
+   the steps below it are never read at all, which is the whole thing this is
+   here to stop. On a question the student HAS already answered it is shown at
+   once — they have committed to an answer, the verdict chip has already told
+   them how it went, and a teacher marking a script must not have to click
+   through twenty cards to see the answers they are marking against.
+
+   ONE PRESS OPENS EVERYTHING. 👣 Show all working at the top of the paper, and
+   Show all working on each card: a student who wants the answer can always
+   have it, and the point is that taking it is a choice rather than the
+   default. ↺ Start again closes the card back up for a second go. */
+function stepsBoxHtml(it, i) {
+  var steps = (it && it.steps) || [];
+  if (!steps.length) return '';
+  var shown = _stepsShown(it);
+  var all = shown >= steps.length;
+  var rows = steps.map(function (s, n) {
+    return '<li class="stepRow' + (n < shown ? '' : ' hid') + '">' +
+      '<div class="stepN">' + (n + 1) + '</div>' +
+      '<div class="stepBody">' +
+        '<div class="stepDo">' + escHtml(s.do) + '</div>' +
+        (s.why ? '<div class="stepWhy">' + escHtml(s.why) + '</div>' : '') +
+      '</div></li>';
+  }).join('');
+  var nav = all
+    ? '<span class="stepDone">That is the whole working — ' + steps.length +
+      ' step' + (steps.length === 1 ? '' : 's') + '.</span>' +
+      '<button class="btn" onclick="stepReset(' + i + ')">↺ Start again</button>'
+    : '<button class="btn btnStep" onclick="stepNext(' + i + ')">' +
+      (shown ? 'Next step ▸' : 'Show me the first step ▸') + '</button>' +
+      '<button class="btn" onclick="stepAll(' + i + ')">Show all working</button>';
+  return '<div class="stepBox">' +
+      '<div class="stepHead">' +
+        '<span class="stepLabel">Working — one step at a time</span>' +
+        '<span class="stepCount noPrint">' + shown + ' of ' + steps.length + ' shown</span>' +
+      '</div>' +
+      '<ol class="stepList' + (shown ? ' on' : '') + '">' + rows + '</ol>' +
+      '<div class="stepNav noPrint">' + nav + '</div>' +
+    '</div>';
+}
+/* The three presses. Each one moves `stepsShown` and repaints through
+   `renderAnswers`, the ONE painter — a second one would drift from it the
+   first time a card gained a chip. A card that is no longer there is left
+   alone rather than throwing: these are inline handlers on rendered HTML, so
+   a stale card can reach them after a new run has replaced the answers. */
+function stepNext(i) {
+  var it = _answers[i];
+  if (!it || !(it.steps || []).length) return;
+  it.stepsShown = Math.min(it.steps.length, _stepsShown(it) + 1);
+  renderAnswers();
+}
+function stepAll(i) {
+  var it = _answers[i];
+  if (!it || !(it.steps || []).length) return;
+  it.stepsShown = it.steps.length;
+  renderAnswers();
+}
+function stepReset(i) {
+  var it = _answers[i];
+  if (!it || !(it.steps || []).length) return;
+  it.stepsShown = 0;
+  renderAnswers();
+}
+/* …and the same thing for the whole paper. It TOGGLES, because a teacher who
+   has opened every card wants one press to put them all away again. */
+function stepsAnyCard() {
+  return _answers.some(function (it) { return ((it && it.steps) || []).length > 0; });
+}
+function stepsAllOpen() {
+  var any = false, all = true;
+  _answers.forEach(function (it) {
+    var n = ((it && it.steps) || []).length;
+    if (!n) return;
+    any = true;
+    if (_stepsShown(it) < n) all = false;
+  });
+  return any && all;
+}
+function stepAllCards() {
+  var open = !stepsAllOpen();
+  _answers.forEach(function (it) {
+    var n = ((it && it.steps) || []).length;
+    if (!n) return;
+    it.stepsShown = open ? n : 0;
+  });
+  renderAnswers();
+}
+function renderStepAllBtn() {
+  var b = $('stepAllBtn');
+  if (!b) return;
+  var any = stepsAnyCard();
+  b.classList.toggle('hidden', !any);
+  if (!any) return;
+  var open = stepsAllOpen();
+  b.textContent = open ? '👣 Hide the working' : '👣 Show all working';
+  b.title = open
+    ? 'Close every card back up so the working can be worked through again'
+    : 'Show every step of the working on every card';
+  b.disabled = _scanning;
+}
+
 function answerCardHtml(it, i) {
   var opts = (it.options || []).length
     ? '<ul class="ansOpts">' + it.options.map(function (o) {
@@ -4427,6 +4740,24 @@ function answerCardHtml(it, i) {
     : '';
   var ans = it.answer || (it.option ? '(' + it.option + ')' : '');
   var face = verdictFace(it.verdict);
+  /* The answer is the LAST step. On a question nobody has answered yet it is
+     kept behind the steps still to come, because an answer printed above the
+     working is the only line that gets read. On one the student has already
+     answered it is shown at once: they have committed to an answer, the
+     verdict has already told them how it went, and a teacher marking a script
+     must not have to click through twenty cards to see what they are marking
+     against. */
+  /* "Why" IS THE WHOLE SOLUTION — at full detail it is the working line by
+     line ending with the answer stated. Left on the card under a walk-through
+     nobody has started, it hands over in one paragraph exactly what the steps
+     are there to hand over one at a time, and a student reads it and stops.
+     So while there are steps still to come it waits with them, on a marked
+     card as well as a blank one: the mark, the correct answer and the feedback
+     are all still on a marked card, and it is only the worked solution that
+     waits. Print always has it. */
+  var stepCount = (it.steps || []).length;
+  var hideWhy = stepCount > 0 && _stepsShown(it) < stepCount;
+  var hideAns = !it.marked && hideWhy;
   // An answer to a typed question was never on a page, so it gets no page
   // label and no number chip it did not earn — the head disappears entirely
   // rather than sitting there empty.
@@ -4434,6 +4765,23 @@ function answerCardHtml(it, i) {
   var head = [];
   if (it.number || !isAsk) head.push('<span class="ansNum">' + escHtml(it.number || String(i + 1)) + '</span>');
   if (!isAsk) head.push('<span class="ansPage">' + escHtml(ansPageLabel(it)) + (it.type === 'mcq' ? ' · multiple choice' : '') + '</span>');
+  /* WHAT SUBJECT THIS QUESTION IS, said on the card. It is already worked out
+     per question — it decides which standard the answer is held to, which
+     list 📥 offers, and whether the no-algebra rule applies — and until now
+     the card never once said so, which is how a maths question read off a
+     mixed pile could be answered as maths, marked as maths and filed as maths
+     with nothing on screen calling it a maths question. `itemSubjectWhy` is
+     the ONE door that decides it, and `from` is why the chip can say whether
+     this is what the question READS as or merely what the picker was set to —
+     two very different claims. */
+  var sw = itemSubjectWhy(it);
+  if (sw.key) {
+    head.push('<span class="subjChip" title="' +
+      escHtml(sw.from === 'question'
+        ? 'What this question itself reads as.'
+        : 'The subject you set in Settings — this question did not say.') +
+      '">' + escHtml(subjectLabel(sw.key)) + ' question</span>');
+  }
   if (it.marked) head.push('<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>');
   if (it.marked && it.marks) head.push('<span class="ansMarks">' + escHtml(it.marks) + '</span>');
   // Marked, never hidden: an answer nobody can see is worse than one that says
@@ -4483,8 +4831,14 @@ function answerCardHtml(it, i) {
       ? '<div class="youBox ' + face.cls + '"><div class="youLabel">What you wrote</div>' +
         '<div class="youText">' + escHtml(it.studentAnswer) + '</div></div>'
       : '') +
-    (ans ? '<div class="ansBox"><div class="ansLabel">' + (it.marked ? 'Correct answer' : 'Answer') + '</div>' +
-      '<div class="ansText">' + escHtml(ans) + '</div></div>' : '') +
+    (ans ? '<div class="ansBox' + (hideAns ? ' ansHidden' : '') + '">' +
+      '<div class="ansLabel">' + (it.marked ? 'Correct answer' : 'Answer') + '</div>' +
+      '<div class="ansText">' + escHtml(ans) + '</div>' +
+      (hideAns
+        ? '<div class="ansCover">Work through the ' + stepCount + ' step' + (stepCount === 1 ? '' : 's') +
+          ' below — the last one is the answer.</div>'
+        : '') +
+      '</div>' : '') +
     (it.marked && it.feedback
       ? '<div class="fbBox"><div class="fbLabel">Feedback</div><div class="fbText">' + escHtml(it.feedback) + '</div></div>'
       : '') +
@@ -4494,7 +4848,9 @@ function answerCardHtml(it, i) {
       ? '<div class="keyNoteBox"><div class="keyNoteLabel">⚠ The key and the working differ</div>' +
         '<div class="keyNoteText">' + escHtml(it.keyNote) + '</div></div>'
       : '') +
-    (it.explanation ? '<div class="whyBox"><div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
+    stepsBoxHtml(it, i) +
+    (it.explanation ? '<div class="whyBox' + (hideWhy ? ' hidWhy' : '') + '">' +
+      '<div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
     _vetCardFootHtml(it, i) +
     (function () {
       var chip = mbCardChipHtml(it);
@@ -4670,6 +5026,7 @@ function renderAnswers() {
   $('copyAnswersBtn').disabled = !_answers.length;
   $('printAnswersBtn').disabled = !_answers.length;
   renderReport();
+  renderStepAllBtn();
   renderVetAllBtn();
   renderGroundingLine();
   renderEngineLine();
@@ -4931,6 +5288,9 @@ function answersAsText() {
     var lines = [it.kind === 'ask'
       ? (it.question || 'Answer')
       : (it.number || (i + 1)) + '. ' + (it.question || '')];
+    // What the card says it is, said in the copy too.
+    var csub = itemSubject(it);
+    if (csub) lines.push('   [' + subjectLabel(csub) + ' question]');
     (it.options || []).forEach(function (o) {
       var right = it.option && String(o.label).toLowerCase() === String(it.option).toLowerCase();
       lines.push('   (' + o.label + ') ' + o.text + (right ? '  ✓' : ''));
@@ -4941,6 +5301,15 @@ function answersAsText() {
     }
     lines.push('   ' + (it.marked ? 'Correct answer: ' : 'Answer: ') + (it.answer || ('(' + it.option + ')')));
     if (it.marked && it.feedback) lines.push('   Feedback: ' + it.feedback);
+    /* Every step goes out, whatever the reader had got to on screen: a copied
+       card is the whole worked answer or it is a worse answer key than the
+       one this app replaced. */
+    if ((it.steps || []).length) {
+      lines.push('   Working, step by step:');
+      it.steps.forEach(function (st, n) {
+        lines.push('     ' + (n + 1) + '. ' + st.do + (st.why ? '  — ' + st.why : ''));
+      });
+    }
     if (it.explanation) lines.push('   Why: ' + it.explanation);
     return lines.join('\n');
   }).join('\n\n');
@@ -6302,7 +6671,13 @@ async function mbSaveOne(it, list) {
   var doc = {
     key: key,
     at: new Date().toISOString(),
-    subject: wsMeta.subject || '',
+    /* THE QUESTION'S OWN SUBJECT, through the same one door the vetting lists
+       and the no-algebra check read — not the Settings picker straight. A
+       maths question off a mixed pile was being filed here as whatever the
+       picker happened to say, so the book's chip and the worksheet it prints
+       called a maths question Science; `itemSubject` falls back to the picker
+       itself, so a paper that is all one subject is filed exactly as before. */
+    subject: itemSubject(it),
     level: wsMeta.level || '',
     number: String(it.number || ''),
     question: _scanStr(it.question, 1400),
@@ -8483,6 +8858,7 @@ $('mbSendBtn').addEventListener('click', mbSendPicked);
 $('mbRemoveBtn').addEventListener('click', mbRemovePicked);
 $('mbModal').addEventListener('click', function (e) { if (e.target === $('mbModal')) mbClose(); });
 $('reportBtn').addEventListener('click', reportRewrite);
+$('stepAllBtn').addEventListener('click', stepAllCards);
 $('copyAnswersBtn').addEventListener('click', copyAnswers);
 $('printAnswersBtn').addEventListener('click', function () { window.print(); });
 
