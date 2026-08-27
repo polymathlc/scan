@@ -3559,6 +3559,26 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
   })();
   const headBlock = mediaBlocks['(max-width: 620px), (max-height: 500px) and (pointer: coarse)'] || '';
   const headSmall = mediaBlocks['(max-width: 400px)'] || '';
+  const phoneBlock = mediaBlocks['(max-width: 620px)'] || '';
+  /* A FOOT NEVER STRETCHES ITS BUTTONS. A modal foot is a flex row holding a
+     note and two buttons, and `align-items` defaults to `stretch` — so
+     anything that makes the note tall makes every button beside it that tall.
+     It shipped: `.sub` gained `overflow-wrap: anywhere` (a long email's
+     min-content became ONE CHARACTER) while the buttons were allowed to grow,
+     which crushed the note into a 38-line column one letter wide and stretched
+     📤 Make a worksheet to the full height of the phone. Neither change is
+     wrong alone, which is why the guard is on the ROW. */
+  ok('a modal foot never stretches a button to the row\'s height',
+     /\.modalFoot \{[^}]*align-items: center;/.test(html));
+  /* …and the note gives way by taking its own row, not by being crushed one
+     character at a time in a shrink-fight with a button. */
+  ok('…and the note beside them cannot be crushed',
+     /\.modalFoot \.sub \{[^}]*min-width: 0;/.test(html) &&
+     /\.modalFoot \.sub \{ flex: 1 1 100%; \}/.test(phoneBlock) &&
+     !/id="mbFootNote" style="flex:1/.test(html));
+  /* `0 1`, never `1 1`: growing is what let the buttons take the whole row. */
+  ok('…and the buttons on it are half the row, never more',
+     /\.modalFoot \.btn \{ flex: 0 1 calc\(50% - 5px\); min-height: 46px; \}/.test(phoneBlock));
   /* THE HEADER AND THE TABS ARE ONE STICKY BOX. Two separately-sticky boxes
      need the second to know the first's height, and the header WRAPS — so any
      number written down is right at one width and leaves the tab bar
@@ -3630,7 +3650,7 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
     const mustPass = (mc.match(/^\s*\{ why: /gm) || []).length;
     ok('the phone check mutation-tests itself',
        /if \(process\.argv\.includes\('--selftest'\)\) \{/.test(mc) &&
-       /const MUTANTS = \[/.test(mc) && mutants >= 12,
+       /const MUTANTS = \[/.test(mc) && mutants >= 14,
        mutants + ' mutants');
     /* …in both directions: a check that fires on correct code is how a tool
        stops being read, so at least one page must be required to stay GREEN. */

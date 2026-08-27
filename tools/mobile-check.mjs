@@ -295,6 +295,16 @@ let page = src
      tablet overflow went unseen. */
   .replace('<span id="whoAmI" class="hint"></span>',
            '<span id="whoAmI" class="hint">chungzhikai@gmail.com</span>')
+  /* THE 📕 WINDOW'S FOOT NOTE, which `mbSyncFoot()` fills in. Left empty, the
+     foot has nothing tall in it and the row that stretched two buttons to the
+     full height of the window measured perfectly fine. It is a long unbroken
+     email, which is the whole point: it is what `overflow-wrap: anywhere`
+     turns into a one-character column. */
+  .replace('<span class="sub" id="mbFootNote"></span>',
+           '<span class="sub" id="mbFootNote">The link goes to chungzhikai@gmail.com</span>')
+  .replace('<button class="btn" id="mbRemoveBtn" disabled>', '<button class="btn" id="mbRemoveBtn">')
+  .replace('<button class="btn btnPrimary" id="mbSendBtn" disabled>',
+           '<button class="btn btnPrimary" id="mbSendBtn">')
   .replace('<span id="versionTag"></span>', '<span id="versionTag">v' + (src.match(/APP_VERSION = '([^']+)'/) || [, '?'])[1].replace(/^v/, '') + '</span>');
 page = page.replace('<h2 id="answersTitle" style="margin:0">The answers</h2>',
                     '<h2 id="answersTitle" style="margin:0">Marked &amp; answered (3)</h2>');
@@ -433,7 +443,7 @@ async function measure(url, vp) {
                   'noteEditModal', 'stuModal', 'vetModal', 'camLive', 'howPage'];
   /* The floor is about FINGERS: on a fine pointer there is nothing to check. */
   const states = vp.desktop ? [] : [{ name: '', open: '' }].concat(MODALS.map((m) => ({ name: m, open: m })));
-  const small = [], wideWin = [];
+  const small = [], wideWin = [], tallWin = [];
   for (const st of states) {
     const found = await p.evaluate((arg) => {
       const [min, openId] = arg;
@@ -519,10 +529,31 @@ async function measure(url, vp) {
         return out;
       }, [vp.width, st.open]);
       over.forEach((o) => { if (wideWin.indexOf(o) < 0) wideWin.push(o); });
+
+      /* …and nothing in that window stretched out of shape either. */
+      const tallOnes = await p.evaluate((arg) => {
+        const [max, openId] = arg;
+        const root = document.getElementById(openId);
+        if (!root) return [];
+        const out = [];
+        root.querySelectorAll('button, .tab, select').forEach((el) => {
+          const cs = getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return;
+          const r = el.getBoundingClientRect();
+          if (r.height > max) {
+            out.push(openId + ' ' + (el.id ? '#' + el.id : el.className || el.tagName) +
+                     ' ' + Math.round(r.width) + '×' + Math.round(r.height));
+          }
+        });
+        return out;
+      }, [120, st.open]);
+      tallOnes.forEach((t) => { if (tallWin.indexOf(t) < 0) tallWin.push(t); });
     }
   }
   if (!vp.desktop) ok('no window lays itself out wider than the screen',
      wideWin.length === 0, wideWin.slice(0, 6).join(' | '));
+  if (!vp.desktop) ok('…and no control in one is stretched out of shape',
+     tallWin.length === 0, tallWin.slice(0, 6).join(' | '));
   await p.evaluate(() => {
     document.querySelectorAll('.modalBack, .camLive').forEach((m) => m.classList.remove('open'));
     const how = document.getElementById('howPage');
@@ -658,7 +689,32 @@ async function measure(url, vp) {
   if (ask) ok('the ask box shows its whole placeholder',
      ask.need <= ask.has + 1, 'it needs ' + ask.need + 'px and has ' + ask.has + 'px');
 
-  /* ⑦ The dock never covers the last card. */
+  /* ⑦ NOTHING IS STRETCHED OUT OF SHAPE. Every check above asks whether a
+     control is too SMALL; none asked whether one had become absurd. A flex row
+     defaults to `align-items: stretch`, so one tall thing on a row — a line of
+     prose squeezed to one character wide, say — makes every button beside it
+     that tall. 📤 Make a worksheet shipped as a slab the height of the phone,
+     with every check green, because the harness left that note empty. The
+     ceiling is generous: the camera shutter is the tallest real control at
+     78px. */
+  const huge = await p.evaluate((max) => {
+    const out = [];
+    document.querySelectorAll('.modalBack.open, .camLive.open, body').forEach((root) => {
+      root.querySelectorAll('button, .tab, select').forEach((el) => {
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const r = el.getBoundingClientRect();
+        if (r.height > max) {
+          out.push((el.id ? '#' + el.id : el.className || el.tagName) +
+                   ' ' + Math.round(r.width) + '×' + Math.round(r.height));
+        }
+      });
+    });
+    return out;
+  }, 120);
+  if (!vp.desktop) ok('no control is stretched out of shape', huge.length === 0, huge.slice(0, 6).join(' | '));
+
+  /* ⑧ The dock never covers the last card. */
   const covered = await p.evaluate(() => {
     const dock = document.querySelector('.camDock');
     const list = document.getElementById('answersList');
@@ -795,6 +851,18 @@ const MUTANTS = [
   { check: 'no window lays itself out wider than the screen',
     why: 'a How tab card too wide for the screen',
     css: '#howPage .card { min-width: 900px !important; }' },
+  /* THE SHIPPED SLAB: a foot row where the buttons may grow and the note is
+     `overflow-wrap: anywhere`, so the note is crushed to one character wide and
+     `align-items: stretch` makes the buttons as tall as the column it becomes.
+     📤 Make a worksheet filled the phone. */
+  { check: '…and no control in one is stretched out of shape',
+    why: 'the 📕 foot back to growing buttons beside a crushable note',
+    /* Only the WINDOW check reddens: the page-level one scans the open
+       windows and the body, and with no window open a foot is `display:none`
+       — which is precisely why this shipped. */
+    css: '.modalFoot { align-items: stretch !important; } ' +
+         '.modalFoot .sub { flex: 1 1 0 !important; } ' +
+         '.modalFoot .btn { flex: 1 1 auto !important; }' },
   /* The sticky offset written as a constant — right at one width, and the tab
      bar unreachable behind a wrapped header everywhere else. */
   { check: 'the tab bar is still there, and still pressable, once scrolled',

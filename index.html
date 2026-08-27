@@ -811,10 +811,24 @@
   }
   .modalHead h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
   .modalBody { padding: 24px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  /* `align-items: center` IS THE ONE THAT MATTERS HERE, and it is a guard
+     rather than a preference. A foot is a flex row holding a note and two
+     buttons; the default `stretch` makes every button as tall as the tallest
+     thing on the row, so anything that makes that note tall makes the buttons
+     enormous. That is not hypothetical — it shipped: `.sub` gained
+     `overflow-wrap: anywhere` (so a long email's min-content became ONE
+     CHARACTER) and the buttons were allowed to grow, which squeezed the note
+     into a 38-line column one letter wide and stretched 📤 Make a worksheet to
+     the full height of the window. Neither change is wrong on its own. */
   .modalFoot {
     display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;
+    align-items: center;
     padding: 16px 24px; border-top: 1px solid var(--line);
   }
+  /* The note is the term that gives way, and it does it by TAKING ITS OWN ROW
+     rather than by being crushed: a line of prose in a shrink-fight with two
+     buttons loses one character at a time. */
+  .modalFoot .sub { flex: 1 1 240px; min-width: 0; text-align: left; margin: 0; }
 
   /* ---------- Teaching notes window ---------- */
   .tnPanel {
@@ -1012,7 +1026,12 @@
     .modalHead { padding: 16px 18px; }
     .modalBody { padding: 18px; }
     .modalFoot { padding: 14px 18px; }
-    .modalFoot .btn { flex: 1 1 auto; min-height: 46px; }
+    /* Its own line — see `.modalFoot .sub` above for why it must not share one
+       with a button that can grow. */
+    .modalFoot .sub { flex: 1 1 100%; }
+    /* `0 1`, never `1 1`. Growing is what let two buttons take the whole row
+       and squeeze the note beside them into a single column of letters. */
+    .modalFoot .btn { flex: 0 1 calc(50% - 5px); min-height: 46px; }
   }
   /* ONE RULE, AND IT SITS OUTSIDE THE BLOCK ABOVE ON PURPOSE. A phone in
      landscape is 852px, so it misses the phone block and shows the address —
@@ -1564,7 +1583,7 @@
     </div>
     <div class="modalBody" id="mbBody"></div>
     <div class="modalFoot">
-      <span class="sub" id="mbFootNote" style="flex:1;text-align:left;margin:0"></span>
+      <span class="sub" id="mbFootNote"></span>
       <button class="btn" id="mbRemoveBtn" disabled>🗑 Remove</button>
       <button class="btn btnPrimary" id="mbSendBtn" disabled>📤 Make a worksheet</button>
     </div>
@@ -1800,7 +1819,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.28.6';
+var APP_VERSION = 'v1.28.7';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
