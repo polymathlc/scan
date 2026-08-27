@@ -3528,18 +3528,13 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
   ok('…and the signed-in address gives way before the buttons do',
      /#whoAmI \{[^}]*text-overflow: ellipsis/.test(html));
   /* Five controls, a logo and "Scan & Answer" do not fit across 393px however
-     they are tuned, and the header was clipping it to "Scan & A…er". */
-  /* WHICH BLOCK A RULE LIVES IN IS THE THING THAT SHIPPED BROKEN, and no
-     regex over the whole file can see it: a misplaced brace moved thirty
-     phone-only declarations up into a 900px block and every pin still matched,
-     because the rule TEXT was unchanged. So the blocks are read out and asked
-     what is inside them. `mobile-check` carries the measured half — it asks
-     the browser which rules actually won at 768px. */
-  {
-    /* Brace-matched, not regex-matched: a one-line `@media` (the two
-       reduced-motion rules) has no `\n  }` of its own, so a lazy pattern runs
-       straight past it and swallows the next block whole. */
-    const blocks = {};
+     they are tuned, and the header was clipping it to "Scan & A…er".
+
+     BRACE-MATCHED, NOT REGEX-MATCHED: a one-line `@media` (the two
+     reduced-motion rules) has no `\n  }` of its own, so a lazy pattern runs
+     straight past it and swallows the next block whole. */
+  const mediaBlocks = (function () {
+    const out = {};
     const re = /\n  @media ([^{]+)\{/g;
     let m;
     while ((m = re.exec(html))) {
@@ -3549,13 +3544,23 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
         else if (html[i] === '}') depth--;
         i++;
       }
-      blocks[m[1].trim()] = html.slice(m.index + m[0].length, i - 1);
+      out[m[1].trim()] = html.slice(m.index + m[0].length, i - 1);
     }
-    const phone = blocks['(max-width: 620px)'] || '';
-    const land = blocks['(max-width: 900px)'] || '';
+    return out;
+  })();
+  const headBlock = mediaBlocks['(max-width: 620px), (max-height: 500px) and (pointer: coarse)'] || '';
+  /* WHICH BLOCK A RULE LIVES IN IS THE THING THAT SHIPPED BROKEN, and no
+     regex over the whole file can see it: a misplaced brace moved thirty
+     phone-only declarations up into a 900px block and every pin still matched,
+     because the rule TEXT was unchanged. So the blocks are read out and asked
+     what is inside them. `mobile-check` carries the measured half — it asks
+     the browser which rules actually won at 768px. */
+  {
+    const phone = mediaBlocks['(max-width: 620px)'] || '';
+    const land = mediaBlocks['(max-width: 900px)'] || '';
     ok('the phone LAYOUT lives in the phone block',
        /\.ansActions \.btn \{/.test(phone) && /\.stepNav \.btn \{/.test(phone) &&
-       /main \{ padding: 18px 14px 22px; \}/.test(phone));
+       /main \{ padding: [^;]+; \}/.test(phone));
     /* One rule, and nothing else. Written in the middle of the phone block its
        opening brace closed that block early and carried the two-up button grid
        and a 44px ✎ square up to 900px — an iPad showing a phone's layout, with
@@ -3567,7 +3572,7 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
        across two queries, a width that hid the word without squaring the
        button printed "Edit" in 1.15rem bold spilling out from under a 44px
        disc on every card. */
-    const head = blocks['(max-width: 620px), (max-height: 500px) and (pointer: coarse)'] || '';
+    const head = headBlock;
     ok('✎ Edit is squared in the same breath as the word in it is hidden',
        /\.btnLabel \{ display: none; \}/.test(head) && /\.ansEditBtn \{/.test(head));
     /* And a phone on its SIDE is 852px wide and 393px tall — keyed to width
@@ -3575,13 +3580,36 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
     ok('…and a phone on its side gets the compact head too',
        /max-height: 500px\) and \(pointer: coarse\)/.test(html));
   }
+  /* PINNED TO THE BLOCK, not to each other. Side by side these two match
+     anywhere — moved into base CSS the app wears "Scan" on a 1280px desktop
+     and the full name nowhere at all, and every check stayed green. */
   ok('the app wears a short name where the long one will not fit',
      /<span class="brandFull">Scan &amp; Answer<\/span><span class="brandShort">Scan<\/span>/.test(html) &&
-     /\.brandFull \{ display: none; \}\n\s*\.brandShort \{ display: inline; \}/.test(html));
-  /* And the tool proves the checks behind all of this can FAIL: two of the
-     first five could not, and they were the two the documentation led with. */
-  ok('the phone check mutation-tests itself',
-     /--selftest/.test(fs.readFileSync(new URL('./mobile-check.mjs', import.meta.url), 'utf8')));
+     /\.brandFull \{ display: none; \}/.test(headBlock) &&
+     /\.brandShort \{ display: inline; \}/.test(headBlock) &&
+     /\n  \.brandShort \{ display: none; \}/.test(html));
+  /* AND THE MUTATION TEST IS PINNED BY ITS MECHANISM AND ITS POPULATION, not
+     by the string "--selftest" appearing somewhere in the file — which is
+     satisfied by the tool's own header COMMENT. Replacing the branch with
+     `if (false)` and emptying the mutant list left the old pin green, two
+     lines below the comment that had deleted another pin for exactly that. */
+  {
+    const mc = fs.readFileSync(new URL('./mobile-check.mjs', import.meta.url), 'utf8');
+    const mutants = (mc.match(/^\s*\{ check: /gm) || []).length;
+    const mustPass = (mc.match(/^\s*\{ why: /gm) || []).length;
+    ok('the phone check mutation-tests itself',
+       /if \(process\.argv\.includes\('--selftest'\)\) \{/.test(mc) &&
+       /const MUTANTS = \[/.test(mc) && mutants >= 9,
+       mutants + ' mutants');
+    /* …in both directions: a check that fires on correct code is how a tool
+       stops being read, so at least one page must be required to stay GREEN. */
+    ok('…including pages that must stay green',
+       /const MUST_PASS = \[/.test(mc) && mustPass >= 1, mustPass + ' must-pass pages');
+    /* And a mutant must break exactly what it declares, or an over-broad one
+       proves nothing about the check it is filed under. */
+    ok('…and a mutant must break exactly what it says it breaks',
+       /const expected = \[m\.check\]\.concat\(m\.also \|\| \[\]\)/.test(mc));
+  }
   /* The version badge staying on screen is asserted where it can be MEASURED —
      `mobile-check.mjs` reads its box in every viewport. Pinning it here as
      "this one literal string is absent" named something it did not test,
@@ -3596,17 +3624,40 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      book's own tick box at 19×19 and the Settings pickers at 41px. */
   ok('the 44px floor is about fingers, not about width',
      /@media \(pointer: coarse\), \(any-pointer: coarse\) \{/.test(html) &&
-     /button:not\(\.shotBtn\), \.tab, \.mbTab, \.camLiveBtn, summary \{\n\s*min-height: 44px; min-width: 44px;/.test(html) &&
-     /select, input\[type="text"\][^{]*\{ min-height: 44px; \}/.test(html) &&
-     /input\[type="checkbox"\] \{ width: 22px; height: 22px; \}/.test(html));
+     /* Anchored with `[^{}]*` so adding a selector to either list does not fail
+        a correct file — the round-four trap in another guise. */
+     /button:not\(\.shotBtn\)[^{}]*summary[^{}]*\{[^}]*min-height: 44px;[^}]*min-width: 44px;/.test(html) &&
+     /select,[^{}]*input\[type="password"\][^{}]*\{[^}]*min-height: 44px;/.test(html) &&
+     /input\[type="checkbox"\][^{}]*\{[^}]*width: 22px; height: 22px;/.test(html));
   /* A tick box is pressed by the label round it. The mistake book's had none
      at all — a bare 19px input with an aria-label. */
   ok('…and the one control the mistake book turns on has a real target',
      /<label class="mbPickBox">/.test(html) &&
      /\.mbPickBox \{ width: 44px; height: 44px;/.test(html));
   ok('…while ✎ Edit is a square rather than a pill that owns a whole row',
-     /\.ansEditBtn \{\n\s*width: 44px; height: 44px;/.test(html) &&
+     /\.ansEditBtn \{[^}]*width: 44px; height: 44px;/.test(html) &&
      /✎<span class="btnLabel">Edit<\/span>/.test(html));
+  /* …and it is taken OUT of the wrapping head row, where as a sibling it could
+     author a row of its own with nothing else on it. */
+  ok('…and it cannot author a row of its own',
+     /\.ansEditBtn \{[^}]*position: absolute;/.test(html) &&
+     /\.ansHead \{[^}]*position: relative;[^}]*padding-right: 52px;/.test(html));
+  /* THE VERDICT AND THE MARKS ARE ONE FACT. As two siblings in a wrapping row
+     they split at exactly 390 and 393px — most of the school — leaving "1/2"
+     alone on a row as an unlabelled fragment. */
+  ok('the verdict and the marks wrap together or not at all',
+     /<span class="mark">/.test(html) &&
+     /\.mark \{[^}]*white-space: nowrap;/.test(html));
+  /* 🗑, NOT ✕: as a ✕ the row's DELETE was byte-identical to the window's own
+     close button, and it was the one that deleted immediately while its
+     labelled twin in the foot asked first. */
+  ok('the mistake book\'s row delete is not disguised as a close button',
+     /onclick="mbRemoveRow\([^"]*\)">🗑<\/button>/.test(html) &&
+     /async function mbRemoveRow\(id\) \{[\s\S]{0,400}?confirm\(/.test(html));
+  /* …and the confirm is NOT inside `mbRemove`, which the answer card's 📕 chip
+     also calls — that one is deliberately a single tap. */
+  ok('…and the card\'s own 📕 chip stays a single tap',
+     !/async function mbRemove\(id\) \{[\s\S]{0,200}?confirm\(/.test(html));
   /* A SINGLE UNBROKEN TOKEN IS THE SAME BUG FROM THE OTHER END: `pre-wrap`
      does not break a run with no spaces in it, so one pasted url in an answer
      lays the card out at 439px on a 393px screen and shrinks the whole app to

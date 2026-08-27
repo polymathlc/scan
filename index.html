@@ -38,7 +38,13 @@
     --font: 'Century Gothic', CenturyGothic, AppleGothic, 'Segoe UI', sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
+  /* `height: 100%` MADE THE STICKY HEADER STOP STICKING. It fixes body's box
+     at exactly one viewport while the content runs to three or four, and a
+     sticky element cannot travel outside its containing block — so on a
+     twenty-question paper the header left the screen for good at about 790px
+     of scroll, taking the version badge, 📕 My questions and Sign out with it.
+     `min-height` gives the same full-height page with a box that grows. */
+  html, body { min-height: 100%; }
   body {
     font-family: var(--font);
     color: var(--ink);
@@ -123,7 +129,7 @@
   main { max-width: 900px; margin: 0 auto; padding: 24px 20px 28px; }
   /* Only the Snap tab sits under the dock, so only the Snap tab pays for it —
      the How tab would otherwise end in a screenful of nothing. */
-  #scanPage { padding-bottom: calc(200px + env(safe-area-inset-bottom, 0px)); }
+  #scanPage { padding-bottom: calc(260px + env(safe-area-inset-bottom, 0px)); }
   .card {
     background: var(--bg); border: 1px solid var(--line);
     border-radius: var(--radius); box-shadow: var(--shadow-card);
@@ -166,8 +172,13 @@
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-strong); outline-offset: 1px; }
 
   /* ---------- Tabs ---------- */
+  /* UNDER the header, not beneath it. Both were `top: 0` and the header has
+     the higher z-index, so from the first pixel of scroll the two tabs were
+     hidden behind it — the whole navigation of the app, invisible whenever the
+     page was scrolled at all. The offset is the header's own height, and it
+     changes with the header's padding, so it moves with the compact head. */
   .tabs {
-    position: sticky; top: 0; z-index: 55;
+    position: sticky; top: 68px; z-index: 55;
     display: flex; gap: 6px; padding: 8px 20px 0;
     background: var(--bg); border-bottom: 1px solid var(--line);
   }
@@ -315,12 +326,18 @@
      since the mistake book shipped. CJK needs none of it — it breaks between
      characters — and `anywhere` breaks only where a line would otherwise
      overflow, so ordinary prose is untouched. */
+  /* `overflow-wrap` INHERITS, so these are subtrees, not a list of leaves. The
+     first pass named `.repLead, .repGapText` and missed the report's other
+     seven text classes: `.repFail` carries a raw thrown AI error verbatim, and
+     a Gemini 429 — the routine one, the reason the backup engine exists — laid
+     the document out at 456px on a 393px screen. `.repList li` reached 484px.
+     `.sub` is the same story for `#askedLine` (the student's own typed text,
+     1200 characters of it) and `#howEngines` (whatever each engine last said
+     when it refused). The app broke its own layout precisely when it was being
+     used to diagnose a breakage. */
   .ansQ, .ansText, .ansOpts li, .stepDo, .stepWhy, .stepLead,
   .fbText, .youText, .whyText, .keyNoteText, .mbQ, .mbYou, .mbAns,
-  /* The report is model-written too, and unlike the windows' text it is not
-     inside a `.modalBody` — whose `overflow-y: auto` computes an `overflow-x`
-     that contains the damage. */
-  .repLead, .repGapText {
+  .reportCard, .sub {
     overflow-wrap: anywhere;
   }
 
@@ -329,7 +346,15 @@
     background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
     box-shadow: var(--shadow-card); padding: 22px 24px; margin-bottom: 16px;
   }
-  .ansHead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  /* `align-items: flex-start`, not `baseline`: a 44px ✎ square baseline-aligned
+     against 12px chips sits visibly adrift of the row it is in. And the ✎ is
+     taken out of the wrap flow entirely — as a wrapping sibling it could
+     author a row of its own with nothing else on it. */
+  .ansHead {
+    position: relative; display: flex; align-items: flex-start;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 10px; padding-right: 52px;
+  }
+  .mark { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
   .ansNum {
     font-size: 0.78rem; font-weight: 700; color: #7A5410;
     background: #FDF4E3; border: 1px solid #E7BD72; border-radius: 999px; padding: 3px 12px;
@@ -691,12 +716,22 @@
     background: var(--bg-soft); border: 1px solid var(--line); word-break: break-all;
     font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6;
   }
+  /* 0.8rem, not 0.7: the pill was given the 44px floor and the type inside it
+     was left at 11.2px — shrinking the font instead of the box, which is the
+     one move the house rule names. */
   .mbBookChip {
-    font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 3px 11px;
+    font-size: 0.8rem; font-weight: 700; border-radius: 999px; padding: 3px 11px;
     border: 1px solid #E7BD72; background: #FDF4E3; color: #7A5410; cursor: pointer;
     font-family: var(--font);
   }
-  .mbBookChip.off { border-color: var(--line); background: var(--bg-soft); color: var(--ink-faint); }
+  /* NOT YET IN EITHER LIST, and both chips say so the same way. `--ink-faint`
+     on `--bg-soft` measures 3.2:1 at this size, under the 4.5:1 an 12.8px
+     label needs; and while 📕 was drawn faint-grey the 📗 beside it inherited
+     the filled green of the JOINED state, so a student read one of two
+     identical offers as already chosen. */
+  .mbBookChip.off {
+    border-color: var(--line); background: var(--bg-soft); color: var(--ink-soft);
+  }
   /* A status, not a button — these two say what the paper just did to the book. */
   .mbBookChip.done { border-color: #CFE7D0; background: #EFF8EF; color: #1F5F23; cursor: default; }
   .mbBookChip.near { cursor: default; }
@@ -704,6 +739,11 @@
   /* 📗 the learning list — the same shapes, a different colour, so the two
      lists are told apart at a glance without reading anything. */
   .mbBookChip.learn { border-color: #BFDCC4; background: #F1F8F2; color: #23602B; }
+  /* …and the offer beats the colour: an unjoined learning chip is drawn
+     unjoined, whichever list it is offering. */
+  .mbBookChip.off.learn {
+    border-color: var(--line); background: var(--bg-soft); color: var(--ink-soft);
+  }
   .mbChip.mLearn { background: #F1F8F2; color: #23602B; border-color: #BFDCC4; }
   /* The two tabs. They carry their own counts, so a student can see there is
      something in the other list without opening it. */
@@ -866,7 +906,11 @@
   @media (max-width: 620px), (max-height: 500px) and (pointer: coarse) {
     header { padding: 9px 12px; gap: 8px; }
     .headTools { gap: 6px; }
-    .tabs { padding: 6px 12px 0; }
+    /* Sign out is an ACCOUNT action sitting in a row of content actions, and
+       five identical white squares give the eye nothing to divide them by. A
+       little more air before the last one is enough. */
+    .headTools .btn#signOutBtn { margin-left: 6px; }
+    .tabs { padding: 6px 12px 0; top: 62px; }
     .btnLabel { display: none; }
     .brandOrg { display: none; }
     .brandFull { display: none; }
@@ -898,16 +942,23 @@
        decorative blob rather than the one thing on the head row you can
        press. */
     .ansEditBtn {
-      width: 44px; height: 44px; padding: 0; margin-left: auto;
+      position: absolute; top: 0; right: 0; margin-left: 0;
+      width: 44px; height: 44px; padding: 0;
       display: grid; place-items: center;
       font-size: 1.15rem; color: var(--ink-soft);
     }
   }
   /* ---- and the phone's LAYOUT, which is about width and nothing else ---- */
   @media (max-width: 620px) {
-    #whoAmI { display: none; }
+    /* `#whoAmI` is NOT here: the 900px block below covers every width this one
+       does, so a copy here would be a rule that can never win — and the
+       comment on that block argues it belongs outside this one. */
     main { padding: 18px 14px 22px; }
-    #scanPage { padding-bottom: calc(192px + env(safe-area-inset-bottom, 0px)); }
+    /* The dock is 161px with the bar showing, and the ask box grows to 132px
+       when a student types a long question — 245px in all on a 320px screen,
+       against clearance that was 192px. The last card was covered by what the
+       student had just typed. */
+    #scanPage { padding-bottom: calc(252px + env(safe-area-inset-bottom, 0px)); }
     .camBar { padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); }
     .askRow { padding: 10px 14px 0; }
     .card { padding: 20px 18px; }
@@ -922,7 +973,7 @@
        only ever existed at exactly four buttons — which is the rarest case: a
        student sees three (never 📥) and 🖨 Print stretched across the whole
        card, twice the size of Copy, making the least useful button on a phone
-       the loudest thing on the answers; a teacher sees five as soon as 📋
+       the loudest thing on the answers; a teacher sees five as soon as 📊
        Report appears. `0 1` holds every button to half, and an odd one sits at
        the left of its own row where it reads as one of a set. */
     .ansActions { width: 100%; gap: 8px; justify-content: flex-start; }
@@ -983,6 +1034,11 @@
     .ansCard, .card { padding: 16px 14px; }
     .stepBox { padding: 15px 13px; }
     .ansBox, .whyBox, .youBox, .fbBox { padding: 13px 14px; }
+    /* MORE AIR BETWEEN THE BOXES, NOT LESS TYPE. They were spaced at roughly
+       their own interior padding — 12px between, 13px inside — which is what
+       makes a marked card read as one stack of grey rather than five separate
+       things. This is the house rule's own prescription. */
+    .ansBox, .whyBox, .youBox, .fbBox, .stepBox, .keyNoteBox { margin-top: 20px; }
   }
   /* =====================================================================
      44px IS ABOUT FINGERS, NOT ABOUT WIDTH
@@ -1016,7 +1072,8 @@
     button:not(.shotBtn), .tab, .mbTab, .camLiveBtn, summary {
       min-height: 44px; min-width: 44px;
     }
-    select, input[type="text"], input[type="email"], input[type="search"] { min-height: 44px; }
+    select, textarea, input[type="text"], input[type="email"],
+    input[type="search"], input[type="password"] { min-height: 44px; }
     input[type="checkbox"] { width: 22px; height: 22px; }
     /* A tick box is pressed by the LABEL round it far more often than by the
        box itself — so the label is what carries the target, and the box stays
@@ -1029,6 +1086,10 @@
     body { background: #fff; }
     main { max-width: none; padding: 0; }
     .ansCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
+    /* The id selector beats `main { padding: 0 }`, so the clearance the camera
+       dock needs on screen was printing as two inches of blank paper at the
+       end of every answer key — enough to spill a page of nothing. */
+    #scanPage { padding-bottom: 0; }
     /* A printed worksheet is not clicked through: every step and the answer
        go on to the paper whatever the screen was showing. */
     .stepRow.hid { display: flex !important; }
@@ -1191,7 +1252,7 @@
         still blank it is simply answered. A page holding some of each comes back with some of each.</p>
       <p class="sub" style="margin-top:10px">The correct answer is always worked out from scratch first, so what the student
         wrote can never talk the app into the wrong answer.</p>
-      <h3 style="margin-top:22px">📋 And then the report on the whole paper</h3>
+      <h3 style="margin-top:22px">📊 And then the report on the whole paper</h3>
       <p class="sub" style="margin-top:6px">Once every page has been read, the marked script is looked at <b>as a whole</b> and
         the report appears above the answers: the score, then what the student can already do, what their mistakes have
         in common — the same slip in questions 3, 7 and 12 is <i>one</i> misunderstanding, not three — and what to go and
@@ -1429,7 +1490,7 @@
 <div class="camDock hidden" id="camDock">
   <div class="askRow" id="askBar">
     <textarea id="askText" rows="1" maxlength="1200"
-      placeholder="Ask a question, or say what to do with these pages…"></textarea>
+      placeholder="Ask a question, or say what to do…"></textarea>
     <!-- Shown only where the browser really has dictation, so it is never a
          button that does nothing. -->
     <button class="askBtn" id="micBtn" type="button" title="Dictate" hidden>🎤</button>
@@ -1711,7 +1772,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.28.4';
+var APP_VERSION = 'v1.28.5';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -4983,6 +5044,12 @@ function renderStepAllBtn() {
   b.disabled = _scanning;
 }
 
+/* `_vetCardFootHtml` hands back its own wrapper — it is drawn on its own
+   elsewhere — so the card's single foot takes what is inside it. */
+function _ansFootInner(html) {
+  var m = String(html || '').match(/^<div class="ansSend noPrint">([\s\S]*)<\/div>$/);
+  return m ? m[1] : String(html || '');
+}
 function answerCardHtml(it, i) {
   var opts = (it.options || []).length
     ? '<ul class="ansOpts">' + it.options.map(function (o) {
@@ -5036,8 +5103,17 @@ function answerCardHtml(it, i) {
         : 'The subject you set in Settings — this question did not say.') +
       '">' + escHtml(subjectLabel(sw.key)) + '<span class="subjWord"> question</span></span>');
   }
-  if (it.marked) head.push('<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>');
-  if (it.marked && it.marks) head.push('<span class="ansMarks">' + escHtml(it.marks) + '</span>');
+  /* THE VERDICT AND THE MARKS ARE ONE FACT AND THEY WRAP TOGETHER. Pushed as
+     two siblings into a wrapping row they split at exactly 390 and 393px —
+     the iPhone 12/13/14 and the 15 Pro, which is most of the school: "~ Partly
+     right" stayed on line one and "1/2" dropped alone to line two, an
+     unlabelled fragment on a row of its own. */
+  if (it.marked) {
+    head.push('<span class="mark">' +
+      '<span class="verdict ' + face.cls + '">' + escHtml(face.chip) + '</span>' +
+      (it.marks ? '<span class="ansMarks">' + escHtml(it.marks) + '</span>' : '') +
+    '</span>');
+  }
   // Marked, never hidden: an answer nobody can see is worse than one that says
   // what is wrong with it, and ✎ Edit is right there.
   if (it.algebra) {
@@ -5102,10 +5178,15 @@ function answerCardHtml(it, i) {
     stepsBoxHtml(it, i, hideAns) +
     (it.explanation ? '<div class="whyBox' + (hideWhy ? ' hidWhy' : '') + '">' +
       '<div class="whyLabel">Why</div><div class="whyText">' + escHtml(it.explanation) + '</div></div>' : '') +
-    _vetCardFootHtml(it, i) +
+    /* ONE FOOT, NOT TWO. 📥 and 📕 were two separate `.ansSend` rows, each with
+       its own 18px top margin, each content-width — so a card ended in two
+       ragged pills of different widths and, above the breakpoint, a 36px
+       button with a 19px chip stacked under it. They are one row that wraps. */
     (function () {
+      var vet = _vetCardFootHtml(it, i);
       var chip = mbCardChipHtml(it);
-      return chip ? '<div class="ansSend noPrint">' + chip + '</div>' : '';
+      if (!vet && !chip) return '';
+      return '<div class="ansSend noPrint">' + _ansFootInner(vet) + chip + '</div>';
     })() +
   '</div>';
 }
@@ -7095,6 +7176,24 @@ function mbRunToast(added, cleared, closer, failed) {
   toast('📕 ' + bits.join(' · ') + '.', 7000);
 }
 
+/* …and it asks first, exactly as the bulk 🗑 Remove in the foot does. The
+   confirm lives HERE and not inside `mbRemove`, because `mbRemove` is also
+   what the answer card's 📕 chip calls — and that one is deliberately a single
+   tap: the chip says the question is in the book and pressing it takes it back
+   out, which is a toggle a student uses while reading their own paper. A
+   confirm on a row in a list of thirty is a different question from a confirm
+   on the one card in front of you. */
+async function mbRemoveRow(id) {
+  var m = mbFindById(id);
+  var q = m ? _scanStr(m.question, 60) : '';
+  if (!confirm('Remove this question from your ' +
+      (mbIsLearning(m) ? 'learning list' : 'mistake book') + '?' +
+      (q ? '\n\n' + q : ''))) return;
+  await mbRemove(id);
+}
+function mbFindById(id) {
+  return _mistakes.filter(function (m) { return m.id === id; })[0] || null;
+}
 async function mbRemove(id) {
   try { await _mbCol().doc(id).delete(); }
   catch (e) { console.warn('mistake delete failed', e); toast('That could not be removed — try again.', 4000); return; }
@@ -7250,7 +7349,13 @@ function mbRowHtml(m) {
             (_askBusy ? ' disabled' : '') +
             ' onclick="mbAskChung(\'' + m.id + '\', \'attach\')">📎</button>'
         : '') +
-      '<button class="btn btnGhost" title="Remove" onclick="mbRemove(\'' + m.id + '\')">✕</button>' +
+      /* 🗑, NOT ✕. As a ✕ it was byte-identical to the window's own close
+         button — same class, same glyph, same 44px, both hard against the
+         right edge of their container — and it was the one that deleted a
+         question, immediately, while its labelled twin in the foot asked
+         first. One glyph per meaning: ✕ closes a window, 🗑 deletes. */
+      '<button class="btn btnGhost mbDrop1" title="Remove this question" ' +
+        'onclick="mbRemoveRow(\'' + m.id + '\')">🗑</button>' +
     '</div>' +
   '</div>';
 }

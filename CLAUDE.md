@@ -944,7 +944,7 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   as before.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
-## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.4)
+## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.5)
 
 `tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
 `header { flex-wrap: wrap }`, and the `@media` blocks at 620px, 400px, 900px and — the one this
@@ -966,7 +966,7 @@ section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
 - **HALF THE CARD EACH, AND NEVER MORE.** `.ansActions .btn` is `flex: 0 1`, not `1 1`: `1 1` GROWS,
   so the tidy two-up grid only ever existed at exactly four buttons, which is the rarest case. A
   student sees three (never 📥) and 🖨 Print stretched across the whole card — the least useful
-  button on a phone as the loudest thing on the answers — and a teacher sees five the moment 📋
+  button on a phone as the loudest thing on the answers — and a teacher sees five the moment 📊
   Report appears.
 - **THE APP WEARS A SHORT NAME WHERE THE LONG ONE WILL NOT FIT.** Five controls, a logo and
   "Scan & Answer" do not fit across 393px however they are tuned — that is arithmetic, not styling,
@@ -1021,6 +1021,29 @@ section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
   by `.shot`, which is itself off the side of the strip, and stopping there reported every page in
   an ordinary run. A check that fires on correct code is how a tool stops being read — which is why
   `--selftest` also carries a mutant that must stay GREEN.
+- **THE THREE CONTROLS THE APP IS WERE NEVER MEASURED.** `showTab()` unhides `camDock` and `camBar`
+  together; the harness unhid only the dock, so the gallery button, the shutter and ✓ sat at
+  `display: none` through every check — and the dock measured 59px instead of 161px, which is 102px
+  of false headroom under the dock check. The tool's own header claimed the camera surface was
+  exactly what it existed to measure. **A harness that renders less than the app claims coverage it
+  does not have**, and the fix is to render it, not to narrow the sentence.
+- **`overflow-x: hidden` IS NOT "SCROLLS".** The exemption written for the page strip took `hidden`
+  with it — so the ORIGINAL shipped defect, with `main { overflow-x: hidden }` painted over it,
+  passed every check: four buttons off the side of the card with no way to reach them, reported
+  clean. The house rule says wraps **or scrolls**; clipped-and-unreachable is the bug, not the cure.
+- **A CHECK CANNOT FAIL IF THE THING IT MEASURES IS NOT DRAWN.** `getComputedStyle` on a child of a
+  `display: none` ANCESTOR reports the child's own `display`, so hiding `.brandTitle` outright still
+  selected `.brandShort`, measured a zero-width Range and passed — a header with no name in it at
+  all, green. Every measurement now requires a real box (`getBoundingClientRect().width > 0`).
+- **THE SHORT-NAME RULES ARE PINNED TO THEIR BLOCK, NOT TO EACH OTHER.** Side by side they match
+  anywhere: moved into base CSS, the app wore "Scan" on a 1280px desktop and the full name nowhere,
+  and every check stayed green. This is the same class as the misplaced brace — where a rule LIVES
+  is the thing that ships broken.
+- **A MUTANT MUST BREAK EXACTLY WHAT IT DECLARES.** Asserting only that the named check went red
+  lets an over-broad mutant pass: a page wrecked enough to redden half the suite proves nothing
+  about the one check it is filed under. Each mutant lists its full expected red set in `also`, and
+  anything more or fewer is a failure — which catches an over-broad mutant and a check that has
+  quietly stopped noticing, in one assertion.
 - **`tools/mobile-check.mjs` MEASURES THE REAL PAGE** — the Snap tab with a paper on it, signed in,
   and every window opened in turn with real rows in it: the cards come from the real
   `answerCardHtml`, the 📕 book's rows from the real `mbRowHtml` and `mbTabsHtml`, and

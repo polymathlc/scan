@@ -18,6 +18,35 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📱 The sticky header, the delete button, and a tool that was measuring a page the app never shows (v1.28.5)
+
+A fifth review round, and most of what it found was in the *checking*, not the app:
+
+- **The sticky header stopped sticking** after about one screenful — `height: 100%`
+  on `body` bounds it — so on a twenty-question paper the header, the version
+  badge, 📕 My questions and Sign out all left the screen for good. And the two
+  tabs were **hidden behind the header** from the first pixel of scroll.
+- **The mistake book's per-row delete was a ✕ identical to the window's close
+  button** — same class, same glyph, same size, both hard against the right
+  edge — and it deleted *immediately*, while its labelled twin in the foot
+  asked first. It is 🗑 now, and it asks. (The 📕 chip on an answer card stays
+  a single tap; that one is a toggle on the card in front of you.)
+- **The verdict and the marks split onto two rows at exactly 390 and 393px** —
+  most of the school — leaving "1/2" alone as an unlabelled fragment.
+- **The ask box clipped its own placeholder** on every phone, on the first
+  screen.
+- **A report that failed printed the raw error**, and a Gemini spending-cap
+  message is one unbroken URL: 456px of it on a 393px screen. The app broke its
+  own layout precisely when it was being used to diagnose a breakage.
+
+And the tool: it was never rendering the camera bar — **the shutter, the gallery
+and ✓, the three controls the app actually is** — so they were exempt from every
+check and the dock measured 59px instead of 161px. Its exemption for scrolling
+rows also exempted `overflow-x: hidden`, which meant the *original* bug with the
+classic band-aid over it passed everything. Both fixed, the How tab and the
+report card are now rendered and measured, and every mutant must break **exactly**
+the set of checks it declares — an over-broad one proves nothing.
+
 ## 📱 …and the tablet, and the phone on its side (v1.28.4)
 
 Two more review rounds. The fixes had been done in one place and not the next,

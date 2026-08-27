@@ -24,7 +24,20 @@
 
    AND EVERY ONE OF THEM IS MUTATION-TESTED (`--selftest`): two of the first
    five could not fail at all, and they were the two the documentation led
-   with. A check that cannot fail is not a check.
+   with. A check that cannot fail is not a check — and one that fires on
+   correct code is how a tool stops being read, so `--selftest` also requires
+   pages that must stay GREEN, and requires every mutant to break EXACTLY the
+   set of checks it declares.
+
+   WHAT IT CANNOT SEE, said plainly rather than left to be discovered:
+     • CLIPPING. It measures boxes, so `white-space: nowrap; overflow: hidden`
+       on a text container — words cut mid-glyph — is green here.
+     • Anything the page cannot render without Firebase: the notes list, the
+       roster and the vetting picker open for their CHROME only, with empty
+       bodies. The 📕 book, the report card, the page strip, the asked line and
+       the whole How tab ARE seeded, from the real renderers.
+     • iOS itself. `dvh`, momentum scrolling and the real shrink-to-fit are
+       Safari behaviours a headless Chromium only approximates.
 
    No network: every <script> is stripped and the logo is swapped for the
    inline SVG the header already falls back to, so this runs offline and the
@@ -107,12 +120,19 @@ const api = new Function(prelude +
      of the file like everything else so the window is measured with something
      in it. */
   cut('function mbRowHtml(m) {', '/* Switching tabs CLEARS the ticks.') +
+  /* THE REPORT CARD, which is where the worst unbroken-token overflow was: it
+     prints a raw thrown AI error verbatim, and a Gemini 429 — the routine one,
+     the reason a backup engine exists at all — laid the document out at 456px
+     on a 393px screen. Never rendered, never measured. */
+  cut('/* =====================================================================\n   📋 THE REPORT',
+      '/* =====================================================================\n   📕 THE MISTAKE BOOK') +
   cut('/* ================= Tolerant JSON parse', '/* ================= Teaching notes & AI style training') +
   cut('/* ================= Teaching notes & AI style training', '/* ================= Uploading notes') +
   cut('/* =====================================================================\n   THE SCAN', '/* ---- Showing the answers ----') +
   cut('/* ---- Showing the answers ----', '/* =====================================================================\n   📋 THE REPORT') +
   `\n  var _vetCardFootHtml = function () { return '<div class="ansSend noPrint"><button class="btn btnScan">📥 Send to Maths vetting</button></div>'; };
   return { answerCardHtml: answerCardHtml, mbRowHtml: mbRowHtml, mbTabsHtml: mbTabsHtml,
+           reportCardHtml: reportCardHtml, setReport: function (v) { _report = v; },
            setAnswers: function (v) { _answers = v; }, setMeta: function (v) { wsMeta = v; },
            setBook: function (v) { _mistakes = v; } };`
 )();
@@ -170,6 +190,37 @@ const bookBody = api.mbTabsHtml() +
    house rule. Left empty it proved nothing; seeded, it is what keeps the
    overflow scan from crying wolf on correct code. A twelve-page paper is the
    case this app was built for. */
+/* THE REPORT, IN THE STATE THAT BREAKS IT: a failed run printing the error it
+   was given, verbatim. The 429 below is the real one — the spending cap that
+   made the backup engine necessary — and it is one unbroken url. */
+const SCORE = { marked: 3, judged: 3, correct: 1, partial: 1, wrong: 1, blank: 0,
+                got: 1.5, total: 3, pct: 50, byMarks: false };
+api.setReport({
+  status: 'failed', score: SCORE,
+  err: '[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/' +
+       'v1beta/models/gemini-3.7-flash:generateContent?key=AIzaSyExampleExampleExampleExampleExample: ' +
+       '[429 Too Many Requests] Your billing account has exceeded its monthly spending cap.'
+});
+const reportFail = api.reportCardHtml();
+api.setReport({
+  status: 'done', score: SCORE,
+  words: {
+    headline: 'A solid paper: the pattern questions are secure and the working is set out line by line.',
+    strengths: ['Squaring the figure number is reliable now.', 'Every answer carries its unit.'],
+    gaps: [{ title: 'Check the second multiplication',
+             detail: '21 × 21 was written as 440. Multiply out rather than adding one more lot of 20.',
+             questions: ['16(b)'] }],
+    next: ['Ten mixed square-number drills.', 'One past-year pattern question under time.'],
+    empty: false
+  }
+});
+const reportDone = api.reportCardHtml();
+if (!reportFail || !reportDone) {
+  console.error('the report card rendered empty — the harness is not seeding it, and every ' +
+                'claim about the report is worthless. Check reportCardHtml\'s shape.');
+  process.exit(2);
+}
+
 const STRIP = Array.from({ length: 8 }, function (_, i) {
   return '<div class="shot">' +
     '<img alt="page ' + (i + 1) + '">' +
@@ -201,8 +252,24 @@ let page = src
            '<div class="modalBody" id="mbBody">' + bookBody + '</div>')
   .replace('<div class="shots" id="shots"></div>',
            '<div class="shots" id="shots">' + STRIP + '</div>')
-  // the dock is what the Snap tab is laid out around, so it has to be up
+  .replace('<div id="reportWrap"></div>', '<div id="reportWrap">' + reportDone + reportFail + '</div>')
+  /* The student's own typed instruction, which is 1200 characters wide at the
+     limit and reaches the page through `.sub` like the engine line does. */
+  .replace('<p class="sub" id="askedLine" style="margin-top:10px;display:none"></p>',
+           '<p class="sub" id="askedLine" style="margin-top:10px">Asked: “only question 16 please, ' +
+           'and check my working on the last page”</p>')
+  /* THE DOCK AND THE BAR INSIDE IT. `showTab()` unhides both together;
+     unhiding only the dock left `#camBar` at `display: none`, so the gallery
+     button, the shutter and ✓ — the three controls this whole app is, and the
+     ones this tool's own header says it exists to measure — were skipped by
+     the overflow scan, the 44px floor and the dock height. The dock measured
+     59px instead of 161px: 102px of false headroom under the dock check. */
   .replace('<div class="camDock hidden" id="camDock">', '<div class="camDock" id="camDock">')
+  .replace('<div class="camBar hidden" id="camBar">', '<div class="camBar" id="camBar">')
+  .replace('<span class="camBadge hidden" id="shotBadge">0</span>',
+           '<span class="camBadge" id="shotBadge">8</span>')
+  .replace('id="micBtn" type="button" title="Dictate" hidden',
+           'id="micBtn" type="button" title="Dictate"')
   .replace('<span class="mbCount hidden" id="mbBadge">0</span>', '<span class="mbCount" id="mbBadge">22</span>')
   /* SIGNED IN AS SOMEBODY. Left empty, the header measures 136px narrower
      than it ever is in front of a teacher — which is most of the reason the
@@ -291,7 +358,14 @@ async function measure(url, vp) {
       let n = el.parentElement;
       while (n && n !== document.body) {
         const cs = getComputedStyle(n);
-        if (/(auto|scroll|hidden)/.test(cs.overflowX)) {
+        /* `auto|scroll` AND NOT `hidden`. The house rule is "wraps OR
+           scrolls"; `hidden` is neither — the content is clipped and
+           unreachable, which is the bug rather than the cure. Exempting it
+           meant the ORIGINAL shipped defect with `main { overflow-x: hidden }`
+           painted over it passed every check on this page: the four answer
+           buttons running off the card with no way to reach them, reported
+           clean. */
+        if (/^(auto|scroll)$/.test(cs.overflowX)) {
           const r = n.getBoundingClientRect();
           /* KEEP WALKING if this one does not fit. A thumbnail is clipped by
              `.shot` (overflow:hidden) which is itself off the side of the
@@ -336,15 +410,22 @@ async function measure(url, vp) {
      surface — and it is NOT a `.modalBack`, so listing only the modals left it
      out of every measurement. */
   const MODALS = vp.desktop ? [] : ['mbModal', 'notesModal', 'quickNoteModal', 'ansEditModal',
-                  'noteEditModal', 'stuModal', 'vetModal', 'camLive'];
+                  'noteEditModal', 'stuModal', 'vetModal', 'camLive', 'howPage'];
   /* The floor is about FINGERS: on a fine pointer there is nothing to check. */
   const states = vp.desktop ? [] : [{ name: '', open: '' }].concat(MODALS.map((m) => ({ name: m, open: m })));
   const small = [], wideWin = [];
   for (const st of states) {
     const found = await p.evaluate((arg) => {
       const [min, openId] = arg;
+      /* The How tab is a whole tab — every setting the app has — hidden by
+         `.hidden` rather than opened by `.open`. It was never laid out, so
+         `select { min-height: 44px }` was pinned by string and measured
+         nowhere. It is shown the way `showTab()` shows it. */
       document.querySelectorAll('.modalBack, .camLive').forEach((m) => m.classList.remove('open'));
-      if (openId) document.getElementById(openId).classList.add('open');
+      const how = document.getElementById('howPage');
+      if (how) how.classList.add('hidden');
+      if (openId === 'howPage') how.classList.remove('hidden');
+      else if (openId) document.getElementById(openId).classList.add('open');
       const out = [];
       const sel = 'button, [role="button"], .tab, select, summary, a[href], ' +
                   'input[type="checkbox"], input[type="radio"], input[type="file"]';
@@ -388,11 +469,12 @@ async function measure(url, vp) {
         const [limit, openId] = arg;
         const out = [];
         const root = document.getElementById(openId);
+        if (!root) return [];
         const clipped = (el, lim) => {
           let n = el.parentElement;
           while (n && n !== document.body) {
             const cs = getComputedStyle(n);
-            if (/(auto|scroll|hidden)/.test(cs.overflowX)) {
+            if (/^(auto|scroll)$/.test(cs.overflowX)) {
               const rr = n.getBoundingClientRect();
               if (rr.right <= lim + 1 && rr.left >= -1) return true;
             }
@@ -421,7 +503,11 @@ async function measure(url, vp) {
   }
   if (!vp.desktop) ok('no window lays itself out wider than the screen',
      wideWin.length === 0, wideWin.slice(0, 6).join(' | '));
-  await p.evaluate(() => document.querySelectorAll('.modalBack, .camLive').forEach((m) => m.classList.remove('open')));
+  await p.evaluate(() => {
+    document.querySelectorAll('.modalBack, .camLive').forEach((m) => m.classList.remove('open'));
+    const how = document.getElementById('howPage');
+    if (how) how.classList.add('hidden');
+  });
   if (!vp.desktop) ok('every control is at least ' + TAP_MIN + 'px, in every window',
      small.length === 0, small.slice(0, 10).join(' | ') +
      (small.length > 10 ? '  (+' + (small.length - 10) + ' more)' : ''));
@@ -445,7 +531,13 @@ async function measure(url, vp) {
        how much room was it given? A Range over the text node answers it and
        cannot be fooled by the layout above it. */
     const el = [].slice.call(document.querySelectorAll('.brandTitle span, .brandTitle'))
-      .filter((n) => getComputedStyle(n).display !== 'none' && n.textContent.trim())[0];
+      /* `.getBoundingClientRect().width > 0` is the load-bearing half:
+         `getComputedStyle` on a child of a `display: none` ANCESTOR reports
+         the child's own `display` (inline), so hiding `.brandTitle` outright
+         still selected `.brandShort`, measured a zero-width Range, and passed.
+         The check could not fail on a header with no name in it at all. */
+      .filter((n) => getComputedStyle(n).display !== 'none' && n.textContent.trim() &&
+                     n.getBoundingClientRect().width > 0)[0];
     if (!el) return { squeezed: true, text: '(no name in the header at all)', needs: 0, has: 0 };
     const r = document.createRange();
     r.selectNodeContents(el);
@@ -529,8 +621,18 @@ async function measure(url, vp) {
    The strip is already seeded with eight pages in the built page, so the
    ordinary run covers it — this names it so nobody removes the guard. */
 const MUST_PASS = [
-  { why: 'a page strip with eight pages in it, which is meant to scroll',
-    css: '' }
+  /* A TWELVE-PAGE PAPER, which is the case this app was built for and the case
+     the strip's `overflow-x: auto` exists for. The first version of this
+     re-ran the unmodified page, which exercised nothing — it was a tick, not a
+     check. Twelve pages is 1,536px of thumbnails in a 365px strip. */
+  { why: 'a strip holding a twelve-page paper, which is meant to scroll',
+    body: '', strip: 12 },
+  /* And a second scrolling row, so the chain walk is not pinned to one
+     element's particular ancestry. */
+  { why: 'a second overflow-x:auto row of its own',
+    css: '#answersList { overflow-x: auto; }',
+    body: '<div style="position:fixed;left:0;top:0;width:200px;overflow-x:auto">' +
+          '<div style="width:2000px;height:8px"></div></div>' }
 ];
 
 /* ---------------------------------------------------------------------
@@ -552,9 +654,12 @@ const MUST_PASS = [
 const MUTANTS = [
   { check: 'the page is no wider than the screen',
     why: 'a 900px block dropped on the page',
+    also: ['nothing hangs off either edge', 'no window lays itself out wider than the screen'],
     css: '', body: '<div style="width:900px;height:12px"></div>' },
   { check: 'nothing hangs off either edge',
     why: 'the answers row put back the way it shipped',
+    also: ['the page is no wider than the screen',
+           'no window lays itself out wider than the screen'],
     css: '.ansActions { flex-wrap: nowrap !important; } .ansActions .btn { flex: none !important; }' },
   { check: 'every control is at least 44px, in every window',
     why: '✎ Edit shrunk back under the floor',
@@ -587,6 +692,53 @@ const MUTANTS = [
        `width: 900px` is only its BASE size and `flex-shrink` pulls it straight
        back to the screen — the mutant looked broken and laid out fine. */
     css: '#vetModal .modalCard { min-width: 900px !important; max-width: none !important; }' },
+  /* THE ORIGINAL BUG WITH THE CLASSIC BAND-AID OVER IT. `overflow-x: hidden`
+     on an ancestor makes the document measure clean while the buttons are off
+     the card and unreachable — the house rule is "wraps or SCROLLS", and
+     hidden is neither. This passed every check until the exemption stopped
+     treating `hidden` as a scroller. */
+  { check: 'nothing hangs off either edge',
+    why: 'the shipped row back, with `overflow-x: hidden` painted over it',
+    css: '.ansActions { flex-wrap: nowrap !important; } .ansActions .btn { flex: none !important; } ' +
+         'main { overflow-x: hidden !important; }' },
+  /* THE THREE CONTROLS THE APP IS. They were `display: none` in every
+     measurement, so the one button that starts a run could sit off the side of
+     a 320px screen and the tool called the viewport clean. */
+  { check: 'nothing hangs off either edge',
+    why: 'the shutter grown until ✓ is off the screen',
+    css: '.camBar { flex-wrap: nowrap !important; } .shutter { width: 150px !important; } ' +
+         '.camSide { width: 110px !important; }' },
+  /* …and the dock check was carrying 102px of false headroom, enough that a
+     real regression fitted inside the slack. */
+  { check: 'the camera dock does not sit on top of the last answer',
+    why: 'the dock clearance cut to 90px — a real regression, not an absurd one',
+    css: '#scanPage { padding-bottom: 90px !important; }' },
+  /* A header with no name in it at all. `getComputedStyle` on a child of a
+     hidden ANCESTOR reports the child's own display, so the guard for this
+     never fired. */
+  { check: "the app's own name fits in the header",
+    why: 'the whole brand title hidden — no name in the header at all',
+    css: '.brandTitle { display: none !important; }' },
+  /* The one `ok()` name in `measure` that had no mutant, against the house
+     rule this pass itself wrote. */
+  { check: 'the phone layout is on',
+    why: 'the phone layout switched off on a phone',
+    css: '@media (max-width: 620px) { .ansActions .btn { flex: 0 1 auto !important; } ' +
+         'main { padding: 24px 20px 28px !important; } }' },
+  /* The report prints a raw thrown error verbatim, and the routine one is a
+     Gemini 429 carrying an unbroken url. */
+  { check: 'the page is no wider than the screen',
+    why: "the report's own error text, with the wrap guard off the report card",
+    also: ['nothing hangs off either edge',
+           'no window lays itself out wider than the screen'],
+    css: '.reportCard, .sub { overflow-wrap: normal !important; word-break: normal !important; }' },
+  /* A whole tab of settings that was never laid out. */
+  { check: 'every control is at least 44px, in every window',
+    why: "the How tab's three settings pickers shrunk — a whole tab no other check saw",
+    css: '#scanDetail, #scanLevel, #scanSubject { min-height: 0 !important; height: 12px !important; }' },
+  { check: 'no window lays itself out wider than the screen',
+    why: 'a How tab card too wide for the screen',
+    css: '#howPage .card { min-width: 900px !important; }' },
   /* THE MISPLACED BRACE, as a rule that leaks past the breakpoint. Every
      other check passes on this page: the layout is valid, just the wrong one. */
   { check: 'the phone layout stops at the breakpoint',
@@ -601,6 +753,8 @@ const MUTANTS = [
      token with no spaces in it, which `pre-wrap` will not break. */
   { check: 'the page is no wider than the screen',
     why: 'one unbroken token in an answer, with the wrap guard removed',
+    also: ['nothing hangs off either edge',
+           'no window lays itself out wider than the screen'],
     css: '.ansQ, .ansText, .stepDo, .stepWhy, .youText, .whyText, .fbText ' +
          '{ overflow-wrap: normal !important; word-break: normal !important; }',
     seed: 'https://firebasestorage.googleapis.com/v0/b/mathgen--app.appspot.com/o/' +
@@ -635,14 +789,37 @@ if (process.argv.includes('--selftest')) {
       console.log('  ✗ ' + m.check + '\n      still passed with ' + m.why + ' — this check cannot fail');
       bad++;
     } else {
-      console.log('  ✓ ' + m.check + '\n      goes red on ' + m.why);
+      /* AND IT MUST BREAK EXACTLY WHAT IT SAYS IT BREAKS. Only asserting that
+         the named check went red lets an over-broad mutant pass: a page
+         wrecked enough to redden half the suite proves nothing about the one
+         check it is filed under. Some collateral is honest — an element off
+         the right edge really does widen the document — so each mutant
+         DECLARES its full expected set in `also`, and anything more or fewer
+         is a failure. It catches an over-broad mutant and a check that has
+         quietly stopped noticing, in the same assertion. */
+      const expected = [m.check].concat(m.also || []).sort().join(' | ');
+      const actual = r.results.filter((x) => !x.pass).map((x) => x.name).sort().join(' | ');
+      if (expected !== actual) {
+        console.log('  ~ ' + m.check + '\n      goes red on ' + m.why +
+                    '\n      …but the red set is "' + actual + '"\n      and it declares "' + expected + '"');
+        bad++;
+      } else {
+        console.log('  ✓ ' + m.check + '\n      goes red on ' + m.why +
+                    ((m.also || []).length ? '  (with ' + m.also.length + ' related)' : ''));
+      }
     }
   }
   /* …and the other direction. */
   console.log('');
   for (const m of MUST_PASS) {
     const f = path.join(OUT, 'mutant.html');
-    fs.writeFileSync(f, page.replace('</head>', '<style>' + (m.css || '') + '</style></head>'));
+    let good = page.replace('</head>', '<style>' + (m.css || '') + '</style></head>')
+                   .replace('</body>', (m.body || '') + '</body>');
+    if (m.strip) {
+      good = good.replace('<div class="shots" id="shots">' + STRIP + '</div>',
+        '<div class="shots" id="shots">' + STRIP.repeat(Math.ceil(m.strip / 8)) + '</div>');
+    }
+    fs.writeFileSync(f, good);
     const r = await measure('file://' + f, PHONE);
     await r.ctx.close();
     const red = r.results.filter((x) => !x.pass);
@@ -676,7 +853,13 @@ for (const vp of VIEWPORTS) {
     const d = document.querySelector('.camDock');
     if (d) d.style.visibility = 'hidden';
   });
-  await r.page.screenshot({ path: path.join(OUT, vp.name + '.png'), fullPage: true });
+  /* A `fullPage` shot RESIZES THE VIEWPORT to the page height, so every
+     `(max-height: …)` rule stops matching while the picture is taken: the
+     landscape shot was rendered at 852×6230 and showed a 171px desktop header
+     with a pill "✎ Edit" — the exact layout that query exists to prevent, and
+     not what the device gets. A short viewport is photographed as it is. */
+  const tall = vp.height >= 500;
+  await r.page.screenshot({ path: path.join(OUT, vp.name + '.png'), fullPage: tall });
   await r.ctx.close();
 }
 await browser.close();
