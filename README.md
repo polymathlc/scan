@@ -18,6 +18,34 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📱 …and the tablet, and the phone on its side (v1.28.4)
+
+Two more review rounds. The fixes had been done in one place and not the next,
+and the tool that said otherwise had a blind spot each time:
+
+- **A misplaced brace carried thirty phone-only rules up to 900px** — so an
+  iPad, and every phone turned sideways, got the phone's two-up button grid,
+  phone page margins, and a 44px ✎ disc with the word "Edit" spilling out from
+  under it on every card. Every check passed: the layout was *valid*, just the
+  wrong one. Both harnesses now check which rules actually win at 768px.
+- **A phone on its side got the desktop header** — 117px of chrome on the
+  shortest screen the app ever has. The compact header is keyed to height and
+  pointer now, not width alone.
+- **One long unbroken token** — a pasted link in an answer — still laid a card
+  out at 439px on a 393px screen. Every text container wraps now.
+- **The 44px floor was height-only**, so 📎 Attach was 40×44 — on precisely the
+  phones the floor exists for.
+- **A generated build artifact had been committed**, in a directory named
+  `--selftest`. Removed, and the tool now refuses to write anywhere inside the
+  repository.
+
+And the tool got the two checks it was missing: one that notices a *window*
+laid out too wide (a 900px dialog passed everything before), and one that
+notices the phone layout leaking past its breakpoint. `--selftest` now also
+carries a mutant that must stay **green** — a page strip with eight pages in it
+is *meant* to run off the side of itself, and a check that fires on correct
+code is how a tool stops being read.
+
 ## 📱 It fits the phone, the tablet and the landscape too (v1.28.2)
 
 Three reviewers went over v1.28.1 and found the same fix had been done in one
@@ -29,7 +57,7 @@ place and not the next:
   window) the page was still too wide and **Sign out was still off the edge**.
 - **The two-up button grid only existed at four buttons** — the rarest case.
   A student sees three and 🖨 Print stretched across the whole card; a teacher
-  sees five once 📋 Report appears. Every button is now exactly half the card.
+  sees five once 📊 Report appears. Every button is now exactly half the card.
 - **44px is about fingers, not about width.** Keyed to a narrow screen the
   floor switched off the moment the phone was turned sideways. It is keyed to
   the pointer now, and it covers *every* control — the mistake book's tick box
@@ -299,7 +327,7 @@ blank is never counted against you, and an answer the AI would not commit to a v
 out rather than marked wrong.
 
 A paper with nothing written on it gets no report — there is nothing to report on, only answers.
-The report goes out with **Copy** and **Print**, and **📋 Report** writes it again.
+The report goes out with **Copy** and **Print**, and **📊 Report** writes it again.
 
 ## 📕 Your mistake book
 

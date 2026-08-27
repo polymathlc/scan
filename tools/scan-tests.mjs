@@ -3529,6 +3529,52 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      /#whoAmI \{[^}]*text-overflow: ellipsis/.test(html));
   /* Five controls, a logo and "Scan & Answer" do not fit across 393px however
      they are tuned, and the header was clipping it to "Scan & A…er". */
+  /* WHICH BLOCK A RULE LIVES IN IS THE THING THAT SHIPPED BROKEN, and no
+     regex over the whole file can see it: a misplaced brace moved thirty
+     phone-only declarations up into a 900px block and every pin still matched,
+     because the rule TEXT was unchanged. So the blocks are read out and asked
+     what is inside them. `mobile-check` carries the measured half — it asks
+     the browser which rules actually won at 768px. */
+  {
+    /* Brace-matched, not regex-matched: a one-line `@media` (the two
+       reduced-motion rules) has no `\n  }` of its own, so a lazy pattern runs
+       straight past it and swallows the next block whole. */
+    const blocks = {};
+    const re = /\n  @media ([^{]+)\{/g;
+    let m;
+    while ((m = re.exec(html))) {
+      let i = m.index + m[0].length, depth = 1;
+      while (i < html.length && depth > 0) {
+        if (html[i] === '{') depth++;
+        else if (html[i] === '}') depth--;
+        i++;
+      }
+      blocks[m[1].trim()] = html.slice(m.index + m[0].length, i - 1);
+    }
+    const phone = blocks['(max-width: 620px)'] || '';
+    const land = blocks['(max-width: 900px)'] || '';
+    ok('the phone LAYOUT lives in the phone block',
+       /\.ansActions \.btn \{/.test(phone) && /\.stepNav \.btn \{/.test(phone) &&
+       /main \{ padding: 18px 14px 22px; \}/.test(phone));
+    /* One rule, and nothing else. Written in the middle of the phone block its
+       opening brace closed that block early and carried the two-up button grid
+       and a 44px ✎ square up to 900px — an iPad showing a phone's layout, with
+       nothing overflowing and every check green. */
+    ok('…and the landscape block holds the one rule it is for',
+       /#whoAmI \{ display: none; \}/.test(land) &&
+       land.replace(/#whoAmI \{ display: none; \}/, '').trim() === '');
+    /* The square and the hidden word are two halves of one decision. Split
+       across two queries, a width that hid the word without squaring the
+       button printed "Edit" in 1.15rem bold spilling out from under a 44px
+       disc on every card. */
+    const head = blocks['(max-width: 620px), (max-height: 500px) and (pointer: coarse)'] || '';
+    ok('✎ Edit is squared in the same breath as the word in it is hidden',
+       /\.btnLabel \{ display: none; \}/.test(head) && /\.ansEditBtn \{/.test(head));
+    /* And a phone on its SIDE is 852px wide and 393px tall — keyed to width
+       alone it took the desktop header on the shortest viewport in the app. */
+    ok('…and a phone on its side gets the compact head too',
+       /max-height: 500px\) and \(pointer: coarse\)/.test(html));
+  }
   ok('the app wears a short name where the long one will not fit',
      /<span class="brandFull">Scan &amp; Answer<\/span><span class="brandShort">Scan<\/span>/.test(html) &&
      /\.brandFull \{ display: none; \}\n\s*\.brandShort \{ display: inline; \}/.test(html));
@@ -3567,7 +3613,15 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
      fit — no row of buttons involved. `.mbLink` has carried the same guard
      since the mistake book shipped. */
   ok('one long unbroken token cannot widen the page',
-     /\.ansQ, \.ansText[\s\S]{0,240}overflow-wrap: anywhere;/.test(html));
+     /* ANCHORED INSIDE THE RULE, like the header pin beside it. `[\s\S]{0,N}`
+        crosses `}`, so the declaration it found need not be in this rule at
+        all — the guard could be deleted and put on an unrelated selector and
+        this still passed, with the page laying out at 439px on a 393px
+        screen. And N is a trap in the other direction too: growing the
+        selector list pushed the declaration out of the window and failed a
+        correct file. */
+     /\.ansQ, \.ansText[^{}]*\{[^}]*overflow-wrap: anywhere;/.test(html) &&
+     /\.repLead, \.repGapText[^{}]*\{[^}]*overflow-wrap: anywhere;/.test(html));
   /* AN ANSWER THAT IS WAITING IS NOT DRAWN AT ALL. Greying the box was half a
      fix — a student still reading a container labelled ANSWER whose contents
      were not the answer — and the grey dashed styling then leaked onto PAPER,

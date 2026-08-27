@@ -165,6 +165,22 @@ api.setBook(BOOK);
 const bookBody = api.mbTabsHtml() +
   '<div class="mbList">' + BOOK.map(api.mbRowHtml).join('') + '</div>';
 
+/* EIGHT PAGES IN THE STRIP, because the strip is MEANT to run off the side of
+   itself and be dragged — `overflow-x: auto`, the "or scrolls" half of the
+   house rule. Left empty it proved nothing; seeded, it is what keeps the
+   overflow scan from crying wolf on correct code. A twelve-page paper is the
+   case this app was built for. */
+const STRIP = Array.from({ length: 8 }, function (_, i) {
+  return '<div class="shot">' +
+    '<img alt="page ' + (i + 1) + '">' +
+    '<div class="shotBar">' +
+      '<span class="shotNum">' + (i + 1) + '</span>' +
+      '<button class="shotBtn" title="Move earlier">◀</button>' +
+      '<button class="shotBtn" title="Move later">▶</button>' +
+      '<button class="shotBtn" title="Remove">✕</button>' +
+    '</div></div>';
+}).join('');
+
 /* ---- the real page, with nothing that needs the network ---- */
 const SVG_LOGO = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22 viewBox=%220 0 40 40%22%3E%3Crect width=%2240%22 height=%2240%22 rx=%228%22 fill=%22%234a7c59%22/%3E%3Ctext x=%2220%22 y=%2229%22 font-size=%2224%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EP%3C/text%3E%3C/svg%3E";
 let page = src
@@ -183,6 +199,8 @@ let page = src
   .replace('<div id="answersList"></div>', '<div id="answersList">' + cards + '</div>')
   .replace('<div class="modalBody" id="mbBody"></div>',
            '<div class="modalBody" id="mbBody">' + bookBody + '</div>')
+  .replace('<div class="shots" id="shots"></div>',
+           '<div class="shots" id="shots">' + STRIP + '</div>')
   // the dock is what the Snap tab is laid out around, so it has to be up
   .replace('<div class="camDock hidden" id="camDock">', '<div class="camDock" id="camDock">')
   .replace('<span class="mbCount hidden" id="mbBadge">0</span>', '<span class="mbCount" id="mbBadge">22</span>')
@@ -261,6 +279,31 @@ async function measure(url, vp) {
      thing anybody can go and fix. */
   const wide = await p.evaluate((limit) => {
     const out = [];
+    /* A ROW THAT SCROLLS IS NOT A ROW THAT OVERFLOWS. The house rule is
+       "wraps OR scrolls", and the page strip and the camera strip are both
+       `overflow-x: auto` by design: a twelve-page paper is meant to run off
+       the side of its own strip and be dragged. Reported as offenders they
+       would make the tool cry wolf on correct code — which is how a check
+       stops being read, and is the mirror of the failure that started all
+       this. So an element is only an offender if the thing CLIPPING it
+       overflows too. */
+    const clipped = (el, lim) => {
+      let n = el.parentElement;
+      while (n && n !== document.body) {
+        const cs = getComputedStyle(n);
+        if (/(auto|scroll|hidden)/.test(cs.overflowX)) {
+          const r = n.getBoundingClientRect();
+          /* KEEP WALKING if this one does not fit. A thumbnail is clipped by
+             `.shot` (overflow:hidden) which is itself off the side of the
+             strip — the question is whether ANY clipper up the chain contains
+             the damage, and here it is `.shots` above it. Stopping at the
+             first one reported every thumbnail in a scrolling strip. */
+          if (r.right <= lim + 1 && r.left >= -1) return true;
+        }
+        n = n.parentElement;
+      }
+      return false;
+    };
     document.querySelectorAll('body *').forEach((el) => {
       /* NOT `offsetParent`, which is null for every position:fixed box — that
          quietly exempted the camera dock, the whole camera overlay and the
@@ -270,6 +313,7 @@ async function measure(url, vp) {
       if (cs.display === 'none' || cs.visibility === 'hidden') return;
       const r = el.getBoundingClientRect();
       if (r.width === 0) return;
+      if (clipped(el, limit)) return;
       if (r.right > limit + 1 || r.left < -1) {
         out.push((el.id ? '#' + el.id : el.tagName.toLowerCase()) +
                  (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '') +
@@ -344,11 +388,24 @@ async function measure(url, vp) {
         const [limit, openId] = arg;
         const out = [];
         const root = document.getElementById(openId);
+        const clipped = (el, lim) => {
+          let n = el.parentElement;
+          while (n && n !== document.body) {
+            const cs = getComputedStyle(n);
+            if (/(auto|scroll|hidden)/.test(cs.overflowX)) {
+              const rr = n.getBoundingClientRect();
+              if (rr.right <= lim + 1 && rr.left >= -1) return true;
+            }
+            n = n.parentElement;
+          }
+          return false;
+        };
         root.querySelectorAll('*').forEach((el) => {
           const cs = getComputedStyle(el);
           if (cs.display === 'none' || cs.visibility === 'hidden') return;
           const r = el.getBoundingClientRect();
           if (r.width === 0) return;
+          if (clipped(el, limit)) return;
           if (r.right > limit + 1 || r.left < -1) {
             out.push(openId + ' ' + (el.id ? '#' + el.id : el.tagName.toLowerCase()) +
                      ' [' + Math.round(r.left) + '→' + Math.round(r.right) + ']');
@@ -421,7 +478,39 @@ async function measure(url, vp) {
   ok('the version badge is on the screen', badge.w > 0 && badge.h > 0,
      'versionTag is ' + badge.w + '×' + badge.h + ' ("' + badge.text + '")');
 
-  /* ④ The dock never covers the last card. */
+  /* ④ THE PHONE LAYOUT STOPS AT THE BREAKPOINT.
+     A misplaced brace once moved thirty phone-only declarations up into a
+     900px block — the two-up button grid on an iPad, phone padding on a
+     tablet, and a 44px ✎ square with the word "Edit" spilling out below it on
+     every card from 621px to 900px. EVERY OTHER CHECK PASSED, because the
+     layout was valid: it was simply the wrong one, applied 280px too far.
+     Overflow, tap targets and clipping cannot see that; which rules actually
+     won can. */
+  const layout = await p.evaluate(() => {
+    const btn = document.querySelector('.ansActions .btn');
+    const edit = document.querySelector('.ansEditBtn');
+    return {
+      grid: btn ? getComputedStyle(btn).flexBasis : '',
+      mainPad: getComputedStyle(document.querySelector('main')).paddingLeft,
+      editW: edit ? Math.round(edit.getBoundingClientRect().width) : 0,
+      labelHidden: edit && edit.querySelector('.btnLabel')
+        ? getComputedStyle(edit.querySelector('.btnLabel')).display === 'none' : null
+    };
+  });
+  const phone = vp.width <= 620;
+  const isPhoneLayout = layout.grid !== 'auto' || layout.mainPad === '14px';
+  ok(phone ? 'the phone layout is on' : 'the phone layout stops at the breakpoint',
+     phone ? isPhoneLayout : !isPhoneLayout,
+     'button basis ' + layout.grid + ', main padding ' + layout.mainPad +
+     ', ✎ is ' + layout.editW + 'px wide');
+  /* The two halves of ✎ Edit must agree: a square button with the word still
+     rendered spills "Edit" out of it in 1.15rem bold across the card. */
+  ok('✎ Edit is a square with no word in it, or a pill with one',
+     layout.labelHidden === null || (layout.editW <= 48) === layout.labelHidden,
+     '✎ is ' + layout.editW + 'px wide and its label is ' +
+     (layout.labelHidden ? 'hidden' : 'shown'));
+
+  /* ⑤ The dock never covers the last card. */
   const covered = await p.evaluate(() => {
     const dock = document.querySelector('.camDock');
     const list = document.getElementById('answersList');
@@ -433,6 +522,16 @@ async function measure(url, vp) {
 
   return { results, page: p, ctx };
 }
+
+/* A mutant that must STAY GREEN. Everything above asks "does this check
+   fail when it should"; this one asks the other question, which is just as
+   easy to get wrong: a row that legitimately scrolls must not be reported.
+   The strip is already seeded with eight pages in the built page, so the
+   ordinary run covers it — this names it so nobody removes the guard. */
+const MUST_PASS = [
+  { why: 'a page strip with eight pages in it, which is meant to scroll',
+    css: '' }
+];
 
 /* ---------------------------------------------------------------------
    DOES ANY OF THIS ACTUALLY FAIL?
@@ -488,6 +587,16 @@ const MUTANTS = [
        `width: 900px` is only its BASE size and `flex-shrink` pulls it straight
        back to the screen — the mutant looked broken and laid out fine. */
     css: '#vetModal .modalCard { min-width: 900px !important; max-width: none !important; }' },
+  /* THE MISPLACED BRACE, as a rule that leaks past the breakpoint. Every
+     other check passes on this page: the layout is valid, just the wrong one. */
+  { check: 'the phone layout stops at the breakpoint',
+    why: 'the phone button grid leaking up to 900px, the way a misplaced brace did',
+    css: '@media (max-width: 900px) { .ansActions .btn { flex: 0 1 calc(50% - 4px) !important; } ' +
+         'main { padding: 18px 14px 22px !important; } }' },
+  { check: '✎ Edit is a square with no word in it, or a pill with one',
+    why: 'the square kept past the width that hides the word in it',
+    css: '@media (max-width: 900px) { .ansEditBtn { width: 44px !important; height: 44px !important; ' +
+         'padding: 0 !important; display: grid !important; } }' },
   /* THE HEADLINE FAILURE, FROM CONTENT RATHER THAN FROM A CONTROL ROW: one
      token with no spaces in it, which `pre-wrap` will not break. */
   { check: 'the page is no wider than the screen',
@@ -499,7 +608,12 @@ const MUTANTS = [
 ];
 
 if (process.argv.includes('--selftest')) {
-  const vp = { name: 'selftest', width: 393, height: 852 };
+  const PHONE = { name: 'selftest', width: 393, height: 852 };
+  /* Two of the mutants are defects that only exist ABOVE the phone
+     breakpoint, so they are given a viewport that is above it. */
+  const TABLET = { name: 'selftest-tablet', width: 768, height: 1024 };
+  const ABOVE = ['the phone layout stops at the breakpoint',
+                 '✎ Edit is a square with no word in it, or a pill with one'];
   console.log('SELF-TEST — each check is given a page broken in the way it names.\n');
   let bad = 0;
   for (const m of MUTANTS) {
@@ -513,7 +627,7 @@ if (process.argv.includes('--selftest')) {
     if (m.seed) mutated = mutated.replace('400 and 441', m.seed);
     const f = path.join(OUT, 'mutant.html');
     fs.writeFileSync(f, mutated);
-    const r = await measure('file://' + f, vp);
+    const r = await measure('file://' + f, ABOVE.indexOf(m.check) >= 0 ? TABLET : PHONE);
     await r.ctx.close();
     const hit = r.results.filter((x) => x.name === m.check)[0];
     if (!hit) { console.log('  ✗ ' + m.check + ' — check never ran'); bad++; continue; }
@@ -524,9 +638,25 @@ if (process.argv.includes('--selftest')) {
       console.log('  ✓ ' + m.check + '\n      goes red on ' + m.why);
     }
   }
+  /* …and the other direction. */
+  console.log('');
+  for (const m of MUST_PASS) {
+    const f = path.join(OUT, 'mutant.html');
+    fs.writeFileSync(f, page.replace('</head>', '<style>' + (m.css || '') + '</style></head>'));
+    const r = await measure('file://' + f, PHONE);
+    await r.ctx.close();
+    const red = r.results.filter((x) => !x.pass);
+    if (red.length) {
+      console.log('  ✗ cried wolf on ' + m.why + '\n      ' +
+                  red.map((x) => x.name + (x.extra ? ' → ' + x.extra : '')).join('\n      '));
+      bad++;
+    } else {
+      console.log('  ✓ stays green on ' + m.why);
+    }
+  }
   await browser.close();
-  console.log('\n' + (bad ? '✗ ' + bad + ' check' + (bad === 1 ? '' : 's') + ' cannot fail'
-                          : '✓ every check fails when it should'));
+  console.log('\n' + (bad ? '✗ ' + bad + ' check' + (bad === 1 ? '' : 's') + ' is wrong'
+                          : '✓ every check fails when it should, and only when it should'));
   process.exit(bad ? 1 : 0);
 }
 

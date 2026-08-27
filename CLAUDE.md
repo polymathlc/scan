@@ -379,7 +379,7 @@ step, and ship a change to the shape in both repos together**:
   has nothing to report on, and one marked question is the feedback card again in longer words. An
   answer to a typed question (`kind: 'ask'`) was never on a paper and is never a script.
 - **A failed call still leaves a real report** — the score is on screen the moment the run ends and
-  only the WORDS are waited for. 📋 Report rewrites it.
+  only the WORDS are waited for. 📊 Report rewrites it.
 - **A question reference the model invented is dropped** (`_reportRefs`, matched the way the option
   labels are, so "7(a)", "7a" and "(7a)" are one question): a reference to a question that is not
   on this paper points the student at nothing.
@@ -944,7 +944,7 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   as before.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
-## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened in v1.28.2)
+## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.4)
 
 `tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
 `header { flex-wrap: wrap }`, and the `@media` blocks at 620px, 400px, 900px and — the one this
@@ -999,6 +999,28 @@ section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
   no reason a reader could see. `.ansHidden` is now `display: none` on screen and the ordinary green
   box in print, with no second styling left to disagree with it. What the box used to say is said by
   `.stepLead`, over the working it names.
+- **WHICH MEDIA BLOCK A RULE LIVES IN IS THE THING THAT SHIPS BROKEN, and no regex over the file can
+  see it.** A `@media (max-width: 900px)` written in the middle of the phone block closed that block
+  early and carried **thirty phone-only declarations up to 900px**: an iPad and every phone in
+  landscape got the two-up button grid, phone padding, and a 44px ✎ square with the word "Edit"
+  spilling out from under it on every card. **Every check passed** — the layout was valid, just the
+  wrong one, applied 280px too far. So `scan-tests` brace-matches the blocks and asks what is inside
+  them (a one-line `@media` has no `\n  }` of its own, which is why a lazy regex swallows the next
+  block whole), and `mobile-check` asks the BROWSER which rules actually won at 768px.
+- **THE COMPACT HEAD IS NOT KEYED TO WIDTH ALONE.** A phone in landscape is 852px wide and 393px
+  TALL, so keyed to width it took the desktop header — two rows of word-buttons, 117px of chrome —
+  on the shortest viewport the app ever has. `(max-height: 500px) and (pointer: coarse)` is the
+  other half, and it means "a phone on its side" rather than "a short desktop window".
+- **`.btnLabel` AND `.ansEditBtn` LIVE IN THE SAME BLOCK ON PURPOSE.** The square and the hidden
+  word are two halves of one decision; split across two queries, a width that hid the word without
+  squaring the button printed "Edit" in 1.15rem bold across the card from under a 44px disc.
+- **A ROW THAT SCROLLS IS NOT A ROW THAT OVERFLOWS.** The house rule is "wraps OR scrolls", and the
+  page strip and the camera strip are `overflow-x: auto` by design — a twelve-page paper is MEANT to
+  run off the side of its own strip. The overflow scan therefore skips an element whose damage is
+  contained by a scroll-clipping ancestor, **walking the whole chain**: a thumbnail is clipped first
+  by `.shot`, which is itself off the side of the strip, and stopping there reported every page in
+  an ordinary run. A check that fires on correct code is how a tool stops being read — which is why
+  `--selftest` also carries a mutant that must stay GREEN.
 - **`tools/mobile-check.mjs` MEASURES THE REAL PAGE** — the Snap tab with a paper on it, signed in,
   and every window opened in turn with real rows in it: the cards come from the real
   `answerCardHtml`, the 📕 book's rows from the real `mbRowHtml` and `mbTabsHtml`, and
