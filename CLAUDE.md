@@ -7,7 +7,10 @@ Guidance for Claude when working in this repo.
   `mathgen--app` Firebase project with Google sign-in. Photograph a worksheet or an exam paper —
   or pick pictures out of the gallery — and **every question printed on them is read: what the
   student has already written is MARKED, what is still blank is ANSWERED**. Four subjects:
-  Science, Mathematics, English, Chinese. **A typed or dictated question is the other way in**:
+  Science, Mathematics, English, Chinese, and **every answer card says which of the four the question
+  is**. **The working is handed over ONE STEP AT A TIME** — press Next step, read the line and the
+  reason under it, and the answer is the last step — with one press to open the whole paper; see
+  that section below. **A typed or dictated question is the other way in**:
   with pages it governs the run, with no pages it *is* the run. **When the last page has been read,
   the marked script comes back as a REPORT** — the score, what went well, what the mistakes have in
   common, what to practise next. See that section below. **Every question the student gets WRONG is
@@ -880,6 +883,67 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   for exactly that case and only in standalone mode — do not "fix" it to match this.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 👣 One step at a time, and 🏷 the subject said on the card (v1.28.0)
+- **A worked answer printed in full is read from the bottom up.** The student finds the final
+  number, writes it down and learns nothing — which makes a card that hands over the whole solution
+  the exact opposite of teaching. So the SAME working is asked for a second time cut into `steps`
+  (`SCAN_STEPS_RULE`), one line of working and one line saying why it is done, and the card hands
+  them over one press of **Next step** at a time.
+- **`_scanSteps` is the ONE door**, used by `_scanNewItem` and `_askNewItem` alike exactly as
+  `_markFields` is for the marking fields. It drops an empty step, promotes a step that came back
+  with only its reason (half a step is still something to walk through; a blank numbered row is
+  not), and **caps the count in code** — `SCAN_STEPS_MAX` is in the prompt as well, but a model that
+  returns forty steps for one sum would otherwise put forty presses between a student and their
+  answer.
+- **THE WHOLE WORKING IS IN THE MARKUP FROM THE MOMENT THE CARD IS DRAWN**, and the steps still to
+  come simply are not displayed (`.stepRow.hid`). Nothing is fetched between presses so nothing can
+  be lost between them; **🖨 Print reveals every one of them** without touching what is on screen,
+  and 📋 Copy carries them all whatever the reader had got to.
+- **`stepsShown` is the only thing the reveal moves**, and `_stepsShown` CLAMPS it on the way out —
+  a card opened to five steps and then edited down to two must not claim to be showing five.
+- **THE ANSWER IS THE LAST STEP.** On a question **nobody has answered yet** it waits behind the
+  steps (`.ansHidden`), because an answer printed above the working is the only line that gets read.
+  On a question the student **has** answered it is shown at once: they have committed to an answer,
+  the verdict chip has already said how it went, and a teacher marking a script must not click
+  through twenty cards to see what they are marking against.
+- **`Why` waits with the steps on BOTH**, marked or blank. At full detail the explanation *is* the
+  worked solution ending with the answer stated, so leaving it under an unstarted walk-through hands
+  over in one paragraph exactly what the steps hand over one at a time, and the reveal is
+  decoration. The mark, the correct answer and the feedback all stay on a marked card; only the
+  solution waits. Print has it either way.
+- **One press opens everything.** `Show all working` on the card, and **👣 Show all working** at the
+  top of the answers for the whole paper — which **toggles**, because a teacher who has opened every
+  card wants one press to put them all away. `↺ Start again` closes one card for a second go. A
+  student who wants the answer can always have it; the point is that taking it is a choice rather
+  than the default.
+- **The reveal repaints through `renderAnswers`, the ONE painter.** A second one would drift the
+  first time a card gained a chip. `stepNext` / `stepAll` / `stepReset` are inline handlers on
+  rendered HTML, so a card that is no longer there is left alone rather than throwing.
+- **"Answer only" turns it off.** The steps ARE the working, so a run asked for the answer alone has
+  none to walk through — `SCAN_DETAIL_RULE.short` says so, and the Settings card says it out loud.
+- **Algebra cannot hide in the steps.** `_itemUsesAlgebra` reads `_stepsText` too, the rewrite call
+  is asked for the steps and given the old ones, and a rewritten walk-through is taken only when it
+  is really free of algebra — otherwise the explanation is put right and the student is still walked
+  through "let x be" line by line, in the one place they are reading it hardest.
+- **An answer the teacher rewrites drops its steps.** They were written to arrive at an answer that
+  is no longer on the card, so walking a student through them now ends one line short of the answer
+  printed above them — a card contradicting itself. No walk-through is better than one to somewhere
+  else, and the teacher's own working is in Why where they typed it. Same rule, same place, as the
+  🔑 badge and the key note `_ansEditApply` already drops.
+- **EVERY CARD SAYS WHAT SUBJECT THE QUESTION IS** (`.subjChip` — "Mathematics question"). It was
+  already worked out per question and it already decided which standard the answer is held to,
+  whether the no-algebra rule applies and which list 📥 offers — and the card never once said so, so
+  a maths question off a mixed pile was answered as maths, marked as maths and filed as maths with
+  nothing on screen calling it a maths question. It is drawn through `itemSubjectWhy`, the ONE door,
+  and `from` is what lets the chip say whether this is what the question READS as or merely what the
+  picker was set to. **Never add a second reading of the subject to draw it with.**
+- **The mistake book files the question's OWN subject too** (`itemSubject(it)`, not `wsMeta.subject`
+  straight). It was filing every question under the picker, so a maths question off a mixed pile
+  came back in the book chipped as Science and printed on a worksheet titled Science.
+  `itemSubject` falls back to the picker itself, so a paper that is all one subject is filed exactly
+  as before.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -1368,6 +1432,19 @@ that same PDF**.
   that goes deep again, or a `nearInk` guard that goes away, rubs the child's
   own pencil working off the picture and sends the teacher the question with
   the work removed — which is the one thing he was being asked to look at.
+- After touching **the step-by-step reveal or the subject chip** (`SCAN_STEPS_RULE`,
+  `SCAN_STEPS_MAX`, `_scanSteps`, `_stepsText`, `_stepsShown`, `stepsBoxHtml`, `stepNext`,
+  `stepAll`, `stepReset`, `stepsAnyCard`, `stepsAllOpen`, `stepAllCards`, `renderStepAllBtn`,
+  `hideWhy` / `hideAns` in `answerCardHtml`, the `.subjChip`, `mbSaveOne`'s `subject`), run
+  `node tools/scan-tests.mjs`. Every failure here is silent and the card looks finished either way:
+  a reveal that shows every step at once has handed the whole solution to a student who pressed
+  Next once, one that shows none of them on PAPER prints a worksheet with no working on it, and a
+  `Why` left open under an unstarted walk-through gives the same solution away in one paragraph
+  while the steps below it sit there looking like a feature. Steps kept on an answer the teacher has
+  just rewritten walk a student to an answer that is no longer on the card, and algebra rewritten
+  out of the explanation and left in the steps is algebra in the one place it is read line by line.
+  A subject chip drawn from a second reading of the subject is a card that says Science on a
+  question this app answered, marked and filed as maths.
 - After touching **scanning for a student** (`STU_COL`, `scanForUid`,
   `scanForName`, `stuAllowed`, `stuLoad`, `stuStart`, `stuStop`, `stuAdd`,
   `stuRowHtml`, `stuSyncBar`, `_mbCol`, `_mbUpload`'s folder, or `renderAuth`'s
