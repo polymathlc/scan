@@ -54,8 +54,18 @@
   }
 
   /* ---------- Header ---------- */
+  /* ONE STICKY BOX FOR BOTH, and it is the only way this can be right at every
+     width. The tabs were `top: 0` under a `top: 0` header and were hidden
+     behind it from the first pixel of scroll; giving them the header's height
+     as a constant (68px) fixed exactly the widths where the header happens to
+     be one row, and left them unreachable — `elementFromPoint` returning
+     `.headTools` — at 621px, at 768px and at 320px, where `flex-wrap: wrap`
+     takes the header to 101 or 171px. The header's height changes with
+     WRAPPING, not with padding, so nothing can be written down. Sticking the
+     pair together means neither has to know the other's size. */
+  .topBar { position: sticky; top: 0; z-index: 60; }
   header {
-    position: sticky; top: 0; z-index: 60;
+    position: relative; z-index: 1;
     /* IT WRAPS, and that is the last line of defence rather than the layout.
        On every phone in use the brand and the toolbar fit on one row; on
        something narrower than any of them the toolbar drops to a row of its
@@ -178,7 +188,7 @@
      page was scrolled at all. The offset is the header's own height, and it
      changes with the header's padding, so it moves with the compact head. */
   .tabs {
-    position: sticky; top: 68px; z-index: 55;
+    position: relative; z-index: 0;
     display: flex; gap: 6px; padding: 8px 20px 0;
     background: var(--bg); border-bottom: 1px solid var(--line);
   }
@@ -337,7 +347,7 @@
      used to diagnose a breakage. */
   .ansQ, .ansText, .ansOpts li, .stepDo, .stepWhy, .stepLead,
   .fbText, .youText, .whyText, .keyNoteText, .mbQ, .mbYou, .mbAns,
-  .reportCard, .sub {
+  .reportCard, .sub, .tnText, .tnCardTitle {
     overflow-wrap: anywhere;
   }
 
@@ -359,7 +369,9 @@
     font-size: 0.78rem; font-weight: 700; color: #7A5410;
     background: #FDF4E3; border: 1px solid #E7BD72; border-radius: 999px; padding: 3px 12px;
   }
-  .ansPage { font-size: 0.74rem; color: var(--ink-faint); }
+  /* `--ink-faint` on white is 3.47:1 at this size, under the 4.5:1 small text
+     needs — and `.stepCount` is the progress readout of the headline feature. */
+  .ansPage { font-size: 0.74rem; color: var(--ink-soft); }
   .ansQ { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.65; white-space: pre-wrap; }
   .ansOpts { list-style: none; margin: 12px 0 0; display: flex; flex-direction: column; gap: 5px; }
   .ansOpts li { font-size: 0.86rem; color: var(--ink-soft); padding: 5px 10px; border-radius: 8px; }
@@ -383,7 +395,7 @@
      it is telling the student to do. */
   .stepLead { font-size: 0.86rem; color: var(--ink-soft); line-height: 1.7; margin-top: 10px; }
   .stepLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
-  .stepCount { font-size: 0.74rem; color: var(--ink-faint); margin-left: auto; }
+  .stepCount { font-size: 0.74rem; color: var(--ink-soft); margin-left: auto; }
   .stepList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
   .stepList.on { margin-top: 16px; }
   .stepRow { display: flex; gap: 14px; align-items: flex-start; }
@@ -910,7 +922,7 @@
        five identical white squares give the eye nothing to divide them by. A
        little more air before the last one is enough. */
     .headTools .btn#signOutBtn { margin-left: 6px; }
-    .tabs { padding: 6px 12px 0; top: 62px; }
+    .tabs { padding: 6px 12px 0; }
     .btnLabel { display: none; }
     .brandOrg { display: none; }
     .brandFull { display: none; }
@@ -1026,6 +1038,13 @@
     .headTools { gap: 5px; }
     .brandMark { width: 31px; height: 31px; }
     .brandTitle { font-size: 0.92rem; }
+    /* THE ASK BOX HOLDS ITS OWN PLACEHOLDER. `rows="1"` with no floor is 46px
+       whatever the placeholder needs, and `askGrow()` sizes from `scrollHeight`,
+       which ignores placeholder text — so below 375px the invitation wrapped to
+       two lines inside a one-line box and "do…" was cut through its x-height,
+       on the home screen, above the shutter. Shortening the string fixed the
+       width it was measured at and nothing else; the box is what has to give. */
+    .askRow textarea { min-height: 72px; }   /* 70px of content plus its 1px borders */
     /* The chip gives up the word "question" so the head row can hold the ✎
        instead of growing an empty row beneath it to carry the pencil alone.
        360px is an ordinary Android width and a blank worksheet — every card
@@ -1082,13 +1101,17 @@
     .mbPickBox { width: 44px; height: 44px; margin-top: -3px; }
   }
   @media print {
-    header, .tabs, .camBar, .camDock, .noPrint, #toast, .modalBack { display: none !important; }
+    .topBar, header, .tabs, .camBar, .camDock, .noPrint, #toast, .modalBack { display: none !important; }
+    /* The page strip is chrome too, and its 8th thumbnail runs off a 794px
+       sheet with its ◀ ▶ ✕ printed beside it. */
+    .shots { display: none !important; }
     body { background: #fff; }
     main { max-width: none; padding: 0; }
     .ansCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
-    /* The id selector beats `main { padding: 0 }`, so the clearance the camera
-       dock needs on screen was printing as two inches of blank paper at the
-       end of every answer key — enough to spill a page of nothing. */
+    /* `main { padding: 0 }` above says nothing about this: `#scanPage` is a
+       section INSIDE main with a bottom padding of its own, and that padding —
+       the clearance the camera dock needs on screen — was printing as two
+       inches of blank paper at the end of every answer key. */
     #scanPage { padding-bottom: 0; }
     /* A printed worksheet is not clicked through: every step and the answer
        go on to the paper whatever the screen was showing. */
@@ -1103,6 +1126,10 @@
 </head>
 <body>
 
+<!-- THE HEADER AND THE TABS TRAVEL AS ONE. Two separately-sticky boxes need
+     the second to know the first's height, and the header's height is not a
+     constant: it WRAPS. Any number written here is right at one width. -->
+<div class="topBar">
 <header>
   <div class="brand">
     <!-- The logo, with the SAME inline-SVG fallback the Science portal uses:
@@ -1143,6 +1170,7 @@
   <button class="tab on" id="tabSnap" data-tab="snap">📸 Snap</button>
   <button class="tab" id="tabHow" data-tab="how">❓ How to use</button>
 </nav>
+</div><!-- /.topBar -->
 
 <main>
 
@@ -1772,7 +1800,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.28.5';
+var APP_VERSION = 'v1.28.6';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -5044,12 +5072,6 @@ function renderStepAllBtn() {
   b.disabled = _scanning;
 }
 
-/* `_vetCardFootHtml` hands back its own wrapper — it is drawn on its own
-   elsewhere — so the card's single foot takes what is inside it. */
-function _ansFootInner(html) {
-  var m = String(html || '').match(/^<div class="ansSend noPrint">([\s\S]*)<\/div>$/);
-  return m ? m[1] : String(html || '');
-}
 function answerCardHtml(it, i) {
   var opts = (it.options || []).length
     ? '<ul class="ansOpts">' + it.options.map(function (o) {
@@ -5183,10 +5205,15 @@ function answerCardHtml(it, i) {
        ragged pills of different widths and, above the breakpoint, a 36px
        button with a 19px chip stacked under it. They are one row that wraps. */
     (function () {
-      var vet = _vetCardFootHtml(it, i);
+      /* The BUTTONS, not the wrapper: `_vetFootBtns` is the one place they are
+         built, and both callers add their own row round them. Re-parsing one
+         function's HTML in another was a silent trap — a drifted class order
+         and the whole wrapper nests inside this row again, restoring the
+         double-margin ragged foot this replaced. */
+      var vet = _vetFootBtns(it, i);
       var chip = mbCardChipHtml(it);
       if (!vet && !chip) return '';
-      return '<div class="ansSend noPrint">' + _ansFootInner(vet) + chip + '</div>';
+      return '<div class="ansSend noPrint">' + vet + chip + '</div>';
     })() +
   '</div>';
 }
@@ -7354,7 +7381,7 @@ function mbRowHtml(m) {
          right edge of their container — and it was the one that deleted a
          question, immediately, while its labelled twin in the foot asked
          first. One glyph per meaning: ✕ closes a window, 🗑 deletes. */
-      '<button class="btn btnGhost mbDrop1" title="Remove this question" ' +
+      '<button class="btn btnGhost" title="Remove this question" ' +
         'onclick="mbRemoveRow(\'' + m.id + '\')">🗑</button>' +
     '</div>' +
   '</div>';
@@ -8719,7 +8746,7 @@ async function _vetAutoFile() {
 /* The button on the card, because a question is worth keeping one at a time:
    this one is a good question, the next one is the model reading a smudge.
    📥 Send all in the header is the same door for a paper worth keeping whole. */
-function _vetCardFootHtml(it, i) {
+function _vetFootBtns(it, i) {
   /* Not for a student, and not while a run is in flight — the same two gates
      the ✎ carries, and for the ✎'s second reason as well as its first: the
      answers are still arriving, and this card could be folded into the one
@@ -8734,10 +8761,14 @@ function _vetCardFootHtml(it, i) {
      protection that matters: a misread subject is caught by the eye on the
      card rather than found later in the wrong app's vetting list. */
   var t = itemTarget(it);
-  return '<div class="ansSend noPrint">' +
-    '<button class="btn btnScan" type="button" onclick="vetOpen(' + i + ')">📥 Send to ' +
-    escHtml(t ? t.short + ' vetting' : 'vetting') + '</button>' +
-    chips + '</div>';
+  return '<button class="btn btnScan" type="button" onclick="vetOpen(' + i + ')">📥 Send to ' +
+    escHtml(t ? t.short + ' vetting' : 'vetting') + '</button>' + chips;
+}
+/* …and the row round them, for the one caller that draws them on their own.
+   The answer card puts these in a row it shares with the 📕/📗 chips. */
+function _vetCardFootHtml(it, i) {
+  var btns = _vetFootBtns(it, i);
+  return btns ? '<div class="ansSend noPrint">' + btns + '</div>' : '';
 }
 /* Shown only to the admin, and only once there is something to send. */
 function renderVetAllBtn() {

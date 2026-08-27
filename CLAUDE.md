@@ -944,7 +944,7 @@ Google screen, a hop back, and a page still signed out with nothing on it to say
   as before.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
-## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.5)
+## 📱 It is a phone app, and the phone is not the narrow case (v1.28.1, hardened through v1.28.6)
 
 `tools/mobile-check.mjs` (run it), plus `.ansActions`, `.headTools`, `.brandFull`/`.brandShort`,
 `header { flex-wrap: wrap }`, and the `@media` blocks at 620px, 400px, 900px and — the one this
@@ -1044,6 +1044,24 @@ section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
   about the one check it is filed under. Each mutant lists its full expected red set in `also`, and
   anything more or fewer is a failure — which catches an over-broad mutant and a check that has
   quietly stopped noticing, in one assertion.
+- **THE HEADER AND THE TABS ARE ONE STICKY BOX** (`.topBar`), and that is the whole point: two
+  separately-sticky boxes need the second to know the first's height, and **the header's height is
+  not a constant — it WRAPS**. Giving the tabs `top: 68px` fixed exactly the widths where the header
+  happens to be one row and left the tab bar *unreachable behind it* — `elementFromPoint` returning
+  `.headTools` — at 621px, at 768px and at 320px, where the header is 101 or 171px. It shipped that
+  way twice. Nothing is written down now, so nothing can drift; and `html, body` is `min-height`,
+  not `height`, because `height: 100%` fixes body at one viewport and a sticky box cannot travel
+  outside its containing block — the header left the screen for good after one screenful.
+- **THE ASK BOX HOLDS ITS OWN PLACEHOLDER.** `rows="1"` with no floor is 46px whatever the
+  placeholder needs, and `askGrow()` sizes from `scrollHeight`, which ignores placeholder text
+  entirely — so below 375px the invitation wrapped to two lines inside a one-line box and was cut
+  through its x-height, on the home screen, above the shutter. **Shortening the string fixed the one
+  width it was measured at**; the box is what has to give.
+- **EVERY OTHER CHECK MEASURES AT SCROLL 0**, and a `fullPage` screenshot resizes the viewport to the
+  document height — so nothing is ever scrolled in it and a sticky overlap is *guaranteed* invisible
+  in the picture the docs tell you to look at. That is how the tab bar shipped broken twice with
+  seven clean viewports. The tab-bar check scrolls and HIT-TESTS the tab, and a second screenshot
+  per viewport is taken scrolled at the real size.
 - **`tools/mobile-check.mjs` MEASURES THE REAL PAGE** — the Snap tab with a paper on it, signed in,
   and every window opened in turn with real rows in it: the cards come from the real
   `answerCardHtml`, the 📕 book's rows from the real `mbRowHtml` and `mbTabsHtml`, and

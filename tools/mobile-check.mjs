@@ -38,6 +38,10 @@
        the whole How tab ARE seeded, from the real renderers.
      • iOS itself. `dvh`, momentum scrolling and the real shrink-to-fit are
        Safari behaviours a headless Chromium only approximates.
+     • SCROLL STATE, mostly. Only the tab-bar and dock checks scroll; a defect
+       that appears halfway down a page is otherwise invisible here — which is
+       exactly how a sticky offset that was right at one width shipped twice.
+       A second screenshot per viewport is taken scrolled, so the eye can.
 
    No network: every <script> is stripped and the logo is swapped for the
    inline SVG the header already falls back to, so this runs offline and the
@@ -93,8 +97,14 @@ function toast(){}
 function renderReport(){} function renderStepAllBtn(){} function renderVetAllBtn(){}
 function renderGroundingLine(){} function renderEngineLine(){} function renderAskedLine(){} function renderTally(){}
 function reportAsText(){return '';}
-/* The real chip's own markup — it is a BUTTON, and it was 19px tall. */
-function mbCardChipHtml(){return '<button class="mbBookChip" onclick="void 0">📕 Keep this mistake</button>';}
+function mbAvailable(){return true;}
+var _mbRunNews = {};
+function mbKeyOf(it){return String((it && it.question) || '').slice(0, 60).toLowerCase();}
+function mbFindByKey(){return null;}          // nothing filed yet: the commonest state
+function mbIsRight(){return false;}
+function vetTarget(k){return { key: k, short: 'Maths' };}
+function _vetSentTargets(){return ['math'];}  // so the sent chip is drawn and measured
+function itemTarget(){return { key: 'math', short: 'Maths' };}
 var _mistakes = [], _mbSel = {}, _mbTab = 'mistake';
 var MB_LIST_MISTAKE = 'mistake', MB_LIST_LEARNING = 'learning', MB_CLEAR_WINS = 2;
 function mbListOf(m){return m && m.list === MB_LIST_LEARNING ? MB_LIST_LEARNING : MB_LIST_MISTAKE;}
@@ -120,6 +130,12 @@ const api = new Function(prelude +
      of the file like everything else so the window is measured with something
      in it. */
   cut('function mbRowHtml(m) {', '/* Switching tabs CLEARS the ticks.') +
+  /* THE ANSWER CARD'S OWN FOOT, from the real renderers. Stubbed, it drew ONE
+     chip; the real one draws TWO in the commonest student state — 📕 Add and
+     📗 Add on a blank or correct question — which is exactly the `.off.learn`
+     colour this pass changed, and `.sentChip` was never measured at all. */
+  cut('function mbCardChipHtml(it) {', 'function mbCardItemFor(key) {') +
+  cut('function _vetFootBtns(it, i) {', '/* …and the row round them') +
   /* THE REPORT CARD, which is where the worst unbroken-token overflow was: it
      prints a raw thrown AI error verbatim, and a Gemini 429 — the routine one,
      the reason a backup engine exists at all — laid the document out at 456px
@@ -130,8 +146,7 @@ const api = new Function(prelude +
   cut('/* ================= Teaching notes & AI style training', '/* ================= Uploading notes') +
   cut('/* =====================================================================\n   THE SCAN', '/* ---- Showing the answers ----') +
   cut('/* ---- Showing the answers ----', '/* =====================================================================\n   📋 THE REPORT') +
-  `\n  var _vetCardFootHtml = function () { return '<div class="ansSend noPrint"><button class="btn btnScan">📥 Send to Maths vetting</button></div>'; };
-  return { answerCardHtml: answerCardHtml, mbRowHtml: mbRowHtml, mbTabsHtml: mbTabsHtml,
+  `\n  return { answerCardHtml: answerCardHtml, mbRowHtml: mbRowHtml, mbTabsHtml: mbTabsHtml,
            reportCardHtml: reportCardHtml, setReport: function (v) { _report = v; },
            setAnswers: function (v) { _answers = v; }, setMeta: function (v) { wsMeta = v; },
            setBook: function (v) { _mistakes = v; } };`
@@ -193,8 +208,12 @@ const bookBody = api.mbTabsHtml() +
 /* THE REPORT, IN THE STATE THAT BREAKS IT: a failed run printing the error it
    was given, verbatim. The 429 below is the real one — the spending cap that
    made the backup engine necessary — and it is one unbroken url. */
+/* `reportScoreText` reads `credit`, not `got` — the fixture said `got`, so the
+   report card printed "NaN / 3 of the questions attempted" on every one of the
+   seven screenshots the docs tell a reader to look at. A harness that draws a
+   wrong number teaches a reviewer to book it against the app. */
 const SCORE = { marked: 3, judged: 3, correct: 1, partial: 1, wrong: 1, blank: 0,
-                got: 1.5, total: 3, pct: 50, byMarks: false };
+                credit: 1.5, total: 3, pct: 50, byMarks: false };
 api.setReport({
   status: 'failed', score: SCORE,
   err: '[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/' +
@@ -294,6 +313,7 @@ fs.writeFileSync(file, page);
 const VIEWPORTS = [
   { name: 'iphone-15-pro',   width: 393, height: 852 },
   { name: 'iphone-se',       width: 375, height: 667 },
+  { name: 'android-360',     width: 360, height: 800 },
   { name: 'galaxy-fold',     width: 320, height: 800 },
   { name: 'breakpoint-edge', width: 621, height: 800 },
   { name: 'iphone-landscape', width: 852, height: 393 },
@@ -602,7 +622,43 @@ async function measure(url, vp) {
      '✎ is ' + layout.editW + 'px wide and its label is ' +
      (layout.labelHidden ? 'hidden' : 'shown'));
 
-  /* ⑤ The dock never covers the last card. */
+  /* ⑤ THE TAB BAR SURVIVES A SCROLL — and every other check measures at scroll
+     0, which is how a sticky offset that was right at one width shipped twice.
+     The header WRAPS, so its height is not a constant; hit-testing the tab is
+     the only thing that does not have to know it. */
+  const tabs = await p.evaluate(() => {
+    const bar = document.getElementById('tabBar');
+    if (!bar || bar.classList.contains('hidden')) return null;
+    window.scrollTo(0, 1400);
+    const r = bar.getBoundingClientRect();
+    const tab = bar.querySelector('.tab');
+    const t = tab.getBoundingClientRect();
+    const hit = document.elementFromPoint(t.left + t.width / 2, t.top + t.height / 2);
+    const out = {
+      onScreen: r.top >= -1 && r.bottom <= window.innerHeight + 1 && r.height > 0,
+      reaches: !!(hit && hit.closest && hit.closest('.tab')),
+      top: Math.round(r.top),
+      hit: hit ? (hit.id ? '#' + hit.id : hit.tagName + '.' + String(hit.className || '').split(/\s+/)[0]) : 'nothing'
+    };
+    window.scrollTo(0, 0);
+    return out;
+  });
+  if (tabs) ok('the tab bar is still there, and still pressable, once scrolled',
+     tabs.onScreen && tabs.reaches,
+     'the tab sits at ' + tabs.top + 'px and the press lands on ' + tabs.hit);
+
+  /* ⑥ A CONTROL SHOWS ITS OWN LABEL. The tool measures boxes, so clipping is
+     mostly invisible to it — but the one place it has already bitten twice is
+     the ask box, whose `rows="1"` height ignores the placeholder entirely. */
+  const ask = await p.evaluate(() => {
+    const t = document.getElementById('askText');
+    if (!t) return null;
+    return { need: t.scrollHeight, has: t.clientHeight };
+  });
+  if (ask) ok('the ask box shows its whole placeholder',
+     ask.need <= ask.has + 1, 'it needs ' + ask.need + 'px and has ' + ask.has + 'px');
+
+  /* ⑦ The dock never covers the last card. */
   const covered = await p.evaluate(() => {
     const dock = document.querySelector('.camDock');
     const list = document.getElementById('answersList');
@@ -739,6 +795,17 @@ const MUTANTS = [
   { check: 'no window lays itself out wider than the screen',
     why: 'a How tab card too wide for the screen',
     css: '#howPage .card { min-width: 900px !important; }' },
+  /* The sticky offset written as a constant — right at one width, and the tab
+     bar unreachable behind a wrapped header everywhere else. */
+  { check: 'the tab bar is still there, and still pressable, once scrolled',
+    why: 'the tabs given the header\'s height as a number again',
+    css: '.topBar { position: static !important; } ' +
+         'header { position: sticky !important; top: 0 !important; z-index: 60 !important; } ' +
+         '.tabs { position: sticky !important; top: 68px !important; z-index: 55 !important; }' },
+  /* The ask box back to a one-line height that ignores its own placeholder. */
+  { check: 'the ask box shows its whole placeholder',
+    why: 'the ask box back to one line on a screen whose placeholder needs two',
+    css: '.askRow textarea { min-height: 0 !important; height: 46px !important; }' },
   /* THE MISPLACED BRACE, as a rule that leaks past the breakpoint. Every
      other check passes on this page: the layout is valid, just the wrong one. */
   { check: 'the phone layout stops at the breakpoint',
@@ -767,7 +834,13 @@ if (process.argv.includes('--selftest')) {
      breakpoint, so they are given a viewport that is above it. */
   const TABLET = { name: 'selftest-tablet', width: 768, height: 1024 };
   const ABOVE = ['the phone layout stops at the breakpoint',
-                 '✎ Edit is a square with no word in it, or a pill with one'];
+                 '✎ Edit is a square with no word in it, or a pill with one',
+                 /* the header only WRAPS above the breakpoint, which is the
+                    whole reason a written-down offset looked right below it */
+                 'the tab bar is still there, and still pressable, once scrolled'];
+  /* …and the ask box only overflows its line BELOW 375px. */
+  const NARROW = ['the ask box shows its whole placeholder'];
+  const SMALL = { name: 'selftest-small', width: 360, height: 800 };
   console.log('SELF-TEST — each check is given a page broken in the way it names.\n');
   let bad = 0;
   for (const m of MUTANTS) {
@@ -781,7 +854,8 @@ if (process.argv.includes('--selftest')) {
     if (m.seed) mutated = mutated.replace('400 and 441', m.seed);
     const f = path.join(OUT, 'mutant.html');
     fs.writeFileSync(f, mutated);
-    const r = await measure('file://' + f, ABOVE.indexOf(m.check) >= 0 ? TABLET : PHONE);
+    const r = await measure('file://' + f,
+      ABOVE.indexOf(m.check) >= 0 ? TABLET : NARROW.indexOf(m.check) >= 0 ? SMALL : PHONE);
     await r.ctx.close();
     const hit = r.results.filter((x) => x.name === m.check)[0];
     if (!hit) { console.log('  ✗ ' + m.check + ' — check never ran'); bad++; continue; }
@@ -860,6 +934,12 @@ for (const vp of VIEWPORTS) {
      not what the device gets. A short viewport is photographed as it is. */
   const tall = vp.height >= 500;
   await r.page.screenshot({ path: path.join(OUT, vp.name + '.png'), fullPage: tall });
+  /* …and one SCROLLED, at the real viewport size. `fullPage` resizes the
+     viewport to the document height, so nothing is ever scrolled in it and no
+     sticky overlap can ever appear — the defect class above is guaranteed
+     invisible in the picture the docs tell you to look at. */
+  await r.page.evaluate(() => window.scrollTo(0, 1400));
+  await r.page.screenshot({ path: path.join(OUT, vp.name + '-scrolled.png'), fullPage: false });
   await r.ctx.close();
 }
 await browser.close();

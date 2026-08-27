@@ -18,6 +18,32 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📱 The tab bar, for real this time (v1.28.6)
+
+The previous round said the tab bar was fixed. It was fixed at one width.
+
+The header **wraps** — that is its documented last line of defence when the
+toolbar will not fit — so giving the tabs the header's height as a number
+(68px) was right on a phone and wrong everywhere else. On an iPad in portrait,
+at 621px, and on a 320px fold, the header is 101 or 171px tall and the tab bar
+sat *underneath* it: not merely hidden but unclickable. The header and the tabs
+are now one sticky box, so neither has to know the other's size and there is no
+number left to drift.
+
+Two more of the same shape:
+
+- **The ask box still clipped its placeholder below 375px.** Shortening the
+  text fixed the width it was measured at; the box had no minimum height at
+  all, and it sizes itself from typed content, which a placeholder is not.
+- **Every check the phone tool has ran at scroll 0**, and a full-page
+  screenshot resizes the viewport to the document height — so a sticky overlap
+  could never appear in any picture it wrote. It now scrolls, hit-tests the
+  tab, and writes a second screenshot per viewport from partway down the page.
+
+Also: the report card in the tool's own screenshots had been printing
+"NaN / 3 of the questions attempted" — a fixture bug, but it meant the tool had
+never once shown the number a parent reads.
+
 ## 📱 The sticky header, the delete button, and a tool that was measuring a page the app never shows (v1.28.5)
 
 A fifth review round, and most of what it found was in the *checking*, not the app:

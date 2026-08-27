@@ -1794,7 +1794,16 @@ ok('a run still being read cannot be sent', /if \(_scanning\) \{ toast\(/.test(h
 /* The same two gates the ✎ carries. A card can still be folded into the one
    before it a second later, and half a question is worse than none. */
 ok('the button is not drawn on a card while the run is still arriving',
-   /function _vetCardFootHtml[\s\S]{0,520}if \(_scanning \|\| !isAdmin\(currentUser\)\) return '';/.test(html));
+   /function _vetFootBtns[\s\S]{0,520}if \(_scanning \|\| !isAdmin\(currentUser\)\) return '';/.test(html));
+/* The BUTTONS and the ROW round them are separate, because the answer card
+   puts them in a row it shares with the 📕/📗 chips. One function regexing the
+   other's HTML back apart was the version before this, and a drifted class
+   order would have silently re-nested the whole wrapper — restoring the
+   double-margin ragged foot it was written to remove. */
+ok('…and the row round them is the caller\'s, not baked into them',
+   /function _vetCardFootHtml\(it, i\) \{\n  var btns = _vetFootBtns\(it, i\);/.test(html) &&
+   /var vet = _vetFootBtns\(it, i\);/.test(html) &&
+   !/_ansFootInner/.test(html));
 
 /* ---------- NO ALGEBRA ----------
    This centre teaches the methods the PSLE is marked on. An answer that
@@ -3549,6 +3558,28 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
     return out;
   })();
   const headBlock = mediaBlocks['(max-width: 620px), (max-height: 500px) and (pointer: coarse)'] || '';
+  const headSmall = mediaBlocks['(max-width: 400px)'] || '';
+  /* THE HEADER AND THE TABS ARE ONE STICKY BOX. Two separately-sticky boxes
+     need the second to know the first's height, and the header WRAPS — so any
+     number written down is right at one width and leaves the tab bar
+     unreachable behind the header everywhere else, which is what shipped
+     twice. Nothing to write down, nothing to drift. */
+  ok('the header and the tabs stick as one box',
+     /<div class="topBar">/.test(html) &&
+     /\.topBar \{ position: sticky; top: 0; z-index: 60; \}/.test(html));
+  ok('…so neither is given the other\'s height as a constant',
+     !/\.tabs \{[^}]*top:\s*\d+px/.test(html) &&
+     !/\n  header \{[^}]*position: sticky/.test(html));
+  /* `height: 100%` fixes body at one viewport, and a sticky box cannot travel
+     outside its containing block — the header left the screen for good after
+     about one screenful of a twenty-question paper. */
+  ok('…and the page can grow past one screenful',
+     /html, body \{ min-height: 100%; \}/.test(html));
+  /* The ask box holds its own placeholder: `rows="1"` with no floor is 46px
+     whatever the placeholder needs, and `askGrow()` sizes from `scrollHeight`,
+     which ignores placeholder text entirely. */
+  ok('the ask box has a floor that fits its own invitation',
+     /\.askRow textarea \{ min-height: 72px; \}/.test(headSmall));
   /* WHICH BLOCK A RULE LIVES IN IS THE THING THAT SHIPPED BROKEN, and no
      regex over the whole file can see it: a misplaced brace moved thirty
      phone-only declarations up into a 900px block and every pin still matched,
@@ -3599,7 +3630,7 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
     const mustPass = (mc.match(/^\s*\{ why: /gm) || []).length;
     ok('the phone check mutation-tests itself',
        /if \(process\.argv\.includes\('--selftest'\)\) \{/.test(mc) &&
-       /const MUTANTS = \[/.test(mc) && mutants >= 9,
+       /const MUTANTS = \[/.test(mc) && mutants >= 12,
        mutants + ' mutants');
     /* …in both directions: a check that fires on correct code is how a tool
        stops being read, so at least one page must be required to stay GREEN. */
