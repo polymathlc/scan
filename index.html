@@ -139,7 +139,7 @@
   main { max-width: 900px; margin: 0 auto; padding: 24px 20px 28px; }
   /* Only the Snap tab sits under the dock, so only the Snap tab pays for it —
      the How tab would otherwise end in a screenful of nothing. */
-  #scanPage { padding-bottom: calc(260px + env(safe-area-inset-bottom, 0px)); }
+  #scanPage { padding-bottom: calc(316px + env(safe-area-inset-bottom, 0px)); }
   .card {
     background: var(--bg); border: 1px solid var(--line);
     border-radius: var(--radius); box-shadow: var(--shadow-card);
@@ -218,6 +218,21 @@
     background: var(--bg); border-top: 1px solid var(--line);
     box-shadow: 0 -2px 16px rgba(0,0,0,0.06);
   }
+  /* The mode row: what ✓ will DO. Two pills, and the one on the left is what
+     this app has always done — leaving it alone is a correct answer rather
+     than an unfinished one. It is a row of its OWN for the same reason the
+     ask row is: the camera bar below it carries exactly three controls. */
+  .modeRow { display: flex; gap: 8px; padding: 10px 20px 0; }
+  .modePill {
+    flex: 1; min-width: 0; min-height: 44px;
+    font-family: var(--font); font-size: 0.86rem; font-weight: 700;
+    color: var(--ink-faint); background: var(--bg-soft);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px;
+    cursor: pointer; overflow-wrap: anywhere;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .modePill.on { background: var(--accent); border-color: var(--accent-strong); color: var(--ink); }
+  .modePill:disabled { opacity: .45; cursor: default; }
   .askRow { display: flex; align-items: flex-end; gap: 10px; padding: 12px 20px 0; }
   .askRow textarea {
     flex: 1; min-width: 0; resize: none; font-family: var(--font);
@@ -597,6 +612,53 @@
   .repNote { font-size: 0.8rem; color: var(--ink-faint); margin-top: 14px; line-height: 1.6; }
   .repPending { font-size: 0.9rem; color: var(--ink-soft); margin-top: 20px; }
   .repFail { font-size: 0.88rem; color: #8C2E1D; margin-top: 20px; line-height: 1.7; }
+
+  /* ---------- 📄 The worksheet ----------
+     A sheet of paper, not a stack of answer cards: one white page, the
+     questions numbered down it and room under each one to write. It is the
+     thing that comes out of the printer, so it is laid out for the printer
+     and the screen shows exactly what will print. */
+  .sheet {
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 32px 34px 38px; margin-bottom: 20px;
+  }
+  .sheetHead { border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 8px; }
+  .sheetTitle { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .sheetMeta { font-size: 0.82rem; color: var(--ink-faint); margin-top: 6px; overflow-wrap: anywhere; }
+  .sheetName { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 18px; font-size: 0.86rem; color: var(--ink-soft); }
+  .sheetName span { flex: 1; min-width: 140px; border-bottom: 1px solid var(--ink-faint); padding-bottom: 3px; }
+  .sheetQs { list-style: none; margin: 0; padding: 0; }
+  .sheetQ { display: flex; gap: 14px; padding: 24px 0 6px; border-bottom: 1px solid var(--line); }
+  .sheetQ:last-child { border-bottom: none; }
+  .sheetNo {
+    flex: none; width: 30px; height: 30px; display: grid; place-items: center;
+    border-radius: 50%; background: var(--accent); font-size: 0.84rem; font-weight: 700;
+  }
+  .sheetBody { flex: 1; min-width: 0; }
+  .sheetQTop { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .sheetQText { flex: 1; min-width: 0; font-size: 0.97rem; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sheetAlloc { flex: none; font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); }
+  .sheetNewChip {
+    font-size: 0.7rem; font-weight: 700; color: #6B2FA0;
+    background: #F3E8FF; border: 1px solid #C9A6E8; border-radius: 999px; padding: 3px 10px;
+  }
+  .sheetOpts { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .sheetOpts li { font-size: 0.92rem; color: var(--ink-soft); line-height: 1.6; overflow-wrap: anywhere; }
+  .sheetLines { margin-top: 14px; display: flex; flex-direction: column; gap: 22px; }
+  .sheetRule { border-bottom: 1px solid #D8D8D4; height: 0; }
+  .sheetFrom { font-size: 0.72rem; color: var(--ink-faint); overflow-wrap: anywhere; }
+  .sheetMetaRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  /* The key is a page of its own: a worksheet handed out with the answers
+     printed under the questions is not a worksheet. */
+  .sheetKey { border-color: #CFE7D0; }
+  .sheetKey .sheetHead { border-bottom-color: #2C6B30; }
+  .sheetKeyQ { padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .sheetKeyQ:last-child { border-bottom: none; }
+  .sheetKeyNo { font-size: 0.8rem; font-weight: 700; color: #2C6B30; }
+  .sheetKeyA { font-size: 0.95rem; font-weight: 600; margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sheetKeyWhy { font-size: 0.86rem; color: var(--ink-soft); margin-top: 8px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sheetTitleRow { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+  .sheetTitleRow label { font-size: 0.76rem; font-weight: 700; color: var(--ink-faint); }
 
   .empty {
     color: var(--ink-faint); text-align: center; padding: 40px 18px;
@@ -984,7 +1046,7 @@
        when a student types a long question — 245px in all on a 320px screen,
        against clearance that was 192px. The last card was covered by what the
        student had just typed. */
-    #scanPage { padding-bottom: calc(252px + env(safe-area-inset-bottom, 0px)); }
+    #scanPage { padding-bottom: calc(308px + env(safe-area-inset-bottom, 0px)); }
     .camBar { padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); }
     .askRow { padding: 10px 14px 0; }
     .card { padding: 20px 18px; }
@@ -1140,6 +1202,12 @@
     .ansHidden { display: block !important; }
     .whyBox.hidWhy { display: block !important; }
     .reportCard { break-inside: avoid; box-shadow: none; border-color: #ccc; }
+    /* 📄 The worksheet IS the printout: no card chrome round it, one question
+       kept whole on one page, and the answer key on a page of its own — a key
+       printed under the questions is a worksheet nobody can hand out. */
+    .sheet { box-shadow: none; border: none; padding: 0; margin: 0; }
+    .sheetQ { break-inside: avoid; }
+    .sheetKey { break-before: page; page-break-before: always; padding-top: 8px; }
   }
 </style>
 </head>
@@ -1202,6 +1270,9 @@
       <b>marked</b> and given feedback; anything still blank is answered. Then the whole paper comes back with a
       <b>report</b> — the score, what went well, what the mistakes have in common and what to practise next.
       A question that runs over onto the next page is fine: add both pictures and they are read as one paper.</p>
+    <p class="sub" style="margin-top:10px">Or switch to <b>📄 Worksheet</b> and the same photographs come back as a fresh
+      worksheet instead — every question typed out clean, nobody's handwriting on it, room to write and the answer key
+      on its own page, ready to print.</p>
     <div class="rowBtns"><button class="btn btnPrimary btnBig" id="signInBtn2">Sign in with Google</button></div>
   </section>
 
@@ -1220,7 +1291,7 @@
 
     <div id="snapEmpty" class="snapEmpty">
       <div class="padIcon">📷</div>
-      <div class="padTitle">Photograph the page — or just ask</div>
+      <div class="padTitle" id="padTitle">Photograph the page — or just ask</div>
       <div class="padSub" id="padSub">One photo per page, then press ✓.<br>Or tap 🖼 to send a PDF — every page of it is read.<br>Or type your question below and press ✓ with no photo at all.</div>
     </div>
 
@@ -1250,9 +1321,17 @@
                  all of them — for a teacher checking a script, and for the
                  student who has finished working through it. -->
             <button class="btn hidden" id="stepAllBtn" title="Show every step of the working on every card">👣 Show all working</button>
+            <!-- 📄 Worksheet runs only: the key is on the page or it is not,
+                 and what is on the screen is exactly what prints. -->
+            <button class="btn hidden" id="sheetKeyBtn" title="Show or hide the answer key">🔑 Answer key</button>
             <button class="btn" id="copyAnswersBtn">📋 Copy</button>
             <button class="btn" id="printAnswersBtn">🖨 Print</button>
           </div>
+        </div>
+        <!-- The worksheet's own name, printed at the top of it. -->
+        <div class="sheetTitleRow hidden" id="sheetTitleRow">
+          <label for="sheetTitle">What this worksheet is called</label>
+          <input type="text" id="sheetTitle" maxlength="120" placeholder="e.g. P5 Science — Heat and Temperature">
         </div>
         <p class="sub" id="askedLine" style="margin-top:10px;display:none"></p>
         <div class="tallyRow" id="markTally"></div>
@@ -1379,6 +1458,32 @@
         up for a second go. <b>Copy</b> and <b>Print</b> always carry every step, whatever is on the screen at the
         time. Set <i>How much explanation</i> to <i>Answer only</i> on the Settings card below and there are no
         steps at all.</p>
+
+      <h3 style="margin-top:22px">📄 Or turn the paper into a worksheet</h3>
+      <p class="sub" style="margin-top:6px">The two pills above the box say what ✓ is for. Leave them alone and the app
+        does what it always has. Press <b>📄 Worksheet</b> and the very same photographs are read for their
+        <b>questions</b> instead: every question on them is typed out clean and the whole scan comes back as
+        <b>one worksheet</b> — numbered from 1, with the marks the paper printed, room under each question to write,
+        and the answer key on a page of its own. Press 🖨 and it comes out of the printer.</p>
+      <ul class="howList" style="margin-top:12px">
+        <li><b>Nothing anybody wrote on the paper comes across.</b> A worked-through paper goes back to being the
+          blank one it started as — no handwriting, no ticks, no filled-in blanks. That is the point of the mode,
+          and it is what makes the sheet safe to hand out.</li>
+        <li><b>Ask for questions the paper does not have.</b> “Another five like question 3”, “same topic but
+          harder”, “change the numbers” — they are written for you and go on the sheet after the ones off the
+          paper. Anything the app wrote itself wears a purple <b>✎ written for you</b> note on screen, so you know
+          what to read first. It never prints on the pupil's copy.</li>
+        <li><b>Or a worksheet with no paper at all.</b> Press ✓ in worksheet mode with just the box filled in —
+          “10 P5 fraction word problems” — and the whole sheet is written from scratch.</li>
+        <li><b>The key is on the page or it is not.</b> <b>🔑 Answer key</b> takes it off for the pupils' copy and
+          puts it back for yours. What you see is exactly what prints, and <b>📋 Copy</b> follows it too.</li>
+      </ul>
+      <p class="sub" style="margin-top:10px">A diagram cannot come off a photograph onto a printed sheet, so a question
+        that needs one says <b>[Diagram: …]</b> where it belongs and the page tells you how many there are to draw
+        back in. The answer key is always worked out from the printed question, never from the pencil on the page,
+        and no mark allocation is invented — only the ones the paper really prints.</p>
+      <p class="sub" style="margin-top:10px">Nothing is marked in this mode, so nothing goes into a mistake book and no
+        report is written: there is no attempt to report on. Your 📕 book and 📗 list are untouched.</p>
 
       <h3 style="margin-top:22px">Four subjects, and every card says which</h3>
       <p class="sub" style="margin-top:6px">Science, Mathematics, English and Chinese. A Chinese paper is answered and marked
@@ -1535,6 +1640,13 @@
      The ask row is a row of its OWN — the camera bar below it still carries
      exactly three controls, which is the whole point of that bar. -->
 <div class="camDock hidden" id="camDock">
+  <!-- What ✓ will do, and the only decision on this screen. The left pill is
+       what the app has always done and is where it starts, so a teacher who
+       never touches this row loses nothing. -->
+  <div class="modeRow" id="modeBar">
+    <button class="modePill on" id="modeAnswer" type="button" data-mode="answer" title="Mark what is written and answer what is blank">✅ Answer &amp; mark</button>
+    <button class="modePill" id="modeSheet" type="button" data-mode="sheet" title="Turn these pages into a worksheet to print">📄 Worksheet</button>
+  </div>
   <div class="askRow" id="askBar">
     <textarea id="askText" rows="1" maxlength="1200"
       placeholder="Ask a question, or say what to do…"></textarea>
@@ -1819,7 +1931,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.28.7';
+var APP_VERSION = 'v1.29.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2808,6 +2920,32 @@ var _scanning = false;
 var _scanRun = 0;                // bumped on every run, so a stale reply is dropped
 var _askedFor = '';              // what the last run was asked, shown above its answers
 
+/* ---- What ✓ will do ----
+   TWO modes and no more. 'answer' is everything this app has ever done: mark
+   what is written, answer what is blank, report on the paper, keep the
+   mistakes. 'sheet' reads the very same pages for their QUESTIONS instead,
+   and the whole run comes back as ONE worksheet — a clean paper to print and
+   hand out, with the answer key on a page of its own.
+
+   IT IS A MODE RATHER THAN A SETTING because it is the only decision that
+   changes what a press of ✓ is FOR, and the honest answer differs from paper
+   to paper: last year's exam is worth answering on Monday and worth
+   reprinting blank on Friday. It starts on 'answer', so a teacher who never
+   touches the row loses nothing.
+
+   `scanMode()` is the ONE reader. The mode is read at the moment ✓ is pressed
+   and carried through the run as an argument, so a thumb on the other pill
+   while a paper is being read cannot turn half a run into the other thing. */
+var SCAN_MODES = { answer: 1, sheet: 1 };
+var _mode = 'answer';
+function scanMode() { return SCAN_MODES[_mode] ? _mode : 'answer'; }
+/* What the answers ON SCREEN were made as — the run's own mode, kept because
+   the pills can be moved while the last run's cards are still up. */
+var _ranAs = 'answer';
+function answersAreWorksheet() { return _ranAs === 'sheet'; }
+var _sheetTitle = '';            // what the worksheet is called, printed at its top
+var _sheetKeyOn = true;          // is the answer key on the page (and so on the printout)
+
 /* ---- What the student typed or said ----
    A photograph is not the only way to ask. The box in the dock takes a
    question or an instruction, and it is read at the moment ✓ is pressed —
@@ -3043,6 +3181,124 @@ var SCAN_ASK_SYS =
   SCAN_STEPS_RULE +
   'If what they sent is not something you can act on — a greeting, or a few stray words — say so in one entry, ' +
   'kindly, and say what to send instead. Never turn a school question away for having no picture with it. ' +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+/* =====================================================================
+   📄 WORKSHEET MODE — the whole scan becomes ONE worksheet
+   ---------------------------------------------------------------------
+   The same photographs, read for a different thing. In 'answer' mode the
+   pages are read for their ANSWERS; here they are read for their QUESTIONS,
+   and the whole run — every page, every question, in order — comes back as
+   one worksheet a teacher can print and hand out, with the answer key on a
+   page of its own.
+
+   THE PUPIL'S HANDWRITING IS LEFT OFF, and that is the whole mode. The paper
+   being photographed is usually one somebody has already worked through, and
+   what is wanted back is the blank paper it started as. A filled-in blank
+   comes back EMPTY, and a circled option comes back as an ordinary option.
+   It is also what makes the mode safe to print: no named child's work on a
+   sheet thirty other children are about to sit.
+
+   THE KEY IS STILL WORKED OUT FROM SCRATCH, from the printed question alone —
+   the same rule the marking lives by, and for the same reason: an answer key
+   that copied the pencil on the page hands a wrong answer to the whole class.
+
+   NOTHING IS MARKED HERE, so nothing goes in a mistake book and no report is
+   written: there is no attempt to report on. The one thing this mode does
+   write is a question sent to a vetting list, exactly as the answer mode
+   does, and only on the teacher's own press.
+   ===================================================================== */
+var SHEET_STRIP_RULE =
+  'WHAT IS WRITTEN ON THE PAPER IS NOT PART OF THE QUESTION. These photographs are usually of a paper somebody ' +
+  'has already worked through. Everything in pen or pencil — answers, working, ticks, circles, crossings-out, a ' +
+  'teacher\'s red marking — is left OFF the worksheet entirely. A blank that has been filled in by hand comes ' +
+  'back as an EMPTY blank; a circled or ticked option comes back as an ordinary option; handwriting in an answer ' +
+  'space is not wording and is never copied into "question". Only what is PRINTED is the question. ';
+
+var SHEET_SYS =
+  'You are an experienced Singapore tuition teacher (P3 to Secondary 1) making a fresh worksheet out of the ' +
+  'photographs of a Science, Mathematics, English or Chinese paper that are attached. You are NOT marking and ' +
+  'NOT answering on the paper: you are typing its questions out cleanly so they can be printed and given to a ' +
+  'class, and writing the answer key that goes with them. Reply with STRICT JSON only, no markdown, exactly ' +
+  'this shape: {"questions":[{"continuation":false,"number":"16","page":1,"origin":"page","type":"mcq",' +
+  '"question":"the printed wording","options":[{"label":"1","text":"…"}],"option":"2",' +
+  '"answer":"(2) the option\'s wording","explanation":"why this is the answer",' +
+  '"subject":"science | math | english | chinese","allocation":"2","lines":0}]}. ' +
+  'Rules: one entry for every question actually PRINTED on the attached pictures, in the order they appear, ' +
+  'keeping the paper\'s own numbering in "number" ("16", "3a") — the worksheet is renumbered from 1 afterwards, ' +
+  'so "number" is only how it was printed. ONE ENTRY PER LETTERED PART: a question printed as 8(a) and 8(b) is ' +
+  'TWO entries, because they are answered separately. EVERY question comes across — multiple choice, fill in ' +
+  'the blank, true or false, matching, a table or diagram to complete, and open-ended parts alike. Never skip a ' +
+  'question because it is multiple choice or because someone has written on it. Count the questions printed on ' +
+  'the pictures before you reply and check your list has that many entries. Never invent a question that is not ' +
+  'there: a cover page, an instructions page or a blank page returns {"questions":[]}, and so does a page that ' +
+  'is an ANSWER KEY or a marking scheme — a list of answers is not a list of questions. ' +
+  '"page" is which of the attached pictures the question is printed on, 1 for the first attached picture. ' +
+  '"question" is the wording EXACTLY as it should appear on the new worksheet: the printed words, without the ' +
+  'number itself, complete and able to stand on their own, with every number, name, unit and quotation kept as ' +
+  'printed. A lettered part that depends on a shared stem carries enough of that stem to be answerable on its ' +
+  'own. Where the question cannot be understood without a diagram, graph, table or picture, end the wording ' +
+  'with a bracket beginning "[Diagram:" and say in one line what has to be drawn there — the picture itself ' +
+  'does NOT travel onto the new sheet and the teacher has to put it back. ' +
+  SHEET_STRIP_RULE +
+  'For a multiple-choice question, "type" is "mcq", "options" lists every printed option as ' +
+  '[{"label":"1","text":"…"}] using the labels the paper prints, "option" is the correct option\'s number or ' +
+  'letter and "answer" is that option\'s own wording. For every other question "type" is "open", "options" is ' +
+  'empty and "option" is empty. ' +
+  'THE ANSWER KEY: work every question out YOURSELF, from the printed question alone, before you write a word ' +
+  'of "answer" — anything pencilled on the photograph is not evidence of anything and is often wrong, which is ' +
+  'usually why the paper is being scanned. "answer" is the correct answer as a marker needs it, and ' +
+  '"explanation" is why. ' +
+  SCAN_SUBJECT_FIELD_RULE +
+  '"allocation" is the marks the paper prints for that question ("2") and an EMPTY STRING when it prints none — ' +
+  'never invent a mark allocation. "lines" is how many ruled lines to leave for the pupil to write on: 0 for a ' +
+  'multiple-choice question or one answered in a printed blank, 1 for a one-word or one-number answer, 2 to 4 ' +
+  'for a sentence or some working, up to 10 for a long answer. ' +
+  '"origin" is "page" for a question printed on the pictures. ' +
+  'Plain text only in every field: no markdown, no bullets, no line breaks.';
+
+/* ---- Asking for questions the paper does not have ----
+   "Another five like question 3", "same topic but harder", "change the
+   numbers". This is the half of the mode that CREATES questions rather than
+   lifting them, and a worksheet is only honest if it says which is which:
+   anything written here comes back `origin:"new"` and wears a chip on the
+   card, because a question the app made up is one the teacher has to read
+   before thirty children sit it. */
+var SHEET_NEW_RULE =
+  'IF THEY ASKED FOR QUESTIONS THE PAPER DOES NOT HAVE — more of them, harder ones, the same question with ' +
+  'different numbers, extra practice on one topic — WRITE THOSE TOO, in the same shape, with "origin":"new", ' +
+  '"number" empty and "page" set to 0. Write them at the standard of the paper you are looking at and in its ' +
+  'style, with a full answer key of your own. Put them AFTER the questions taken off the pages unless they said ' +
+  'otherwise. Never quietly replace a printed question with one of your own, and never mark a question you ' +
+  'invented as "page". If they asked only for particular questions off the paper ("only the word problems", ' +
+  '"just page 2"), take those and leave the rest out entirely. If what they said is only background ("P5 ' +
+  'science", "for Friday"), take it as context and carry every printed question across as usual.\n';
+
+/* A worksheet with no paper behind it at all: ✓ pressed in worksheet mode
+   with nothing photographed and an instruction in the box, so every question
+   on it is one this app wrote. */
+var SHEET_ASK_SYS =
+  'You are an experienced Singapore tuition teacher (P3 to Secondary 1) writing a worksheet from scratch for a ' +
+  'teacher or student who has typed or spoken what they want. NOTHING was photographed — there is only what ' +
+  'they asked. Reply with STRICT JSON only, no markdown, exactly this shape: {"questions":[{"origin":"new",' +
+  '"number":"","page":0,"type":"open","question":"the question as it will be printed","options":[],"option":"",' +
+  '"answer":"the correct answer","explanation":"why","subject":"science | math | english | chinese",' +
+  '"allocation":"","lines":3}]}. ' +
+  'Rules: ONE ENTRY PER QUESTION, in the order they should be printed, as many as they asked for — and 8 to 10 ' +
+  'when they did not say. Every question is one you have written yourself, so "origin" is "new" on all of them, ' +
+  '"number" is empty and "page" is 0. Write them at the level and for the subject they named, in the style of a ' +
+  'Singapore school paper, and give every one of them a correct answer key. Vary them: do not print the same ' +
+  'question ten times with different numbers unless that is what they asked for. ' +
+  'For a multiple-choice question "type" is "mcq" and "options" lists the printed options as ' +
+  '[{"label":"1","text":"…"}] with "option" naming the correct label; otherwise "type" is "open" and both are ' +
+  'empty. "allocation" is a mark allocation only if they asked for one, otherwise an empty string. "lines" is ' +
+  'how many ruled lines to leave for the answer — 0 for multiple choice, 1 for a one-word answer, 2 to 4 for a ' +
+  'sentence or working, up to 10 for a long answer. Where a question needs a diagram, end its wording with a ' +
+  'bracket beginning "[Diagram:" saying what has to be drawn there. ' +
+  SCAN_SUBJECT_FIELD_RULE +
+  'If what they sent is not something you can make a worksheet from, return ONE entry saying so kindly in ' +
+  '"question" and what to ask for instead, with "answer" empty. ' +
+  'Write in the language they asked in: a Chinese worksheet is written in Chinese. ' +
   'Plain text only in every field: no markdown, no bullets, no line breaks.';
 
 /* ---- What each subject is worth marks for ----
@@ -3601,6 +3857,30 @@ function renderShots() {
 /* The three buttons, and the only status the snap screen has room for: how
    many pages are in hand (the badge), what the last one looks like (the
    gallery button's own face) and whether ✓ can be pressed yet. */
+/* What the snap screen says when there is nothing on it yet. It is the only
+   place the two modes are explained where the thumb already is, so it changes
+   with the mode — and it is painted by `renderCamBar`, the one painter,
+   rather than written once at load and left behind by the pills. */
+var _coarsePointer = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+var SNAP_EMPTY = {
+  answer: {
+    title: 'Photograph the page — or just ask',
+    sub: 'One photo per page, then press ✓.<br>Or tap 🖼 to send a PDF — every page of it is read.' +
+         '<br>Or type your question below and press ✓ with no photo at all.',
+    subWide: 'One photo per page, then press ✓ — or tap 🖼 to send a PDF, or type your question below and press ✓ ' +
+             'with no photo at all.<br>You can also drag pictures in, or paste one with Ctrl&nbsp;+&nbsp;V.'
+  },
+  sheet: {
+    title: 'Photograph the paper — it becomes a worksheet',
+    sub: 'One photo per page, then press ✓. Every question on them is typed out as a fresh worksheet to print, ' +
+         'with the answer key on its own page.<br>Ask for more questions in the box, or ask for a whole worksheet ' +
+         'with no photo at all.',
+    subWide: 'One photo per page, then press ✓. Every question on them is typed out as a fresh worksheet to print, ' +
+             'with the answer key on its own page.<br>Ask for more questions in the box — “another 5 like question 3” — ' +
+             'or for a whole worksheet with no photo at all.'
+  }
+};
+
 function renderCamBar() {
   var ready = _shots.filter(function (s) { return s.data; });
   var badge = $('shotBadge');
@@ -3626,16 +3906,52 @@ function renderCamBar() {
   // both. A ✓ that stayed flat while a question sat in the box would be the
   // app refusing to answer something it can perfectly well answer.
   var ask = askText();
+  var mode = scanMode();
+  var sheet = mode === 'sheet';
   var done = $('readBtn');
   done.disabled = busy || (!ready.length && !ask);
   done.innerHTML = busy ? '<span class="camSpin"></span>' : '✓';
-  done.title = _scanning ? 'Working…' : (_pdfBusy ? 'Opening the PDF…' : (ready.length ? 'Read and answer' : 'Answer what you asked'));
+  done.title = _scanning ? 'Working…' : (_pdfBusy ? 'Opening the PDF…'
+    : sheet ? (ready.length ? 'Make a worksheet from these pages' : 'Write the worksheet you asked for')
+    : (ready.length ? 'Read and answer' : 'Answer what you asked'));
+
+  // The pills. Locked while a run is going, like everything else on this bar:
+  // the mode a run started in is the mode it finishes in.
+  ['answer', 'sheet'].forEach(function (m) {
+    var b = $(m === 'sheet' ? 'modeSheet' : 'modeAnswer');
+    if (!b) return;
+    b.classList.toggle('on', mode === m);
+    b.setAttribute('aria-pressed', mode === m ? 'true' : 'false');
+    b.disabled = busy;
+  });
 
   var box = $('askText');
-  if (box) box.disabled = _scanning;
+  if (box) {
+    box.disabled = _scanning;
+    box.placeholder = sheet ? 'Say what this worksheet should be…' : 'Ask a question, or say what to do…';
+  }
   renderMic();
 
+  var empty = SNAP_EMPTY[mode] || SNAP_EMPTY.answer;
+  if ($('padTitle')) $('padTitle').textContent = empty.title;
+  if ($('padSub')) $('padSub').innerHTML = _coarsePointer ? empty.sub : empty.subWide;
   $('snapEmpty').classList.toggle('hidden', _shots.length > 0);
+}
+
+/* The pills, and the ONE place the mode changes. Nothing already on screen is
+   touched: the answers or the worksheet from the last run stay exactly as they
+   are until ✓ is pressed again — what the pills say is what the NEXT run will
+   be. */
+function setMode(m) {
+  if (_scanning || _pdfBusy) return;
+  var next = SCAN_MODES[m] ? m : 'answer';
+  if (next === _mode) return;
+  _mode = next;
+  savePrefs();
+  renderCamBar();
+  toast(next === 'sheet'
+    ? '📄 Worksheet mode — the pages become a worksheet to print, not answers.'
+    : '✅ Answer & mark — what is written is marked, what is blank is answered.', 4000);
 }
 
 /* ---- Dictation ----
@@ -3756,6 +4072,50 @@ function _scanPrompt(n, from, total, carry, ask) {
     'Every other entry has "continuation": false.\n' +
     SCAN_DETAIL_RULE[detail] + '\n' +
     'Count the questions on these pages, then check your reply has that many entries before you send it.';
+}
+
+/* The same pages, read for their QUESTIONS. Everything structural is the
+   scan's — the batches, the page numbers, the carry line that stitches a
+   question across a batch boundary — because it is the same paper read the
+   same way; only what is asked for at the end of it differs. There is no key
+   block here: a worksheet marks nothing, so the paper's own answer key is
+   not consulted, and a key page comes back holding no questions, which is
+   exactly what it holds. */
+function _sheetPrompt(n, from, total, carry, ask) {
+  var detail = scanDetail();
+  var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
+  var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
+  var who = (lvl || subj) ? 'It is a ' + [lvl, subj].filter(Boolean).join(' ') + ' paper.' : '';
+  ask = _scanStr(ask, ASK_MAX_CHARS);
+  return (ask ? 'THIS IS WHAT THE TEACHER ASKED FOR, word for word — read it FIRST:\n"' + ask + '"\n' +
+                SHEET_NEW_RULE : '') +
+    'The attached ' + (n === 1 ? 'picture is page ' + from : n + ' pictures are pages ' + from + '–' + (from + n - 1)) +
+      ' of ' + total + ' of a Singapore worksheet or exam paper, in order. ' + who + '\n' +
+    SCAN_READING_NOTE +
+    scanSubjectRule() +
+    'Type out EVERY question printed on these pages as it should appear on a fresh worksheet — the printed ' +
+    'words only, with nothing anybody has written on the paper by hand — and work out the answer key for each ' +
+    'one yourself.\n' +
+    (carry ? 'The page before these ended part-way through this question: "' + carry + '". If these pages carry it on, ' +
+             'the FIRST entry you return must have "continuation": true and hold only the rest of its wording, ' +
+             'and the answer to the WHOLE question now that you can see all of it.\n' : '') +
+    'Every other entry has "continuation": false.\n' +
+    SCAN_DETAIL_RULE[detail] + '\n' +
+    'Count the questions on these pages, then check your reply has that many entries before you send it.';
+}
+
+/* A worksheet asked for with nothing photographed: every question on it is
+   one this app wrote, and the cards say so. */
+function _sheetAskPrompt(ask, detail) {
+  var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
+  var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
+  var who = (lvl || subj) ? 'It is for ' + [lvl, subj].filter(Boolean).join(' ') + '.\n' : '';
+  return 'THIS IS THE WORKSHEET THEY ASKED FOR, word for word — make exactly this:\n"' +
+      _scanStr(ask, ASK_MAX_CHARS) + '"\n' +
+    who +
+    scanSubjectRule() +
+    (SCAN_DETAIL_RULE[detail] || SCAN_DETAIL_RULE.normal) + '\n' +
+    'Nothing was photographed, so there is no paper to lift questions from: write the whole worksheet yourself.';
 }
 
 /* =====================================================================
@@ -4292,6 +4652,135 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
   return madeOn;
 }
 
+/* ---- One question on a worksheet ----
+   The same reading of the same paper, kept for what will be PRINTED rather
+   than for what was written on it. Three things make it a worksheet entry
+   rather than an answer entry:
+
+   • It is NEVER marked. The marking fields go through `_markFields`, the one
+     door, with an EMPTY row — so a model that volunteers a "studentAnswer" it
+     was never asked for cannot put a child's pencil back onto a paper thirty
+     other children are about to sit. It is also what keeps the mistake book
+     out of a worksheet run: `mbFileRun` files nothing that was not marked.
+   • It knows whether it was LIFTED or WRITTEN. `origin` is 'page' for a
+     question printed on the photographs and 'new' for one this app wrote
+     because the teacher asked for more. The card says which, because a
+     question nobody has read yet is not the same thing as one off a real
+     paper — and the vetting door stamps the difference too.
+   • It carries the room to answer it: the mark allocation the paper printed
+     (never one invented) and how many ruled lines to leave.
+
+   It carries no `qbox` and no `box`. Those rectangles exist to crop a
+   photograph for the mistake book, and nothing here is filed there — a
+   worksheet is the printed words, not a picture of somebody's page. */
+var SHEET_LINES_MAX = 10;
+function _sheetLines(r, type) {
+  var n = parseInt(r && r.lines, 10);
+  if (!(n >= 0)) n = type === 'mcq' ? 0 : 2;
+  return Math.min(SHEET_LINES_MAX, Math.max(0, n));
+}
+function _sheetNewItem(r, batchStart, batchLen) {
+  if (!r || typeof r !== 'object') return null;
+  var question = _scanStr(r.question, 1400);
+  // A worksheet entry with no wording is nothing to print, whatever answer
+  // came with it.
+  if (!question) return null;
+  var type = String(r.type || '').toLowerCase() === 'mcq' ? 'mcq' : 'open';
+  var options = Array.isArray(r.options)
+    ? r.options.map(function (o) {
+        return { label: _scanStr(o && o.label, 4), text: _scanStr(o && o.text, 240) };
+      }).filter(function (o) { return o.label || o.text; })
+    : [];
+  // Nothing was photographed, or the model says it wrote this one: either way
+  // it is not a question off a page and it must not claim a page number.
+  var origin = (!batchLen || String(r.origin || '').toLowerCase() === 'new') ? 'new' : 'page';
+  var page = 0;
+  if (origin === 'page') {
+    page = parseInt(r.page, 10);
+    if (!(page >= 1 && page <= batchLen)) page = 1;
+    page = batchStart + page;
+  }
+  // The one door, with an EMPTY row: whatever the model volunteered about a
+  // student is never even read.
+  var mk = _markFields({});
+  return {
+    kind: 'sheet',
+    origin: origin,
+    subject: _scanSubject(r),
+    qbox: null,
+    box: null,
+    number: origin === 'new' ? '' : _scanStr(r.number, 16),
+    page: page,
+    endPage: page,
+    type: type,
+    question: question,
+    options: options,
+    option: _scanStr(r.option, 8),
+    answer: _scanStr(r.answer, 900),
+    explanation: _scanStr(r.explanation, 2400),
+    allocation: _scanStr(r.allocation, 16),
+    lines: _sheetLines(r, type),
+    // A worksheet's key is a key, not a walk-through: the steps are what the
+    // answer cards hand over one at a time, and there is no card here to
+    // press. The fields exist so everything downstream reads one shape.
+    steps: [],
+    stepsShown: 0,
+    marked: mk.marked,
+    wrote: mk.wrote,
+    studentAnswer: mk.studentAnswer,
+    verdict: mk.verdict,
+    marks: mk.marks,
+    feedback: mk.feedback,
+    answerSource: '',
+    keyNote: ''
+  };
+}
+/* The worksheet's own fold. The continuation is honoured exactly as the
+   scan's is — a question that runs over a batch boundary is ONE question on
+   the printed sheet, or the class is handed half a question. */
+function _sheetFoldRows(rows, batchStart, batchLen, into) {
+  var madeOn = {};
+  (rows || []).forEach(function (r, i) {
+    var it = _sheetNewItem(r, batchStart, batchLen);
+    if (!it) return;
+    var prev = into[into.length - 1];
+    if (i === 0 && r && r.continuation === true && prev) {
+      prev.question = (prev.question + ' ' + it.question).trim();
+      if (it.page) prev.endPage = it.page;
+      if (it.options.length && !prev.options.length) prev.options = it.options;
+      if (it.option && !prev.option) prev.option = it.option;
+      if (it.answer) prev.answer = it.answer;
+      if (it.explanation) prev.explanation = it.explanation;
+      if (it.allocation && !prev.allocation) prev.allocation = it.allocation;
+      if (it.lines > prev.lines) prev.lines = it.lines;
+      if (it.subject && !prev.subject) prev.subject = it.subject;
+      if (it.type === 'mcq') prev.type = 'mcq';
+      return;
+    }
+    into.push(it);
+    if (it.page) madeOn[it.page] = (madeOn[it.page] || 0) + 1;
+  });
+  return madeOn;
+}
+
+/* ---- The one door each call goes through ----
+   Every AI call in this app appends `aiGrounding(kind)`, and these are the
+   two places the run makes one. A worksheet WRITES answers and marks nothing,
+   so it is grounded as an 'answer'; the ordinary run answers the blanks AND
+   marks what is written, so it is grounded as a 'scan'. Choosing the kind
+   here rather than at the call site is what stops one mode being grounded and
+   the other quietly not — and neither failure shows on the screen. */
+function _scanSystem(mode) {
+  return mode === 'sheet'
+    ? SHEET_SYS + aiGrounding('answer')
+    : SCAN_SYS + aiGrounding('scan');
+}
+function _askSystem(mode) {
+  return mode === 'sheet'
+    ? SHEET_ASK_SYS + aiGrounding('answer')
+    : SCAN_ASK_SYS + aiGrounding('scan');
+}
+
 /* =====================================================================
    REWRITING AN ANSWER THAT USED ALGEBRA — and the budget that bounds it
    ---------------------------------------------------------------------
@@ -4380,8 +4869,10 @@ async function _algebraPass(run, all, done, total) {
     try {
       var raw = await window.askGemini(_algebraPrompt(bad), {
         // Grounded like every other call in this app — the rewrite is still
-        // the teacher's answer, in the teacher's own words.
-        system: SCAN_ALGEBRA_SYS + aiGrounding('scan'),
+        // the teacher's answer, in the teacher's own words — and by the same
+        // KIND the run itself is: a worksheet's key is written and never
+        // marked, so it is not handed the marking standard here either.
+        system: SCAN_ALGEBRA_SYS + aiGrounding(answersAreWorksheet() ? 'answer' : 'scan'),
         maxOutputTokens: 12000,
         effort: 'high',
         thinkingLevel: 'high',
@@ -4579,7 +5070,7 @@ async function _markFixPass(run, batch, batchStart, all, done, total) {
    Unchanged by the ask except that the ask goes in the prompt: it may narrow
    the run to one question, or add nothing but context, and either way the
    pages are still read as ONE run with the continuation stitching them. */
-async function _runPages(run, shots, ask, detail, failedPages) {
+async function _runPages(run, shots, ask, detail, failedPages, mode) {
   var total = shots.length;
   var carry = '';
   for (var start = 0; start < total; start += SCAN_BATCH) {
@@ -4594,12 +5085,13 @@ async function _runPages(run, shots, ask, detail, failedPages) {
     var rows;
     try {
       var raw = await window.askGemini(
-        _scanPrompt(batch.length, start + 1, total, carry, ask),
+        (mode === 'sheet' ? _sheetPrompt : _scanPrompt)(batch.length, start + 1, total, carry, ask),
         {
-          // 'scan' is the kind that answers the blanks AND marks what is
-          // already written, so the digest carries the key facts the answers
-          // need and the marking standard the marks are held to.
-          system: SCAN_SYS + aiGrounding('scan'),
+          // The one door: 'scan' answers the blanks AND marks what is already
+          // written, so its digest carries the key facts the answers need and
+          // the marking standard the marks are held to; a worksheet marks
+          // nothing, so it is grounded as an 'answer'. See `_scanSystem`.
+          system: _scanSystem(mode),
           // The budget has to cover the thinking as well as the answers: a
           // page of multiple-choice questions is 15-20 entries, not the 4
           // or 5 an open-ended page comes to.
@@ -4627,13 +5119,17 @@ async function _runPages(run, shots, ask, detail, failedPages) {
     }
     if (run !== _scanRun) return;
 
-    var madeOn = _scanFoldRows(rows, start, batch.length, _answers);
+    var madeOn = (mode === 'sheet' ? _sheetFoldRows : _scanFoldRows)(rows, start, batch.length, _answers);
     // A question the model says was WRITTEN ON and still came back with
     // nothing transcribed is read again, while the run's ration lasts — it
     // would otherwise be a question that is never marked, never reported and
-    // never kept in the mistake book, on a card that looks finished.
-    await _markFixPass(run, batch, start, _answers, Math.min(start + batch.length, total), total);
-    if (run !== _scanRun) return;
+    // never kept in the mistake book, on a card that looks finished. A
+    // worksheet marks nothing, so there is nothing for it to repair: the
+    // repair call is a marking call and a worksheet run must not pay for one.
+    if (mode !== 'sheet') {
+      await _markFixPass(run, batch, start, _answers, Math.min(start + batch.length, total), total);
+      if (run !== _scanRun) return;
+    }
     // Then anything that reached its answer by algebra is rewritten — after
     // the repair, so feedback the repair has just written goes through it too.
     await _algebraPass(run, _answers, Math.min(start + batch.length, total), total);
@@ -4659,11 +5155,12 @@ async function _runPages(run, shots, ask, detail, failedPages) {
    marking, Copy, Print — is the scan's, so this path adds a prompt and a
    parse and nothing else. Returns the error to report, or '' when it went
    through. */
-async function _runAskAlone(run, ask, detail) {
-  scanProgress(0, 1, '✨ Thinking about what you asked…');
+async function _runAskAlone(run, ask, detail, mode) {
+  var sheet = mode === 'sheet';
+  scanProgress(0, 1, sheet ? '✨ Writing the worksheet…' : '✨ Thinking about what you asked…');
   try {
-    var raw = await window.askGemini(_askPrompt(ask, detail), {
-      system: SCAN_ASK_SYS + aiGrounding('scan'),
+    var raw = await window.askGemini((sheet ? _sheetAskPrompt : _askPrompt)(ask, detail), {
+      system: _askSystem(mode),
       maxOutputTokens: detail === 'full' ? 32000 : 20000,
       effort: 'xhigh',
       thinkingLevel: 'high',
@@ -4676,7 +5173,10 @@ async function _runAskAlone(run, ask, detail) {
       ? parsed
       : ((parsed && Array.isArray(parsed.answers)) ? parsed.answers
          : ((parsed && Array.isArray(parsed.questions)) ? parsed.questions : []));
-    _askFoldRows(rows, _answers);
+    // No pages behind it, so `batchLen` is 0 — which is what tells the fold
+    // that every question on this worksheet was written rather than lifted.
+    if (sheet) _sheetFoldRows(rows, 0, 0, _answers);
+    else _askFoldRows(rows, _answers);
     await _algebraPass(run, _answers, 1, 1);
     if (run !== _scanRun) return '';
     scanProgress(1, 1, '');
@@ -4684,7 +5184,7 @@ async function _runAskAlone(run, ask, detail) {
     return '';
   } catch (err) {
     console.warn('ask: failed', err);
-    return (err && err.message) || 'that could not be answered';
+    return (err && err.message) || (sheet ? 'that worksheet could not be written' : 'that could not be answered');
   }
 }
 
@@ -4692,10 +5192,16 @@ async function runScan() {
   if (_scanning) return;
   var shots = _shots.filter(function (s) { return s.data; });
   var ask = askText();
+  // Read ONCE, at the press, and carried through the whole run: a thumb on
+  // the other pill while a paper is being read must not turn half of it into
+  // the other thing.
+  var mode = scanMode();
   // Either half is enough on its own: a photographed page with nothing said
   // about it, or a question with no page behind it at all.
   if (!shots.length && !ask) {
-    toast('Take a photo of the page, or type what you would like to ask.', 5000);
+    toast(mode === 'sheet'
+      ? 'Photograph the paper you want a worksheet from, or say what the worksheet should be about.'
+      : 'Take a photo of the page, or type what you would like to ask.', 5000);
     return;
   }
   if (!window.askGemini || !window.aiReady || !window.aiReady()) {
@@ -4717,6 +5223,10 @@ async function runScan() {
   _answers = [];
   _report = null;                 // last paper's report must never outlive its paper
   _askedFor = ask;
+  _ranAs = mode;
+  // A fresh run is a fresh worksheet: it takes the name this level and
+  // subject give it, and the teacher renames it afterwards if they want to.
+  if (mode === 'sheet') { _sheetTitle = sheetDefaultTitle(); _sheetKeyOn = true; }
   var detail = scanDetail();
   var failedPages = [];
   var askErr = '';
@@ -4731,7 +5241,7 @@ async function runScan() {
        1 has never seen the marking scheme on page 11. It never throws — a
        key that could not be read is a run without one, which is every run
        this app did before this existed. */
-    if (shots.length) {
+    if (shots.length && mode !== 'sheet') {
       _scanKey = await _scanKeyPass(run, shots);
       if (run !== _scanRun) return;
       if (_scanKey) {
@@ -4747,8 +5257,8 @@ async function runScan() {
           (_scanKey.rows.length === 1 ? '' : 's') + '. Marking against it.', 5000);
       }
     }
-    if (shots.length) await _runPages(run, shots, ask, detail, failedPages);
-    else askErr = await _runAskAlone(run, ask, detail);
+    if (shots.length) await _runPages(run, shots, ask, detail, failedPages, mode);
+    else askErr = await _runAskAlone(run, ask, detail, mode);
   } finally {
     if (run === _scanRun) {
       _scanning = false;
@@ -4763,14 +5273,22 @@ async function runScan() {
   // came back without a number is numbered by where it sits on the paper. An
   // answer to a typed question was never numbered on a page, so it is left
   // alone — a "1." in front of a reply is a page number it never had.
-  _answers.forEach(function (it, i) { if (!it.number && it.kind !== 'ask') it.number = String(i + 1); });
+  // …and a worksheet is renumbered from 1 as it is printed, so a question the
+  // app wrote keeps no number of the paper's.
+  _answers.forEach(function (it, i) { if (!it.number && it.kind === 'page') it.number = String(i + 1); });
   renderAnswers();
 
   if (!_answers.length) {
-    toast(askErr ? 'That could not be answered: ' + askErr
+    toast(askErr ? (mode === 'sheet' ? 'That worksheet could not be made: ' : 'That could not be answered: ') + askErr
       : !shots.length ? 'Nothing came back — try saying it another way.'
       : failedPages.length ? 'None of those pages could be read — try a sharper, straighter photo in better light.'
       : 'No questions were found on those pictures.', 6000);
+  } else if (mode === 'sheet') {
+    var made = sheetWrittenCount();
+    toast('📄 Worksheet made — ' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') +
+      (made ? ', ' + made + ' written for you' : '') +
+      (failedPages.length ? '. Page ' + failedPages.join(', ') + ' could not be read' : '') +
+      '. Check it, then print it.', 6500);
   } else if (!shots.length) {
     toast('✅ Answered.', 4000);
   } else {
@@ -5379,30 +5897,53 @@ function renderTally() {
 
 function renderAnswers() {
   var list = $('answersList');
+  var sheet = answersAreWorksheet();
+  var noPages = !_shots.filter(function (s) { return s.data; }).length;
   if (!_answers.length) {
-    var noPages = !_shots.filter(function (s) { return s.data; }).length;
-    list.innerHTML = _scanning
-      ? '<div class="empty">' + (noPages ? 'Working on what you asked…' : 'Reading the pages — the answers appear here as they come back.') + '</div>'
-      : '<div class="empty">' + (noPages ? 'Nothing came back — try saying it another way.' : 'No questions were found on those pictures.') + '</div>';
+    list.innerHTML = '<div class="empty">' + (
+      _scanning
+        ? (sheet
+            ? (noPages ? 'Writing the worksheet…' : 'Reading the pages — the worksheet builds as they come back.')
+            : (noPages ? 'Working on what you asked…' : 'Reading the pages — the answers appear here as they come back.'))
+        : (noPages ? 'Nothing came back — try saying it another way.' : 'No questions were found on those pictures.')
+    ) + '</div>';
   } else {
-    list.innerHTML = _answers.map(answerCardHtml).join('');
+    list.innerHTML = sheet ? worksheetHtml() : _answers.map(answerCardHtml).join('');
   }
   var tally = markTally();
   var asked = answersAreAllAsk();
   $('answersTitle').textContent = !_answers.length
-    ? 'Answers'
+    ? (sheet ? 'The worksheet' : 'Answers')
+    : sheet ? 'The worksheet (' + _answers.length + ' question' + (_answers.length === 1 ? '' : 's') + ')'
     : asked ? (_answers.length === 1 ? 'Your answer' : 'Your answer (' + _answers.length + ' parts)')
     : tally.marked ? 'Marked & answered (' + _answers.length + ')'
     : 'Answers (' + _answers.length + ')';
   renderAskedLine();
   renderTally();
+  renderSheetControls();
   var ground = groundingSummary();
   var did = tally.marked ? 'Marked and answered' : 'Written';
-  $('answersNote').textContent = ground.length
-    ? did + ' against your own ' + ground.join(', ') + '.'
-    : 'No teaching notes are being applied — this is the ordinary syllabus standard.';
+  // A worksheet has to say the two things a printed copy cannot: that nobody's
+  // handwriting came across onto it, and which of it the app wrote itself.
+  if (sheet) {
+    var made = sheetWrittenCount();
+    var draw = sheetNeedsDrawing();
+    $('answersNote').textContent = [
+      (ground.length ? 'Written against your own ' + ground.join(', ') + '.'
+                     : 'No teaching notes are being applied — this is the ordinary syllabus standard.'),
+      'Nothing anybody had written on the paper is on this worksheet.',
+      made ? made + ' question' + (made === 1 ? ' was' : 's were') + ' written by the app rather than taken off the paper — read ' +
+             (made === 1 ? 'it' : 'them') + ' before you print.' : '',
+      draw ? draw + ' question' + (draw === 1 ? '' : 's') + ' needs a diagram drawn back in — a photograph cannot carry one across.' : ''
+    ].filter(Boolean).join(' ');
+  } else {
+    $('answersNote').textContent = ground.length
+      ? did + ' against your own ' + ground.join(', ') + '.'
+      : 'No teaching notes are being applied — this is the ordinary syllabus standard.';
+  }
   $('copyAnswersBtn').disabled = !_answers.length;
   $('printAnswersBtn').disabled = !_answers.length;
+  $('printAnswersBtn').textContent = sheet ? '🖨 Print worksheet' : '🖨 Print';
   renderReport();
   renderStepAllBtn();
   renderVetAllBtn();
@@ -5639,6 +6180,9 @@ function aiSetPrefer() {
 }
 
 function answersAsText() {
+  // A worksheet copies out as a worksheet: the questions with room under
+  // them, and the key after them only when the key is on the page.
+  if (answersAreWorksheet()) return worksheetAsText();
   var head = [];
   var lvl = wsMeta.level ? levelLabel(wsMeta.level) : '';
   var subj = wsMeta.subject ? subjectLabel(wsMeta.subject) : '';
@@ -5711,6 +6255,175 @@ function _copyFallback(text) {
   try { document.execCommand('copy'); toast('Copied.'); }
   catch (e) { toast('Could not copy — select the text and copy it by hand.', 5000); }
   document.body.removeChild(ta);
+}
+
+/* =====================================================================
+   📄 THE WORKSHEET ON THE PAGE
+   ---------------------------------------------------------------------
+   One sheet of paper, not a stack of answer cards: the questions numbered
+   from 1 down a single page with room under each to write, and the answer
+   key on a page of its own after it. What is on the screen is exactly what
+   comes out of the printer — the key is either on the sheet or it is not,
+   and the button that decides says which.
+
+   THE QUESTIONS ARE RENUMBERED FROM 1. It is a new worksheet: it may hold
+   nine questions off a paper that numbered them 12 to 20, and three more
+   written to go with them. Where each one came from is said UNDER it and
+   never printed — a pupil's copy has no business saying which questions the
+   app wrote, and a teacher's screen has every business saying it.
+   ===================================================================== */
+function sheetDefaultTitle() {
+  var who = [wsMeta.level ? levelLabel(wsMeta.level) : '', wsMeta.subject ? subjectLabel(wsMeta.subject) : '']
+    .filter(Boolean).join(' ');
+  return (who ? who + ' — ' : '') + 'Worksheet';
+}
+function sheetTitle() { return String(_sheetTitle || '').trim() || sheetDefaultTitle(); }
+/* Only the marks the PAPER printed are counted. A total added up out of
+   allocations nobody printed is a total the teacher would have to check. */
+function sheetMarksTotal() {
+  var total = 0;
+  _answers.forEach(function (it) {
+    var m = String(it.allocation || '').match(/\d+/);
+    if (m) total += parseInt(m[0], 10);
+  });
+  return total;
+}
+function sheetWrittenCount() {
+  return _answers.filter(function (it) { return it.origin === 'new'; }).length;
+}
+/* A question that needs a picture says so in its own wording, and the picture
+   is the one thing that cannot come off a photograph onto a printed sheet. */
+function sheetNeedsDrawing() {
+  return _answers.filter(function (it) { return /\[Diagram:/i.test(it.question || ''); }).length;
+}
+function sheetLinesHtml(n) {
+  if (!n) return '';
+  var out = '';
+  for (var i = 0; i < n; i++) out += '<div class="sheetRule"></div>';
+  return '<div class="sheetLines">' + out + '</div>';
+}
+/* Where a lifted question came from, said under it on screen. The worksheet
+   says it in its own words rather than reaching for the answer cards' label:
+   this block is read on its own, and "pages 2–3" is the whole of what it
+   needs. */
+function sheetFromLabel(it) {
+  if (!it || !it.page) return '';
+  var where = (it.endPage && it.endPage !== it.page)
+    ? 'pages ' + it.page + '–' + it.endPage
+    : 'page ' + it.page;
+  return 'from ' + where + (it.number ? ', Q' + it.number : '');
+}
+function sheetQuestionHtml(it, i, no) {
+  var opts = (it.options || []).length
+    ? '<ul class="sheetOpts">' + it.options.map(function (o) {
+        return '<li>' + (o.label ? '(' + escHtml(o.label) + ') ' : '') + escHtml(o.text) + '</li>';
+      }).join('') + '</ul>'
+    : '';
+  var from = it.origin === 'new'
+    ? '<span class="sheetNewChip">✎ written for you — read it before you print</span>'
+    : '<span class="sheetFrom">' + escHtml(sheetFromLabel(it)) + '</span>';
+  return '<li class="sheetQ">' +
+    '<span class="sheetNo">' + escHtml(String(no)) + '</span>' +
+    '<div class="sheetBody">' +
+      '<div class="sheetQTop">' +
+        '<div class="sheetQText">' + escHtml(it.question) + '</div>' +
+        (it.allocation ? '<span class="sheetAlloc">[' + escHtml(it.allocation) + ']</span>' : '') +
+      '</div>' +
+      opts +
+      sheetLinesHtml(it.lines) +
+      /* ONE FOOT, NOT TWO — the lesson the answer card already learned. Where
+         a question came from and the teacher's 📥 belong on the same wrapping
+         row; two rows are two top margins and two ragged pills. `_vetFootBtns`
+         is the ONE place those buttons are built, and this row is this
+         caller's own. */
+      '<div class="sheetMetaRow noPrint">' + from + _vetFootBtns(it, i) + '</div>' +
+    '</div>' +
+  '</li>';
+}
+function sheetKeyHtml() {
+  if (!_sheetKeyOn || !_answers.length) return '';
+  return '<div class="sheet sheetKey">' +
+    '<div class="sheetHead">' +
+      '<div class="sheetTitle">Answer key — ' + escHtml(sheetTitle()) + '</div>' +
+      '<div class="sheetMeta">The teacher\'s copy. It prints on a page of its own.</div>' +
+    '</div>' +
+    _answers.map(function (it, i) {
+      var ans = it.answer || (it.option ? '(' + it.option + ')' : '');
+      return '<div class="sheetKeyQ">' +
+        '<div class="sheetKeyNo">' + escHtml(String(i + 1)) + '</div>' +
+        (ans ? '<div class="sheetKeyA">' + escHtml(ans) + '</div>' : '') +
+        (it.explanation ? '<div class="sheetKeyWhy">' + escHtml(it.explanation) + '</div>' : '') +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+function worksheetHtml() {
+  var marks = sheetMarksTotal();
+  var meta = [
+    [wsMeta.level ? levelLabel(wsMeta.level) : '', wsMeta.subject ? subjectLabel(wsMeta.subject) : ''].filter(Boolean).join(' '),
+    _answers.length + ' question' + (_answers.length === 1 ? '' : 's'),
+    marks ? marks + ' marks' : ''
+  ].filter(Boolean).join('  ·  ');
+  return '<div class="sheet">' +
+    '<div class="sheetHead">' +
+      '<div class="sheetTitle">' + escHtml(sheetTitle()) + '</div>' +
+      (meta ? '<div class="sheetMeta">' + escHtml(meta) + '</div>' : '') +
+      '<div class="sheetName"><span>Name:</span><span>Class:</span><span>Date:</span></div>' +
+    '</div>' +
+    '<ol class="sheetQs">' +
+      _answers.map(function (it, i) { return sheetQuestionHtml(it, i, i + 1); }).join('') +
+    '</ol>' +
+  '</div>' + sheetKeyHtml();
+}
+
+/* The worksheet as plain text, for Copy. The key is included only when it is
+   on the page — Copy hands over what is on the screen, exactly as Print does. */
+function worksheetAsText() {
+  var marks = sheetMarksTotal();
+  var head = [sheetTitle()];
+  head.push([
+    [wsMeta.level ? levelLabel(wsMeta.level) : '', wsMeta.subject ? subjectLabel(wsMeta.subject) : ''].filter(Boolean).join(' '),
+    _answers.length + ' question' + (_answers.length === 1 ? '' : 's'),
+    marks ? marks + ' marks' : '',
+    new Date().toLocaleString('en-SG')
+  ].filter(Boolean).join(' · '));
+  if (_askedFor) head.push('Asked: “' + _askedFor + '”');
+  head.push('Name: ______________________   Class: __________   Date: __________');
+  var body = _answers.map(function (it, i) {
+    var lines = [(i + 1) + '. ' + it.question + (it.allocation ? '  [' + it.allocation + ']' : '')];
+    (it.options || []).forEach(function (o) { lines.push('   (' + o.label + ') ' + o.text); });
+    return lines.join('\n');
+  }).join('\n\n');
+  if (!_sheetKeyOn) return head.join('\n') + '\n\n' + body;
+  return head.join('\n') + '\n\n' + body + '\n\n\nANSWER KEY — ' + sheetTitle() + '\n\n' +
+    _answers.map(function (it, i) {
+      var ans = it.answer || (it.option ? '(' + it.option + ')' : '');
+      var lines = [(i + 1) + '. ' + ans];
+      if (it.explanation) lines.push('   Why: ' + it.explanation);
+      return lines.join('\n');
+    }).join('\n\n');
+}
+
+/* The two controls a worksheet has and an answer key does not: what it is
+   called, and whether the key is on it. Painted from `renderAnswers`, the one
+   place the answers area is painted, so a run that came back as answers
+   cannot leave a worksheet's name box behind it. */
+function renderSheetControls() {
+  var sheet = answersAreWorksheet() && !!_answers.length;
+  var row = $('sheetTitleRow');
+  var box = $('sheetTitle');
+  var key = $('sheetKeyBtn');
+  if (row) row.classList.toggle('hidden', !sheet);
+  // Never while it is being typed in: a repaint would take the teacher's
+  // cursor out of the box.
+  if (box && sheet && document.activeElement !== box) box.value = _sheetTitle || '';
+  if (key) {
+    key.classList.toggle('hidden', !sheet);
+    key.textContent = _sheetKeyOn ? '🔑 Answer key: on' : '🔑 Answer key: off';
+    key.title = _sheetKeyOn
+      ? 'The key is on the page and will print — press to leave it off'
+      : 'The key is off the page and will not print — press to put it back';
+  }
 }
 
 /* =====================================================================
@@ -8384,9 +9097,15 @@ function _vetCorrectIndex(it) {
   return -1;
 }
 /* The three fields every document carries whatever shape it is in. */
-function _vetStamp(d) {
+function _vetStamp(d, it) {
   d.source = VET_SOURCE;
   d.sourceApp = VET_SOURCE_APP;
+  /* `scanOrigin` is the newer field and no portal reads it yet: worksheet
+     mode can WRITE a question the teacher asked for rather than lift one off
+     a photograph, and a written question sitting in a vetting list claiming
+     to have been read off a paper is the one lie this door could tell.
+     `source` — the word all four portals really read — is untouched. */
+  d.scanOrigin = (it && it.origin === 'new') ? 'written' : 'page';
   d.scannedAt = new Date().toISOString();
   return d;
 }
@@ -8431,7 +9150,7 @@ function _vetPortalDoc(it) {
     status: 'pending',
     createdAt: new Date().toISOString(),
     createdBy: VET_SOURCE_APP
-  });
+  }, it);
 }
 
 /* Math Practice files its answer on the QUESTION rather than in a block —
@@ -8457,7 +9176,7 @@ function _vetMathDoc(it) {
     markingGuide: String(it.explanation || '').trim(),
     createdAt: new Date().toISOString(),
     createdBy: VET_SOURCE_APP
-  });
+  }, it);
   var qHtml = _vetHtml(it.question);
   if (qHtml) q.blocks.push({ id: _vetId('b_'), type: 'text', content: qHtml });
   if (mcq) {
@@ -9167,18 +9886,27 @@ var SCAN_PREF_KEY = 'scanPrefs';
     if (p.subject && SUBJECT_OK[p.subject]) $('scanSubject').value = p.subject;
     if (p.detail) $('scanDetail').value = p.detail;
     if (p.autoVet === 'auto') $('scanAutoVet').value = 'auto';
+    // Which of the two the last run was: a teacher working through a pile of
+    // papers should not have to press the pill twenty times.
+    if (p.mode && SCAN_MODES[p.mode]) _mode = p.mode;
   } catch (e) {}
   syncMeta();
 })();
-function syncMeta() {
-  wsMeta.level = $('scanLevel').value || '';
-  wsMeta.subject = $('scanSubject').value || '';
+/* ONE writer for the remembered settings, so the mode cannot be saved in one
+   place and forgotten in the other. */
+function savePrefs() {
   try {
     localStorage.setItem(SCAN_PREF_KEY, JSON.stringify({
       level: wsMeta.level, subject: wsMeta.subject, detail: $('scanDetail').value,
-      autoVet: $('scanAutoVet') ? $('scanAutoVet').value : ''
+      autoVet: $('scanAutoVet') ? $('scanAutoVet').value : '',
+      mode: scanMode()
     }));
   } catch (e) {}
+}
+function syncMeta() {
+  wsMeta.level = $('scanLevel').value || '';
+  wsMeta.subject = $('scanSubject').value || '';
+  savePrefs();
   if (_answers.length) renderAnswers();   // the note under the answers names the notes being applied
   // A 华文 question dictated as English phonetics comes back as nonsense, so
   // a language already being listened for is restarted in the new one.
@@ -9268,6 +9996,23 @@ $('mbRemoveBtn').addEventListener('click', mbRemovePicked);
 $('mbModal').addEventListener('click', function (e) { if (e.target === $('mbModal')) mbClose(); });
 $('reportBtn').addEventListener('click', reportRewrite);
 $('stepAllBtn').addEventListener('click', stepAllCards);
+/* The two pills: what the next press of ✓ is for. */
+$('modeAnswer').addEventListener('click', function () { setMode('answer'); });
+$('modeSheet').addEventListener('click', function () { setMode('sheet'); });
+
+/* The worksheet's name, and whether the key is on it. Both repaint the sheet,
+   because both are printed. */
+$('sheetTitle').addEventListener('input', function () {
+  _sheetTitle = this.value;
+  if (_answers.length && answersAreWorksheet()) renderAnswers();
+});
+$('sheetKeyBtn').addEventListener('click', function () {
+  _sheetKeyOn = !_sheetKeyOn;
+  renderAnswers();
+  toast(_sheetKeyOn ? 'The answer key is on the page — it prints after the worksheet.'
+                    : 'The answer key is off. Only the questions will print.', 4000);
+});
+
 $('copyAnswersBtn').addEventListener('click', copyAnswers);
 $('printAnswersBtn').addEventListener('click', function () { window.print(); });
 
@@ -9304,11 +10049,9 @@ document.addEventListener('paste', function (e) {
   e.preventDefault();
   addShots(files);
 });
-if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) {
-  // A phone has neither of these, which is why the buttons are the headline.
-  $('padSub').innerHTML = 'One photo per page, then press ✓ — or type your question below and press ✓ with no photo at all.' +
-    '<br>You can also drag pictures in, or paste one with Ctrl&nbsp;+&nbsp;V.';
-}
+/* What the empty screen says — drag and paste included, where there is a
+   pointer to drag with — is painted by `renderCamBar` along with everything
+   else on this screen. Two painters would drift the moment the mode changed. */
 
 /* Teaching notes window */
 $('notesBtn').addEventListener('click', openNotesModal);

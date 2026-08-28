@@ -11,7 +11,9 @@ Guidance for Claude when working in this repo.
   is**. **The working is handed over ONE STEP AT A TIME** — press Next step, read the line and the
   reason under it, and the answer is the last step — with one press to open the whole paper; see
   that section below. **A typed or dictated question is the other way in**:
-  with pages it governs the run, with no pages it *is* the run. **When the last page has been read,
+  with pages it governs the run, with no pages it *is* the run. **A second MODE reads those very same
+  pages for their QUESTIONS instead, and the whole scan comes back as one printable worksheet** —
+  see that section below. **When the last page has been read,
   the marked script comes back as a REPORT** — the score, what went well, what the mistakes have in
   common, what to practise next. See that section below. **Every question the student gets WRONG is
   kept, in their own mistake book**, and a worksheet of the ones they choose is emailed to them as a
@@ -1109,6 +1111,69 @@ section argues hardest for — `(pointer: coarse), (any-pointer: coarse)`.
 - `node tools/scan-tests.mjs` carries the structural half — the classes, the wrap, the short name,
   the 44px floors — so the shape cannot quietly come back before anybody runs a browser.
 
+## 📄 Worksheet mode — the whole scan becomes the worksheet (v1.29.0)
+- **The same photographs, read for their QUESTIONS.** `'answer'` mode is everything this app has
+  ever done: mark what is written, answer what is blank, report on the paper, keep the mistakes.
+  `'sheet'` mode types every question off the pages out clean and the whole run comes back as **ONE
+  worksheet** — renumbered from 1, with the marks the paper printed, room under each question to
+  write, and the answer key on a page of its own. Same batching, same page numbers, same
+  `continuation` stitching: only what is asked for at the end of the prompt differs.
+- **`SCAN_MODES` is the ONE table and `scanMode()` the ONE reader.** The mode is read **once, at the
+  press of ✓**, and carried through the run as an argument (`_runPages` / `_runAskAlone` take it). A
+  thumb on the other pill mid-run must not turn half a paper into the other thing. `_ranAs` is what
+  the answers ON SCREEN were made as, which is a different question from what the pills say.
+- **It is a MODE, not a How-tab setting, and that is deliberate.** Everything on the How tab is set
+  once and forgotten; this is the one decision that changes what a press of ✓ is *for*, and it
+  changes from paper to paper — last year's exam is worth answering on Monday and worth reprinting
+  blank on Friday. It sits in the dock as a **row of its own** (`#modeBar`, above `#askBar`), so the
+  camera bar below still carries exactly three controls. It starts on `answer`, so a teacher who
+  never touches the row loses nothing, and it is remembered in `scanPrefs` with the rest.
+- **THE PUPIL'S HANDWRITING DOES NOT COME ACROSS** (`SHEET_STRIP_RULE`). A worked-through paper goes
+  back to being the blank one it started as: a filled-in blank comes back EMPTY, a circled option
+  comes back as an ordinary option, and pencil in an answer space is never wording. That is the
+  point of the mode and it is what makes the sheet safe to print — no named child's work on a paper
+  thirty other children are about to sit. `_sheetNewItem` puts it beyond the prompt's word: the
+  marking fields go through **`_markFields({})`, the one door, with an EMPTY row**, so a
+  `studentAnswer` the model volunteers is never even read. That is also what keeps the book out of
+  it — `mbFileRun` files what was MARKED and only `kind: 'page'`.
+- **NOTHING IS MARKED, so nothing that belongs to marking runs.** No key hunt (`_scanKeyPass` is a
+  marking aid and would spend six calls on a paper nobody is marking), no `_markFixPass`, no report,
+  no mistake book. The algebra rewrite DOES run: the key is an answer, and a P5 key written with
+  "let x be" is the thing that rule exists to stop.
+- **The answer key is still worked out from the printed question alone**, exactly as the marking is,
+  and for the same reason: a key copied off the pencil on the page hands a wrong answer to the whole
+  class.
+- **A question the app WROTE says so.** With pages, an ask can ask for questions the paper does not
+  have (`SHEET_NEW_RULE` — "another five like question 3"); with no pages at all, worksheet mode
+  writes the whole sheet (`SHEET_ASK_SYS`). Those carry `origin: 'new'`, no page number and no
+  question number, and they wear a purple **✎ written for you** note on screen — never on the
+  printout, because a pupil's copy has no business saying which questions the app invented. A
+  question lifted off the paper is `origin: 'page'`. `_sheetFoldRows` forces `'new'` whenever there
+  were no pages behind the run.
+- **It is grounded through the ONE door as an `'answer'`.** A worksheet writes answers and marks
+  nothing, so it gets the key facts and the exemplars and NOT the marking standard; the ordinary run
+  still gets `'scan'`. `_scanSystem(mode)` / `_askSystem(mode)` choose the kind in one place rather
+  than at the call sites — grounding one mode and not the other is exactly what the door exists to
+  prevent, and neither failure shows on the screen.
+- **The subject still travels** (`SCAN_SUBJECT_FIELD_RULE`, in all four system prompts now), because
+  that is what routes a question to its own app's vetting list. A worksheet's questions are exactly
+  what a bank wants.
+- **A vetted question says whether it was lifted or written** — `scanOrigin: 'page' | 'written'` in
+  `_vetStamp`. No portal reads it yet and `source: 'scan'` is untouched, but a question this app
+  wrote sitting in a vetting list claiming to have been read off a paper is the one lie that door
+  could tell.
+- **What is on the screen is exactly what prints.** 🔑 Answer key puts the key on the page or takes
+  it off, and Copy and Print both follow it. The key breaks onto a page of its own; a question is
+  never split across two.
+- **No mark allocation is invented** — `allocation` is what the paper printed and nothing else, and
+  the total on the sheet only adds up those. **No diagram travels**: a question that needs one says
+  `[Diagram: …]` where it belongs and the page counts how many have to be drawn back in.
+- **It is NOT the 📤 worksheet the mistake book makes**, and the two must not be merged. That one is
+  a child's own corrections, written to `scanPapers` and rendered by `cer/mistakes.html` at the end
+  of a link; this one is a fresh blank paper made from a scan, printed from this tab and saved
+  nowhere. Different thing, different audience, different lifetime.
+- Run **`node tools/scan-tests.mjs`** and **`node tools/mobile-check.mjs`** after touching any of it.
+
 ## The screen: three buttons and two tabs (v1.2.0)
 - **The Snap tab is a CAMERA, not a form.** Three controls at the bottom, thumb-height, and nothing
   else: **the gallery on the left** (wearing the newest page and a badge counting the pages in
@@ -1669,6 +1734,12 @@ that same PDF**.
   `_scanNewItem`, `_scanFoldRows`, `_markFields`, `_askNewItem`,
   `_askFoldRows`, `_askPrompt`, `_scanPrompt`, `SCAN_SYS`, `SCAN_DETAIL_RULE`, `SCAN_MARK_RULE`,
   `SCAN_SUBJECT_RULE`, `SCAN_ASK_SYS`, `SCAN_ASK_WITH_PAGES_RULE`, `SUBJECTS`, `_parseAIJson`,
+  `SCAN_MODES`, `scanMode`, `_scanSystem`, `_askSystem`, `SHEET_SYS`, `SHEET_ASK_SYS`,
+  `SHEET_STRIP_RULE`, `SHEET_NEW_RULE`, `SHEET_LINES_MAX`, `_sheetPrompt`, `_sheetAskPrompt`,
+  `_sheetNewItem`, `_sheetFoldRows`, `_sheetLines`, `answersAreWorksheet`, `worksheetHtml`,
+  `worksheetAsText`, `sheetQuestionHtml`, `sheetKeyHtml`, `sheetFromLabel`, `sheetMarksTotal`,
+  `sheetWrittenCount`, `sheetNeedsDrawing`, `sheetDefaultTitle`, `renderSheetControls`, `setMode`,
+  `SNAP_EMPTY`, `savePrefs`, `_vetStamp`,
   `SCAN_NO_ALGEBRA_RULE`, `SCAN_ALGEBRA_SYS`, `ALGEBRA_PHRASE_RE`, `ALGEBRA_TERM_RE`,
   `ALGEBRA_BARE_RE`, `_algebraStrip`, `_textUsesAlgebra`, `_itemAsksAlgebra`, `_itemIsMathish`,
   `_itemUsesAlgebra`, `_algebraPass`, `_algebraPrompt`, `_applyAlgebraFix`,
@@ -1706,6 +1777,10 @@ that same PDF**.
   "only question 5" back into the whole paper with nothing on screen to say why. The listener is in there for
   the same reason: a one-shot read looks exactly like a live one until the day somebody types a
   note in Ans Key mid-lesson, and then this app is quietly a day behind the one next to it.
+  Worksheet mode is in there because everything IT can get wrong lands on thirty desks: a pupil's
+  handwriting left on a sheet about to be handed out, an answer key printed under the questions
+  instead of on a page of its own, a question the app invented passing as one off a real paper, and
+  a mark allocation nobody printed.
   The vetting door is in there because everything it can get wrong happens in an app this one
   cannot see: a document written in the wrong SHAPE renders as a question with no answer in it, a
   guessed option marks a whole class against the wrong word, a topic invented from here files the
