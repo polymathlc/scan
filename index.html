@@ -1931,7 +1931,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.29.0';
+var APP_VERSION = 'v1.29.1';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2778,6 +2778,7 @@ function notesWhenText(iso) {
 function notesSourceLabel(n) {
   if (n.source === 'anskey') return 'from Ans Key';
   if (n.source === 'scan') return '';
+  if (n.source === 'tutor') return 'from Study Buddy';
   return 'from the Learning Portal';
 }
 

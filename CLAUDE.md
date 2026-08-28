@@ -48,16 +48,22 @@ step, and ship a change to the shape in both repos together**:
   writes the very same field** (see *✎ Fixing an answer* below) — that is the second door into the
   notebook, and because it is the same field the rule reaches all three apps exactly as a typed note
   does.
-- **ONE notebook, three apps.** The notes live at `users/{adminUid}/teachingNotes/{id}` — the same
-  collection Ans Key and the Science Learning Portal (`polymathlc/cer`) read and write. Keep the
+- **ONE notebook, FOUR apps.** The notes live at `users/{adminUid}/teachingNotes/{id}` — the same
+  collection Ans Key, the Science Learning Portal (`polymathlc/cer`) and the Study Buddy
+  (`polymathlc/tutor`) read and write. Keep the
   fields compatible: `topics` is reserved for the Portal's syllabus list and this app writes it
   **empty**, so a note written here reads as a general note there rather than one tagged with
   topics it has never heard of. This app's own wording goes in `noteTopics` / `subjects` / `levels`.
-  Renaming `keywords`, `markingStandards`, `keyFacts` or `guidance` silently ungrounds the other two
-  apps — nothing throws, the digests just come back empty.
+  Renaming `keywords`, `markingStandards`, `keyFacts` or `guidance` silently ungrounds the other
+  three apps — nothing throws, the digests just come back empty.
+- **`notesSourceLabel` names the app a note was typed in, and falls through to the Learning Portal
+  for a `source` it does not know.** So a fifth app writing notes means a line HERE too — `tutor`
+  was added in v1.29.1 for exactly that reason, or every rule typed on the Study Buddy would have
+  been attributed to an app it never went near. All four repos carry the matching function.
 - **The style profile is READ here and never written.** It lives at
   `users/{adminUid}/aiTraining/answerStyle` and is distilled in **Ans Key** from the answers the
-  teacher has written on their own worksheets. Nothing photographed here is an answer the teacher
+  teacher has written on their own worksheets — the Study Buddy reads it on the same terms and for
+  the same reason. Nothing photographed here is an answer the teacher
   wrote, so there is nothing honest for this app to add to it. Do not add a harvest path without
   deciding first whose answers those are.
 - **The notebook is LIVE, and that is what makes it shared rather than

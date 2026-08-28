@@ -17,6 +17,7 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Math Practice | `polymathlc/math` | the maths bank, practice, Nova Protocol |
 | English Learning Portal | `polymathlc/english` | the English bank and practice |
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
+| Study Buddy | `polymathlc/tutor` | a student's own worksheet, hinted rather than answered |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
 ## 📄 Worksheet mode — the whole scan becomes the worksheet (v1.29.0)
@@ -560,7 +561,8 @@ standard it was held to.
 The teacher's own **teaching notes** and the **style** learned from the answers they have written on
 their own worksheets are consulted **first** — before a blank is answered and before a written
 answer is marked. They come from the same notebook the Ans Key app and the Science Learning Portal
-use, at `users/{adminUid}/teachingNotes`. Notes uploaded in any of the three apps ground all three.
+use — and the Study Buddy too — at `users/{adminUid}/teachingNotes`. Notes uploaded in any of the
+four apps ground all four.
 
 Where there are no notes there is no digest at all and the ordinary syllabus standard applies —
 the plain AI, exactly as it was before any of this existed. Notes can be tagged to one of the four
@@ -579,8 +581,15 @@ answer.
   there on a worksheet you have already answered and every answer written here sharpens with it.
 
 **The notebook is live.** Type a note in Ans Key mid-lesson and the very next question answered
-here obeys it — no reload, nothing to press. The same goes the other way and for the Learning
-Portal: one notebook, three apps, always the same one.
+here obeys it — no reload, nothing to press. The same goes the other way, and for the Learning
+Portal and the Study Buddy: one notebook, four apps, always the same one.
+
+### v1.29.1 — a note typed in the Study Buddy says so
+
+A note's card names the app it was typed in, and that fell through to *"from the Learning Portal"*
+for any `source` it did not recognise. The Study Buddy (`polymathlc/tutor`) writes into the same
+notebook now — a student's own worksheet, hinted rather than answered — so a rule typed there would
+have been attributed to an app it never went near.
 
 The page says which of those it is applying, under the answers. An ungrounded answer looks exactly
 like a grounded one, so it says so rather than leaving you to guess.
