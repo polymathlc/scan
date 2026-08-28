@@ -148,6 +148,10 @@ const api = new Function(prelude +
   cut('/* ---- Showing the answers ----', '/* =====================================================================\n   📋 THE REPORT') +
   `\n  return { answerCardHtml: answerCardHtml, mbRowHtml: mbRowHtml, mbTabsHtml: mbTabsHtml,
            reportCardHtml: reportCardHtml, setReport: function (v) { _report = v; },
+           /* 📄 The worksheet is a whole screen this app has now, and it is the
+              one screen that is MEANT to be printed — so it is laid out and
+              measured like everything else rather than trusted. */
+           worksheetHtml: worksheetHtml,
            setAnswers: function (v) { _answers = v; }, setMeta: function (v) { wsMeta = v; },
            setBook: function (v) { _mistakes = v; } };`
 )();
@@ -184,6 +188,42 @@ const paper = [
 ];
 api.setAnswers(paper);
 const cards = paper.map(function (it, i) { return api.answerCardHtml(it, i); }).join('');
+
+/* 📄 THE WORKSHEET, ON THE SAME PAGE AS THE CARDS. No real screen shows both
+   at once — a run is one or the other — but the report card is already
+   seeded twice over (done AND failed) for exactly this reason: what is on the
+   page is what gets measured, and a screen nobody lays out is a screen with
+   no floor under its buttons. The long unbroken token is here on purpose:
+   it is the defect class that laid the whole document out at 456px. */
+const SHEET = [
+  { kind: 'sheet', origin: 'page', subject: 'math', number: '16(a)', page: 1, endPage: 1, type: 'open',
+    question: 'The figures below are made up of identical squares. Study the pattern and answer the questions ' +
+              'that follow. How many squares are there in Figure 5? [Diagram: five figures of squares in a row]',
+    options: [], option: '', answer: '31 squares', explanation: 'The pattern goes up by 3, 5, 7 and 9.',
+    allocation: '2', lines: 4 },
+  { kind: 'sheet', origin: 'page', subject: 'science', number: '17', page: 2, endPage: 3, type: 'mcq',
+    question: 'Which of the following best explains why the puddle dried up on a hot day?',
+    options: [{ label: '1', text: 'The water was absorbed by the ground.' },
+              { label: '2', text: 'The water evaporated into water vapour.' },
+              { label: '3', text: 'The water condensed on the road.' },
+              { label: '4', text: 'The water froze and disappeared.' }],
+    option: '2', answer: '(2) The water evaporated into water vapour.',
+    explanation: 'Heat from the sun gives the water enough energy to evaporate.',
+    allocation: '1', lines: 0 },
+  { kind: 'sheet', origin: 'new', subject: 'math', number: '', page: 0, endPage: 0, type: 'open',
+    question: 'Write your own pattern question of the same kind, then answer it. See ' +
+              'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent for nothing at all.',
+    options: [], option: '', answer: 'Any correct square-number pattern.', explanation: '',
+    allocation: '', lines: 6 }
+];
+api.setAnswers(SHEET);
+const worksheet = api.worksheetHtml();
+if (!worksheet || worksheet.indexOf('sheetQ') < 0) {
+  console.error('the worksheet rendered empty — the harness is not seeding it, and every claim ' +
+                'about that screen is worthless. Check worksheetHtml\'s shape.');
+  process.exit(2);
+}
+api.setAnswers(paper);
 
 /* The 📕 window with something in it. Every control the round-one floor
    missed lives on one of these rows — the tick box, the 📕/📗 tabs, 💬 Ask
@@ -266,7 +306,9 @@ let page = src
   .replace('<div id="answersWrap" class="hidden"', '<div id="answersWrap"')
   .replace('<button class="btn btnScan hidden" id="vetAllBtn"', '<button class="btn btnScan" id="vetAllBtn"')
   .replace('<button class="btn hidden" id="stepAllBtn"', '<button class="btn" id="stepAllBtn"')
-  .replace('<div id="answersList"></div>', '<div id="answersList">' + cards + '</div>')
+  .replace('<button class="btn hidden" id="sheetKeyBtn"', '<button class="btn" id="sheetKeyBtn"')
+  .replace('<div class="sheetTitleRow hidden" id="sheetTitleRow">', '<div class="sheetTitleRow" id="sheetTitleRow">')
+  .replace('<div id="answersList"></div>', '<div id="answersList">' + cards + worksheet + '</div>')
   .replace('<div class="modalBody" id="mbBody"></div>',
            '<div class="modalBody" id="mbBody">' + bookBody + '</div>')
   .replace('<div class="shots" id="shots"></div>',

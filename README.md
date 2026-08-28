@@ -5,7 +5,8 @@ printed on them is read: whatever the student has already written is **marked**,
 blank is **answered**, in the teacher's own words, with **the working handed over one step at a
 time** — the whole paper comes back as a **report**, and
 every question the student got wrong is kept in their own **mistake book** to try again later. Science, Mathematics, English and Chinese.
-Type or dictate a question alongside the photo — or with no photo at all.
+Type or dictate a question alongside the photo — or with no photo at all. Or switch to
+**📄 Worksheet** and the same photographs come back as a fresh worksheet to print.
 
 Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app` Firebase project:
 
@@ -17,6 +18,32 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | English Learning Portal | `polymathlc/english` | the English bank and practice |
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
+
+## 📄 Worksheet mode — the whole scan becomes the worksheet (v1.29.0)
+
+Two pills above the box say what ✓ is for. Leave them alone and the app does exactly what it always
+has. Press **📄 Worksheet** and the very same photographs are read for their **questions** instead
+of their answers: every question on the pages is typed out clean and the whole scan comes back as
+**one worksheet** — renumbered from 1, with the marks the paper printed, ruled lines under each
+question to write on, and the answer key on a page of its own. Press 🖨 and it is the thing that
+comes out of the printer.
+
+**Nothing anybody wrote on the paper comes across.** A worked-through paper goes back to being the
+blank one it started as: a filled-in blank comes back empty, a circled option comes back as an
+ordinary option. That is the point of the mode, and it is what makes the sheet safe to hand out —
+no named child's work on a paper thirty other children are about to sit.
+
+**It also creates questions.** “Another five like question 3”, “same topic but harder”, “change the
+numbers” — those are written for you and go on the sheet after the ones off the paper, each wearing
+a purple **✎ written for you** note on screen so you know what to read first. It never prints on the
+pupil's copy. Press ✓ in worksheet mode with no photo at all and the whole worksheet is written from
+scratch.
+
+**🔑 Answer key** takes the key off the page for the pupils' copy and puts it back for yours — what
+is on the screen is exactly what prints, and **📋 Copy** follows it too. Nothing is marked in this
+mode, so nothing reaches your mistake book and no report is written; a question that needs a diagram
+says **[Diagram: …]** where it belongs and the page counts how many there are to draw back in. No
+mark allocation is invented — only the ones the paper really prints.
 
 ## 📱 The worksheet button that ate the window (v1.28.7)
 
@@ -340,9 +367,10 @@ Three buttons and two tabs. The **Snap** tab is a camera:
 | --- | --- |
 | 🖼 **left** | your gallery — and the badge on it is how many pages you have so far |
 | 📷 **middle** | the shutter — and the camera **stays open**: page after page, no "use photo / retake" |
-| ✓ **right** | read the lot: mark what has been answered, answer what has not |
+| ✓ **right** | read the lot: mark what has been answered, answer what has not — or make the worksheet |
 
-Above those three there is a box to type in, and a 🎤 beside it where your browser can hear you.
+Above those three there is a box to type in, a 🎤 beside it where your browser can hear you, and
+two pills saying what ✓ is for: **✅ Answer & mark**, or **📄 Worksheet**.
 
 That is the whole interaction. The pictures go up three at a time as **one run**, so a question
 that carries on over the page is stitched back together instead of coming back as two halves, and

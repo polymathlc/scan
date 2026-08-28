@@ -34,6 +34,13 @@ const scan = section(
 const steps = section(
   '/* =====================================================================\n   👣 ONE STEP AT A TIME',
   'function answerCardHtml(');
+/* 📄 The worksheet on the page. It is the thing that comes out of the
+   printer, so what it carries and what it leaves off are worth pinning: a
+   child's handwriting that crept back onto it, or an answer key printed under
+   the questions, is a worksheet that cannot be handed out. */
+const worksheet = section(
+  '/* =====================================================================\n   📄 THE WORKSHEET ON THE PAGE',
+  '/* =====================================================================\n   📋 THE REPORT');
 /* 📋 The report on the whole script. Every number on that card is counted
    HERE, in plain code, from the verdicts already on the answer cards — so a
    score that drifts is the app contradicting itself in front of a parent,
@@ -126,7 +133,7 @@ var db = { collection: () => ({ doc: () => ({
 }) }) };
 `;
 
-const api = new Function(prelude + json + grounding + scan + steps + report + book + vet + authFns + `
+const api = new Function(prelude + json + grounding + scan + steps + worksheet + report + book + vet + authFns + `
   return {
     set notes(v) { teachingNotes = v; },
     set style(v) { aiStyle = v; },
@@ -147,6 +154,16 @@ const api = new Function(prelude + json + grounding + scan + steps + report + bo
     SCAN_MARK_FIX_SYS, SCAN_MARK_FIX_CALLS, SCAN_MARK_FIX_MAX,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
+    /* 📄 Worksheet mode: the same pages, read for their questions. */
+    SCAN_MODES, scanMode, SHEET_SYS, SHEET_ASK_SYS, SHEET_STRIP_RULE, SHEET_NEW_RULE,
+    SHEET_LINES_MAX, _sheetPrompt, _sheetAskPrompt, _sheetNewItem, _sheetFoldRows, _sheetLines,
+    _scanSystem, _askSystem, answersAreWorksheet,
+    sheetDefaultTitle, sheetTitle, sheetMarksTotal, sheetWrittenCount, sheetNeedsDrawing,
+    worksheetHtml, worksheetAsText, sheetQuestionHtml,
+    set mode(v) { _mode = v; },
+    set ranAs(v) { _ranAs = v; },
+    set sheetName(v) { _sheetTitle = v; },
+    set sheetKeyOn(v) { _sheetKeyOn = v; },
     _reportMarkStr, reportScore, reportEligible, _reportPrompt, _reportNew, _reportRefs,
     reportScoreText, reportCountsText, reportBasisText, reportAsText, reportCardHtml,
     REPORT_SYS, REPORT_MIN_MARKED, REPORT_MAX_GAPS, REPORT_MAX_LIST,
@@ -604,7 +621,8 @@ ok('a live repaint yields to whatever is being typed',
    paper without ever being told how this teacher marks — and every card would
    still look perfectly right. */
 ok("the run is grounded as a scan, not as a plain answer",
-   /system: SCAN_SYS \+ aiGrounding\('scan'\),/.test(html));
+   /system: _scanSystem\(mode\),/.test(html) &&
+   /SCAN_SYS \+ aiGrounding\('scan'\)/.test(html));
 ok('the marking reaches the screen',
    /class="youBox/.test(html) && /class="fbBox/.test(html) && /Correct answer/.test(html));
 ok('a paper with nothing written on it says nothing about marks',
@@ -638,7 +656,8 @@ ok('…and is held while a PDF is being split into pages',
 ok('a run with no pages takes the ask-alone path',
    /if \(shots\.length\) await _runPages\([\s\S]{0,120}else askErr = await _runAskAlone\(/.test(html));
 ok('the ask-alone call is grounded too — the one door',
-   /system: SCAN_ASK_SYS \+ aiGrounding\('scan'\),/.test(html));
+   /system: _askSystem\(mode\),/.test(html) &&
+   /SCAN_ASK_SYS \+ aiGrounding\('scan'\)/.test(html));
 ok('dictation is stopped before a run, and when the tab is left',
    /micStop\(\);/.test(html.slice(html.indexOf('async function runScan'), html.indexOf('async function runScan') + 1400)) &&
    /if \(_tab !== 'snap'\) \{ micStop\(\); camClose\(\); \}/.test(html));
@@ -957,6 +976,278 @@ ok('the shutter cannot run past the page ceiling',
    /if \(_shots\.length >= SCAN_MAX_SHOTS\)/.test(html.slice(html.indexOf('async function camSnap'))));
 ok('one painter keeps the strip in step with the pages',
    /renderCamBar\(\);\s*\n\s*if \(camIsOpen\(\)\) camRenderStrip\(\);/.test(html));
+
+/* ---------- 📄 Worksheet mode ----------
+   The same photographs, read for their QUESTIONS instead of their answers,
+   and the whole run coming back as one printable worksheet. Nearly everything
+   it can get wrong is silent and lands on thirty desks: a child's handwriting
+   left on a sheet about to be handed out, an answer key printed under the
+   questions, a question the app invented passing as one off a real paper, or
+   a mark allocation nobody printed. */
+ok('there are two modes and no more',
+   Object.keys(api.SCAN_MODES).length === 2 && api.SCAN_MODES.answer === 1 && api.SCAN_MODES.sheet === 1);
+api.mode = 'sheet';
+ok('the mode is read through ONE reader', api.scanMode() === 'sheet');
+api.mode = 'nonsense';
+ok('anything else falls back to what the app has always done', api.scanMode() === 'answer');
+api.mode = 'answer';
+
+/* The one door, both modes. A worksheet WRITES answers and marks nothing, so
+   it is grounded as an 'answer'; the ordinary run marks too, so it stays a
+   'scan'. Grounding one and not the other is exactly what the door exists to
+   prevent — and neither failure shows on the screen. */
+api.meta = { level: 'P5', subject: 'science' };
+api.notes = [guideNote, sciNote];
+api.style = { profileSamples: 42, profile: {
+  styleRules: 'Full sentences, always name the process.',
+  markingStandards: 'No mark without the keyword.',
+  exemplars: [{ q: 'Why did the water level fall?', a: 'The water evaporated into water vapour.' }]
+} };
+const sysSheet = api._scanSystem('sheet');
+const sysScan = api._scanSystem('answer');
+ok('a worksheet run is grounded at all', sysSheet.includes('it dries up') && /AUTHORITY ORDER/.test(sysSheet));
+ok('it carries the key facts its answer key needs', sysSheet.includes('Evaporation happens'));
+ok('it carries the teacher’s own answers to write like', sysSheet.includes('evaporated into water vapour'));
+ok('a worksheet marks nothing, so it is not handed the marking standard',
+   !sysSheet.includes('How this teacher marks'));
+ok('…and the ordinary run still is', sysScan.includes('How this teacher marks'));
+ok('each mode gets its own system prompt',
+   sysSheet.indexOf(api.SHEET_SYS) === 0 && sysScan.indexOf(api.SCAN_SYS) === 0);
+ok('the ask-alone worksheet goes through the same door',
+   api._askSystem('sheet').indexOf(api.SHEET_ASK_SYS) === 0 && /AUTHORITY ORDER/.test(api._askSystem('sheet')));
+ok('…and so does the ask-alone answer',
+   api._askSystem('answer').indexOf(api.SCAN_ASK_SYS) === 0 && /AUTHORITY ORDER/.test(api._askSystem('answer')));
+api.notes = [];
+api.style = null;
+ok('no notes still means no digest at all, in either mode',
+   api._scanSystem('sheet') === api.SHEET_SYS && api._askSystem('sheet') === api.SHEET_ASK_SYS);
+
+/* What the model is actually told. The handwriting rule IS the mode. */
+ok('the pupil’s handwriting is not part of the question',
+   /NOT PART OF THE QUESTION/.test(api.SHEET_STRIP_RULE) &&
+   /comes back as an EMPTY blank/.test(api.SHEET_SYS));
+ok('a ticked option comes back as an ordinary option',
+   /circled or ticked option comes back as an ordinary option/.test(api.SHEET_SYS));
+ok('the answer key is worked out from the printed question, never off the page',
+   /work every question out YOURSELF, from the printed question alone/.test(api.SHEET_SYS));
+ok('a lettered part is still its own question', /ONE ENTRY PER LETTERED PART/.test(api.SHEET_SYS));
+ok('…and carries enough of its stem to be answerable', /shared stem carries enough of that stem/.test(api.SHEET_SYS));
+ok('multiple choice is not skipped here either',
+   /Never skip a question because it is multiple choice/.test(api.SHEET_SYS));
+ok('a mark allocation is never invented', /never invent a mark allocation/.test(api.SHEET_SYS));
+ok('a page of answers is not a page of questions', /a list of answers is not a list of questions/.test(api.SHEET_SYS));
+ok('a question that needs a diagram says so where it belongs',
+   /\[Diagram:/.test(api.SHEET_SYS) && /does NOT travel/.test(api.SHEET_SYS));
+
+api.meta = { level: 'P5', subject: 'math' };
+const sheetAsk = api._sheetPrompt(2, 1, 4, '', 'another five like question 3');
+ok('what the teacher asked for leads the worksheet prompt',
+   sheetAsk.indexOf('another five like question 3') >= 0 &&
+   sheetAsk.indexOf('another five like question 3') < sheetAsk.indexOf('ABOUT THE IMAGES'));
+ok('questions the paper does not have are WRITTEN, and marked as written',
+   /"origin":"new"/.test(api.SHEET_NEW_RULE) &&
+   /never mark a question you\s+invented as "page"/.test(api.SHEET_NEW_RULE));
+ok('a printed question is never quietly replaced by one of the app’s',
+   /Never quietly replace a printed question/.test(api.SHEET_NEW_RULE));
+ok('naming questions narrows a worksheet run too', /leave the rest out entirely/.test(sheetAsk));
+ok('background is still only background',
+   /carry every printed question across as usual/.test(sheetAsk));
+ok('the worksheet prompt carries the subject standard', sheetAsk.includes('Mathematics:'));
+ok('…and the no-algebra rule with it', /NEVER USE ALGEBRA/.test(sheetAsk));
+ok('the worksheet prompt still stitches a question across a batch',
+   /"continuation": true/.test(api._sheetPrompt(2, 3, 6, 'A tap fills a tank in')));
+const sheetNoAsk = api._sheetPrompt(2, 1, 4, '');
+ok('no instruction means no instruction block', !/THIS IS WHAT THE TEACHER ASKED FOR/.test(sheetNoAsk));
+ok('the plain worksheet run takes the whole paper', /Type out EVERY question printed/.test(sheetNoAsk));
+/* The key hunt is a MARKING aid, and a worksheet marks nothing: a run that
+   paid for it would be spending six calls on a paper it is not marking. */
+ok('a worksheet run never goes looking for the paper’s answer key',
+   !/_keyBlock/.test(sheetNoAsk) &&
+   /if \(shots\.length && mode !== 'sheet'\) \{\s*\n\s*_scanKey = await _scanKeyPass/.test(html));
+ok('…and pays for no marking repair either',
+   /if \(mode !== 'sheet'\) \{\s*\n\s*await _markFixPass\(/.test(html));
+const sheetAlone = api._sheetAskPrompt('10 P5 fraction word problems', 'normal');
+ok('a worksheet asked for with no paper carries what was said',
+   sheetAlone.includes('10 P5 fraction word problems') && /Nothing was photographed/.test(sheetAlone));
+ok('every question on it is one the app wrote', /"origin":"new"/.test(api.SHEET_ASK_SYS));
+
+/* ---------- Reading a worksheet batch ---------- */
+const srow = (o) => Object.assign({ number: '1', page: 1, type: 'open', question: 'Q', answer: 'A' }, o);
+
+let sheet = [];
+api._sheetFoldRows([srow({ number: '12' }), srow({ number: '13', page: 2 })], 0, 3, sheet);
+ok('one worksheet entry per printed question', sheet.length === 2);
+ok('page numbers are global here too', sheet[0].page === 1 && sheet[1].page === 2);
+ok('a worksheet question knows it was lifted off the paper',
+   sheet.every(x => x.kind === 'sheet' && x.origin === 'page'));
+
+/* The rule the whole mode rests on: a paper somebody has worked through goes
+   back to being the blank one it started as. */
+sheet = [];
+api._sheetFoldRows([srow({
+  studentAnswer: '1.4 kg', verdict: 'wrong', marks: '0/2', feedback: 'You added instead of subtracting.',
+  hasWriting: true
+})], 0, 1, sheet);
+ok('a worksheet is never marked, whatever came back with the question',
+   sheet[0].marked === false && sheet[0].studentAnswer === '' && sheet[0].verdict === '' &&
+   sheet[0].marks === '' && sheet[0].feedback === '');
+/* …which is also what keeps the mistake book out of a worksheet run: the book
+   files what was MARKED, and a page item at that. */
+ok('nothing off a worksheet can reach the mistake book',
+   api.mbIsWrong(sheet[0]) === false && sheet[0].kind !== 'page');
+
+sheet = [];
+api._sheetFoldRows([srow({ origin: 'new', number: '9', page: 2, question: 'A fresh one' })], 0, 3, sheet);
+ok('a question the app wrote claims no page and no number of the paper’s',
+   sheet[0].origin === 'new' && sheet[0].page === 0 && sheet[0].number === '');
+sheet = [];
+api._sheetFoldRows([srow({ origin: 'page', page: 1, question: 'From nothing' })], 0, 0, sheet);
+ok('with nothing photographed, every question is one the app wrote',
+   sheet[0].origin === 'new' && sheet[0].page === 0);
+
+sheet = [];
+api._sheetFoldRows([
+  srow({ allocation: '2', lines: 4 }),
+  srow({ type: 'mcq', option: '2', options: [{ label: '1', text: 'a' }, { label: '2', text: 'b' }] }),
+  srow({ lines: 900 }),
+  srow({ lines: 'nonsense' })
+], 0, 1, sheet);
+ok('the mark allocation the paper printed comes across', sheet[0].allocation === '2');
+ok('…and the room to write with it', sheet[0].lines === 4);
+ok('a multiple-choice question keeps its options and needs no ruled lines',
+   sheet[1].options.length === 2 && sheet[1].type === 'mcq' && sheet[1].lines === 0);
+ok('the room to write is clamped, never whatever came back', sheet[2].lines === api.SHEET_LINES_MAX);
+ok('a question with nothing said about it still gets room to answer it', sheet[3].lines === 2);
+
+sheet = [];
+api._sheetFoldRows([{ answer: 'A' }, null, 'nonsense', srow({ question: '' })], 0, 1, sheet);
+ok('an entry with no wording is never printed as an empty question', sheet.length === 0);
+
+/* The subject is what routes a question to its own app's vetting list, so it
+   has to survive this fold exactly as it survives the scan's. */
+sheet = [];
+api._sheetFoldRows([srow({ subject: 'math' }), srow({ subject: 'nonsense' })], 0, 1, sheet);
+ok('a worksheet question carries its own subject', sheet[0].subject === 'math');
+ok('…and an invented one is dropped rather than filed', sheet[1].subject === '');
+
+/* A question running over the page is ONE question on the printed sheet, or
+   the class is handed half a question. */
+sheet = [{ kind: 'sheet', origin: 'page', number: '7', page: 2, endPage: 2, type: 'open',
+           question: 'A tap fills a tank in', options: [], option: '', answer: '', explanation: '',
+           subject: '', allocation: '', lines: 2 }];
+api._sheetFoldRows([
+  srow({ continuation: true, number: '7', page: 1, question: '12 minutes. How long for two taps?',
+         answer: '6 minutes', allocation: '3', lines: 5, subject: 'math' }),
+  srow({ number: '8', page: 1, question: 'Next question' })
+], 2, 2, sheet);
+ok('a question spread over two pages is one question on the worksheet', sheet.length === 2);
+ok('its two halves are joined', sheet[0].question === 'A tap fills a tank in 12 minutes. How long for two taps?');
+ok('the key comes from the half that could see the whole question', sheet[0].answer === '6 minutes');
+ok('the marks and the room to write come with it', sheet[0].allocation === '3' && sheet[0].lines === 5);
+ok('and the subject, so it is still filed by what it asks', sheet[0].subject === 'math');
+ok('the question after it is still filed', sheet[1].question === 'Next question');
+
+/* ---------- The worksheet on the page ---------- */
+api.meta = { level: 'P5', subject: 'science' };
+api.ranAs = 'sheet';
+api.sheetName = '';
+api.sheetKeyOn = true;
+api.answers = [
+  { kind: 'sheet', origin: 'page', number: '12', page: 1, endPage: 1, type: 'mcq', subject: 'science',
+    question: 'Which of these is a good conductor of heat?',
+    options: [{ label: '1', text: 'Wood' }, { label: '2', text: 'Copper' }],
+    option: '2', answer: 'Copper', explanation: 'Metals conduct heat well.',
+    allocation: '1', lines: 0, marked: false, studentAnswer: '', verdict: '', marks: '', feedback: '' },
+  { kind: 'sheet', origin: 'page', number: '13', page: 2, endPage: 2, type: 'open', subject: 'science',
+    question: 'Explain why the water level fell. [Diagram: a beaker of water on a sunny windowsill]',
+    options: [], option: '', answer: 'The water evaporated into water vapour.',
+    explanation: 'Evaporation happens at all temperatures.',
+    allocation: '4', lines: 3, marked: false, studentAnswer: '', verdict: '', marks: '', feedback: '' },
+  { kind: 'sheet', origin: 'new', number: '', page: 0, endPage: 0, type: 'open', subject: 'science',
+    question: 'Name two other materials that conduct heat well.',
+    options: [], option: '', answer: 'Any two metals, e.g. aluminium and iron.', explanation: '',
+    allocation: '', lines: 2, marked: false, studentAnswer: '', verdict: '', marks: '', feedback: '' }
+];
+ok('a run made as a worksheet says so', api.answersAreWorksheet() === true);
+api.ranAs = 'answer';
+ok('…and one made as answers does not', api.answersAreWorksheet() === false);
+api.ranAs = 'sheet';
+
+ok('the worksheet is named after the level and the subject', /P5 Science/.test(api.sheetDefaultTitle()));
+ok('only the marks the paper printed are totalled', api.sheetMarksTotal() === 5);
+ok('what the app wrote itself is counted', api.sheetWrittenCount() === 1);
+ok('so are the diagrams somebody has to draw back in', api.sheetNeedsDrawing() === 1);
+
+const wsHtml = api.worksheetHtml();
+ok('the worksheet is renumbered from 1', /class="sheetNo">1</.test(wsHtml) && /class="sheetNo">3</.test(wsHtml));
+ok('it has a name, a class and a date on it',
+   /Name:/.test(wsHtml) && /Class:/.test(wsHtml) && /Date:/.test(wsHtml));
+ok('there is room under a written question to write', (wsHtml.match(/class="sheetRule"/g) || []).length === 5);
+ok('the marks the paper printed are printed with the question', /class="sheetAlloc">\[4\]/.test(wsHtml));
+ok('the options are printed to choose between', /\(1\) Wood/.test(wsHtml) && /\(2\) Copper/.test(wsHtml));
+ok('…and the key is NOT ticked among them on the pupil’s half',
+   !/\(2\) Copper ✓/.test(wsHtml));
+ok('a question the app wrote wears a note saying so', /sheetNewChip/.test(wsHtml));
+ok('…and that note never prints on the pupil’s copy',
+   wsHtml.indexOf('sheetNewChip') > wsHtml.indexOf('sheetMetaRow noPrint'));
+ok('where a lifted question came from is on screen only',
+   /class="sheetFrom">from page 2, Q13/.test(wsHtml));
+ok('a question stitched over two pages says both', /from pages 2–3/.test(
+   api.sheetQuestionHtml({ origin: 'page', page: 2, endPage: 3, number: '7', question: 'x', options: [], lines: 0 }, 0, 1)));
+ok('the answer key is a page of its own', /class="sheet sheetKey"/.test(wsHtml));
+ok('the key holds the answers', /evaporated into water vapour/.test(wsHtml));
+/* The one thing a worksheet must never carry. */
+ok('nothing anybody wrote on the paper is on the worksheet',
+   !/studentAnswer|youBox|verdict|Feedback/.test(wsHtml));
+
+api.sheetKeyOn = false;
+ok('turning the key off takes it off the page, so it cannot print',
+   !/sheetKey/.test(api.worksheetHtml()));
+ok('…and off the copy with it', !/ANSWER KEY/.test(api.worksheetAsText()));
+api.sheetKeyOn = true;
+const wsText = api.worksheetAsText();
+ok('Copy hands over the worksheet, not an answer key', /^P5 Science — Worksheet/.test(wsText));
+ok('the questions come first, then the key',
+   wsText.indexOf('1. Which of these') < wsText.indexOf('ANSWER KEY'));
+ok('a name line comes with it', /Name: _+/.test(wsText));
+ok('the key is in it once it is on the page', /evaporated into water vapour/.test(wsText));
+ok('and Copy takes that road when the run was a worksheet',
+   /if \(answersAreWorksheet\(\)\) return worksheetAsText\(\);/.test(html));
+api.sheetName = 'Heat — Friday';
+ok('the teacher’s own name for it is what prints', /Heat — Friday/.test(api.worksheetHtml()));
+api.answers = [];
+api.ranAs = 'answer';
+
+/* ---------- The mode on the screen ----------
+   Two pills, and the camera bar below them still carrying exactly three
+   controls — the one thing that screen is not allowed to grow. */
+const modeBar = html.slice(html.indexOf('<div class="modeRow'), html.indexOf('id="askBar"'));
+ok('there are exactly two mode pills', (modeBar.match(/<button/g) || []).length === 2);
+ok('and the one the app has always done is on the left and starts on',
+   modeBar.indexOf('id="modeAnswer"') < modeBar.indexOf('id="modeSheet"') &&
+   /id="modeAnswer"[^>]*data-mode="answer"/.test(modeBar) &&
+   /class="modePill on" id="modeAnswer"/.test(modeBar));
+ok('the mode row is inside the dock, above the ask row and the camera bar',
+   dock.indexOf('id="modeBar"') >= 0 &&
+   dock.indexOf('id="modeBar"') < dock.indexOf('id="askBar"') &&
+   dock.indexOf('id="askBar"') < dock.indexOf('id="camBar"'));
+/* A pill under Apple's floor on the one screen this app IS. */
+ok('a pill is thumb-sized', /\.modePill \{[^}]*min-height: 44px/.test(html));
+ok('the mode is read ONCE, at the press, and carried through the run',
+   /var mode = scanMode\(\);/.test(html) &&
+   /_runPages\(run, shots, ask, detail, failedPages, mode\)/.test(html) &&
+   /_runAskAlone\(run, ask, detail, mode\)/.test(html));
+ok('the pills are locked while a paper is being read',
+   /function setMode[\s\S]{0,80}if \(_scanning \|\| _pdfBusy\) return;/.test(html));
+ok('the mode is remembered with the other settings',
+   /mode: scanMode\(\)/.test(html) && /if \(p\.mode && SCAN_MODES\[p\.mode\]\)/.test(html));
+ok('the snap screen is painted by ONE painter, mode and all',
+   /SNAP_EMPTY\[mode\]/.test(html) &&
+   !/\$\('padSub'\)\.innerHTML = 'One photo per page/.test(html));
+ok('the worksheet is what prints, and the key on a page of its own',
+   /\.sheetKey \{ break-before: page/.test(html) && /\.sheetQ \{ break-inside: avoid/.test(html));
+ok('a worksheet run renumbers rather than borrowing the paper’s numbers',
+   /if \(!it\.number && it\.kind === 'page'\) it\.number = String\(i \+ 1\);/.test(html));
 
 /* ---------- 📕 The mistake book ----------
    THE COLLECTION NAME IS THE ONE THAT CANNOT SLIP. `users/{uid}/mistakes` is
@@ -1718,6 +2009,13 @@ ok('a scanned question SAYS it was scanned', pMcq.source === api.VET_SOURCE && m
 ok("…and the field is spelled 'scan' — the four portals read that one word",
    api.VET_SOURCE === 'scan');
 ok('it names the app it came from', /Scan/.test(pMcq.sourceApp) && /Scan/.test(mMcq.sourceApp));
+/* 📄 A worksheet run can WRITE a question rather than lift one. One that
+   arrived claiming to have been read off a paper is the one lie this door
+   could tell, and nobody vetting it would ever know. */
+ok('a question read off a paper says so', pMcq.scanOrigin === 'page' && mOpen.scanOrigin === 'page');
+ok('a question the app wrote says THAT, in both shapes',
+   api._vetPortalDoc(Object.assign({}, openItem, { origin: 'new' })).scanOrigin === 'written' &&
+   api._vetMathDoc(Object.assign({}, openItem, { origin: 'new' })).scanOrigin === 'written');
 ok('it lands in VETTING, waiting', pMcq.status === 'pending');
 
 /* The question, the options, the answer and why — and nothing of the child's. */
@@ -1909,8 +2207,8 @@ ok('the ration is refilled once per run and never inside the loop',
    (html.match(/_algebraFixLeft = SCAN_ALGEBRA_FIX_CALLS/g) || []).length === 2);   // the declaration + the reset
 ok('the rewrite is text only — no pictures are sent again',
    !/_algebraPrompt[\s\S]{0,600}images:/.test(html));
-ok('the rewrite is grounded like every other call',
-   /system: SCAN_ALGEBRA_SYS \+ aiGrounding\('scan'\)/.test(html));
+ok('the rewrite is grounded like every other call, and by the run’s own kind',
+   /system: SCAN_ALGEBRA_SYS \+ aiGrounding\(answersAreWorksheet\(\) \? 'answer' : 'scan'\)/.test(html));
 ok('it runs BEFORE the cards are painted',
    html.indexOf('await _algebraPass(run, _answers') < html.indexOf('renderAnswers();\n    scanProgress(Math.min'));
 
@@ -2019,8 +2317,14 @@ ok('…and says only "vetting" when it does not know',
 /* The subject travels with a question stitched across a batch boundary. */
 ok('a continuation hands its subject to the half that has none',
    /if \(it\.subject && !prev\.subject\) prev\.subject = it\.subject;/.test(html));
-ok('both prompts ask for it, through the ONE fragment',
-   (html.match(/SCAN_SUBJECT_FIELD_RULE \+/g) || []).length === 2);
+/* FOUR prompts file a question by subject now — the scan, the ask, and the
+   two worksheet ones — and every one of them asks for it through the same
+   fragment. A prompt that asked in its own words is a subject filed by a
+   different standard in an app this one cannot see. */
+ok('every prompt asks for it through the ONE fragment',
+   (html.match(/SCAN_SUBJECT_FIELD_RULE \+/g) || []).length === 4 &&
+   [api.SCAN_SYS, api.SCAN_ASK_SYS, api.SHEET_SYS, api.SHEET_ASK_SYS]
+     .every(sys => sys.includes('a wrong subject is worse than none')));
 ok('the model is told to leave it EMPTY rather than guess',
    /a wrong subject is worse than none/.test(html));
 api.meta = { level: 'P5', subject: 'science' };
