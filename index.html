@@ -1931,7 +1931,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.29.1';
+var APP_VERSION = 'v1.30.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -3956,38 +3956,149 @@ function setMode(m) {
 }
 
 /* ---- Dictation ----
-   The Web Speech API where the browser really has it, and nothing at all
-   where it does not: the 🎤 is only shown when it will work, because a
-   button that silently does nothing is worse than no button. It listens in
-   the language of the paper — a 华文 question dictated as English phonetics
-   comes back as nonsense. */
+   THE MIC GOES THROUGH THE SAME SPEECH MODEL AS THE REST OF POLYMATH.
+   This was the browser's own Web Speech API, which is free and instant and
+   is also why a dictated question came out in a different voice from every
+   other mic in the centre: no punctuation worth the name, no Singapore
+   place names, and — the one that matters on this app — 华文 read as
+   English phonetics on any phone whose Web Speech has no Chinese voice.
+
+   So the recording goes to `gemini-3.5-transcribe` through
+   `window.transcribeAudio`, the ONE door the module below defines, and Web
+   Speech is kept as the FALLBACK where MediaRecorder does not exist: a mic
+   that does something worse is better than a mic that does nothing, which
+   is the same reason the 🎤 is only shown when it will really work.
+   `micRecordable()` is the ONE place that choice is made.
+
+   The LANGUAGE still travels, on both routes. It is the one thing the
+   caller knows and the model cannot, and it is not a nicety: a 华文 answer
+   transcribed as English phonetics comes back as nonsense. */
 var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 var _rec = null;
 var _recOn = false;
 var _recBase = '';               // what was already in the box when listening started
-function micAvailable() { return !!SpeechRec; }
+var _recBusy = false;            // the recording is being written down
+/* A mic left open sends a huge blob to the model for what is meant to be
+   one spoken question, so it stops itself at the cap and writes down what
+   it has rather than recording for ever. */
+var MIC_MAX_MS = 60000;
+var _micRecorder = null, _micStream = null, _micChunks = [], _micMime = '', _micHardStop = null;
+
+function micRecordable() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia &&
+            window.MediaRecorder && window.transcribeAudio);
+}
+function micAvailable() { return micRecordable() || !!SpeechRec; }
 function micLang() { return wsMeta.subject === 'chinese' ? 'zh-CN' : 'en-SG'; }
+function micHint() {
+  return wsMeta.subject === 'chinese'
+    ? 'The speaker is reading a 华文 question aloud. Write it down in Simplified Chinese characters with the ' +
+      'paper\'s own full-width punctuation — never in pinyin and never translated into English.'
+    : 'The speaker is a Singapore student or teacher reading a question aloud, in Singapore English. ' +
+      'Keep names of places, people and school subjects as they are.';
+}
 function renderMic() {
   var b = $('micBtn');
   if (!b) return;
   b.hidden = !micAvailable();
   b.classList.toggle('on', _recOn);
-  b.textContent = _recOn ? '⏹' : '🎤';
-  b.title = _recOn ? 'Stop dictating' : 'Dictate your question';
-  b.disabled = _scanning;
+  b.textContent = _recBusy ? '⏳' : (_recOn ? '⏹' : '🎤');
+  b.title = _recBusy ? 'Writing down what you said…' : (_recOn ? 'Stop dictating' : 'Dictate your question');
+  b.disabled = _scanning || _recBusy;
 }
 function micStop() {
+  if (_micHardStop) { clearTimeout(_micHardStop); _micHardStop = null; }
+  if (_micRecorder) { try { _micRecorder.stop(); } catch (e) {} }
   if (_rec) { try { _rec.stop(); } catch (e) {} }
   _recOn = false;
   renderMic();
 }
 function micStart() {
-  if (!micAvailable() || _scanning) return;
+  if (_scanning || _recBusy) return;
   var box = $('askText');
   if (!box) return;
   // Dictation ADDS to what is already typed rather than replacing it, so a
   // half-typed question can be finished out loud.
   _recBase = box.value ? box.value.replace(/\s+$/, '') + ' ' : '';
+  if (micRecordable()) micStartRecording(box);
+  else micStartSpeech(box);
+}
+function micToggle() { if (_recOn) micStop(); else micStart(); }
+
+/* -- the recorder route -- */
+function _micPickMime() {
+  var types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4'];
+  for (var i = 0; i < types.length; i++) {
+    try { if (MediaRecorder.isTypeSupported(types[i])) return types[i]; } catch (e) {}
+  }
+  return '';
+}
+function _micBlobB64(blob) {
+  return new Promise(function (res, rej) {
+    var r = new FileReader();
+    r.onload = function () { var s = String(r.result || ''); var c = s.indexOf(','); res(c >= 0 ? s.slice(c + 1) : s); };
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+function micStartRecording(box) {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+    var mime = _micPickMime();
+    var rec;
+    try { rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
+    catch (e) {
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      micStartSpeech(box);          // this browser cannot record; the old route still might
+      return;
+    }
+    _micChunks = [];
+    _micMime = rec.mimeType || mime || 'audio/webm';
+    rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) _micChunks.push(ev.data); };
+    rec.onstop = function () { micFinishRecording(box, stream); };
+    rec.start();
+    _micRecorder = rec;
+    _micStream = stream;
+    _recOn = true;
+    renderMic();
+    _micHardStop = setTimeout(function () { if (_recOn) micStop(); }, MIC_MAX_MS);
+  }).catch(function (e) {
+    var code = (e && e.name) || '';
+    toast(code === 'NotAllowedError'
+      ? 'Dictation needs permission to use the microphone — allow it and try again.'
+      : 'The microphone could not be started — type it instead.', 5000);
+    _recOn = false;
+    renderMic();
+  });
+}
+function micFinishRecording(box, stream) {
+  var blob = new Blob(_micChunks, { type: _micMime });
+  var mime = _micMime;
+  if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+  _micRecorder = null; _micStream = null; _micChunks = [];
+  _recOn = false;
+  if (!blob.size) { renderMic(); toast('Did not catch any speech — tap 🎤 and try again.', 4000); return; }
+  _recBusy = true;
+  renderMic();
+  _micBlobB64(blob).then(function (b64) {
+    return window.transcribeAudio(b64, mime, micHint());
+  }).then(function (text) {
+    var clean = String(text || '').trim();
+    if (!clean) { toast('Did not catch any speech — tap 🎤 and try again.', 4000); return; }
+    box.value = (_recBase + clean).slice(0, ASK_MAX_CHARS);
+    askGrow();
+    renderCamBar();
+  }).catch(function (e) {
+    console.warn('transcription failed', e);
+    toast('That did not come through — tap 🎤 to try again, or type it instead.', 5000);
+  }).then(function () {
+    _recBusy = false;
+    renderMic();
+  });
+}
+
+/* -- the Web Speech fallback, for a browser with no MediaRecorder -- */
+function micStartSpeech(box) {
+  if (!SpeechRec) { toast('Dictation is not available on this browser — type it instead.', 4000); return; }
   var settled = '';
   var rec = new SpeechRec();
   _rec = rec;
@@ -4026,7 +4137,7 @@ function micStart() {
     toast('Dictation could not start — type it instead.', 4000);
   }
 }
-function micToggle() { if (_recOn) micStop(); else micStart(); }
+
 
 /* The box grows with what is in it, up to the height the CSS allows, so a
    three-line question is not read through a one-line slot. */
@@ -6054,6 +6165,10 @@ function renderEngineLine() {
   } else if (last.error) {
     bits.push('The last attempt failed on every route: ' + last.error);
   }
+  /* The mic is its own model and its own failure, so it gets its own
+     sentence: an app quietly dictating on the chat model looks exactly like
+     one using the speech model, only a little worse. */
+  if (typeof window.transcribeRouteNote === 'function') bits.push('🎙️ ' + window.transcribeRouteNote());
   el.textContent = bits.join(' ');
 }
 
@@ -10171,6 +10286,96 @@ let geminiModel = null;
 try {
   geminiModel = getGenerativeModel(getAI(app, { backend: new GoogleAIBackend() }), { model: AI_MODEL });
 } catch (e) { console.warn("Firebase AI init failed (AI disabled):", e); }
+
+/* =====================================================================
+   🎙️ TRANSCRIPTION — ONE MODEL, ONE DOOR
+   ---------------------------------------------------------------------
+   Speech is its own job and it has its own model. `gemini-3.5-transcribe`
+   reads every recording this app turns into text, through
+   `window.transcribeAudio` — the ONE door. A call site that reaches past
+   it to `window.askGemini` is a surface still transcribing on the general
+   chat model, and nothing on any screen would say so: the words come back
+   either way, a little worse.
+
+   THE MODEL IS A ROUTE, NOT A PROMISE. A model id gets renamed, withdrawn
+   and rolled out region by region, and an id this project cannot reach is
+   a 400/404 on EVERY recording — which reads as "the mic is broken"
+   rather than "that id is a release out of date". So it is tried FIRST
+   with the ordinary model behind it, and a refusal is remembered for
+   AI_TRANSCRIBE_DOWN_MS rather than paid for again on the next recording.
+   A success clears the mark, so the day the id starts answering this app
+   starts using it with nothing redeployed and nobody told.
+
+   NO THINKING LEVEL IS SENT. Every other call here carries thinkingConfig
+   and a level a model does not know is a 400 — no answer at all, not a
+   worse one. A speech model has no reason to know the chat models' scale,
+   so the one call that could break it is deliberately not made.
+   Transcription is reading, not reasoning.
+   ===================================================================== */
+const AI_TRANSCRIBE_MODEL = "gemini-3.5-transcribe";
+const AI_TRANSCRIBE_DOWN_MS = 10 * 60 * 1000;
+window.AI_TRANSCRIBE_MODEL = AI_TRANSCRIBE_MODEL;
+let transcribeModel = null;
+let _transcribeDownUntil = 0;
+let _transcribeWhy = "";
+function transcribeModelGet() {
+  if (transcribeModel) return transcribeModel;
+  try { transcribeModel = getGenerativeModel(getAI(app, { backend: new GoogleAIBackend() }), { model: AI_TRANSCRIBE_MODEL }); }
+  catch (e) { _transcribeWhy = String((e && e.message) || e); return null; }
+  return transcribeModel;
+}
+/* A model asked for "only the transcription" still hands back a quoted
+   string or a "Transcription:" label often enough to be worth taking off
+   here rather than leaving it in what the student typed. */
+function transcribeClean(text) {
+  let s = String(text || "").trim();
+  s = s.replace(/^(?:transcription|transcript)\s*[:\-—]\s*/i, "").trim();
+  if (s.length > 1 && /^["'“”]/.test(s) && /["'“”]$/.test(s)) s = s.slice(1, -1).trim();
+  return s;
+}
+async function runTranscribe(model, prompt, mimeType, data, maxOutputTokens) {
+  const res = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: mimeType, data: data } }] }],
+    generationConfig: { maxOutputTokens: maxOutputTokens, temperature: 0 }
+  });
+  return transcribeClean(res.response.text() || "");
+}
+/* `hint` is a sentence about what is being spoken — the language of the
+   paper, above all. A 华文 answer transcribed as English phonetics comes
+   back as nonsense, and that is the one thing the caller knows and the
+   model cannot. */
+window.transcribeAudio = async function transcribeAudio(base64, mimeType, hint) {
+  const mt = String(mimeType || "audio/webm").split(";")[0];
+  const prompt =
+    "Transcribe the spoken audio to text exactly and accurately. Return ONLY the transcription as plain text " +
+    "with correct spelling, capitalisation and punctuation. Do not translate, summarise, answer, add quotes, " +
+    "labels or commentary. If there is no clear speech, return an empty string." +
+    (hint ? "\n" + hint : "");
+  const model = Date.now() >= _transcribeDownUntil ? transcribeModelGet() : null;
+  if (model) {
+    try {
+      const out = await runTranscribe(model, prompt, mt, base64, 1024);
+      _transcribeDownUntil = 0; _transcribeWhy = "";
+      return out;
+    } catch (e) {
+      _transcribeDownUntil = Date.now() + AI_TRANSCRIBE_DOWN_MS;
+      _transcribeWhy = String((e && e.message) || e);
+      console.warn("The " + AI_TRANSCRIBE_MODEL + " route refused — falling back to " + AI_MODEL + ":", e);
+    }
+  }
+  if (!geminiModel) throw new Error("AI is not configured yet");
+  return runTranscribe(geminiModel, prompt, mt, base64, 1024);
+};
+/* What the page prints about the mic — only what it knows: which model the
+   last recording really went to, and what the dedicated one said the last
+   time it refused. */
+window.transcribeRouteNote = function transcribeRouteNote() {
+  if (Date.now() < _transcribeDownUntil) {
+    return "Speech is going through " + AI_MODEL + " for a few minutes: " + AI_TRANSCRIBE_MODEL +
+           " refused a moment ago" + (_transcribeWhy ? " (" + _transcribeWhy + ")" : "") + ".";
+  }
+  return "Speech is transcribed by " + AI_TRANSCRIBE_MODEL + ", with " + AI_MODEL + " behind it.";
+};
 
 /* =====================================================================
    ⚙️ TWO ENGINES, AND WHICHEVER ONE WILL ANSWER

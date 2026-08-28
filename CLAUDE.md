@@ -1642,7 +1642,53 @@ that same PDF**.
   touching the layout — it needs `npm i playwright-core`.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
+## 🎙️ The mic goes through the speech model (v1.30.0)
+
+`AI_TRANSCRIBE_MODEL` / `window.transcribeAudio` / `window.transcribeRouteNote`
+in the module, and `micRecordable` / `micStart` / `micStartRecording` /
+`micFinishRecording` / `micStartSpeech` / `micHint` in the page. **Every
+Polymath app that turns speech into text carries the same door — ship a change
+to all of them together.**
+
+The 🎤 was the browser's own Web Speech API, which is free and instant and is
+also why a dictated question came out in a different voice from every other mic
+in the centre: no punctuation worth the name, no Singapore place names, and —
+the one that matters most on this app — **华文 read as English phonetics on any
+phone whose Web Speech has no Chinese voice**.
+
+- **The recording goes to `gemini-3.5-transcribe`** through
+  `window.transcribeAudio`, the ONE door, with `AI_MODEL` behind it: a model id
+  renamed under us costs a worse transcription rather than no mic at all, a
+  refusal is remembered for `AI_TRANSCRIBE_DOWN_MS`, and a success clears it.
+- **Web Speech is kept as the FALLBACK**, for a browser with no MediaRecorder.
+  A mic that does something worse is better than a mic that does nothing —
+  which is the same reason the 🎤 is only shown when it will really work.
+  **`micRecordable()` is the ONE place that choice is made.**
+- **THE LANGUAGE STILL TRAVELS, on both routes** (`micHint` / `micLang`). It is
+  the one thing the caller knows and the model cannot, and it is not a nicety:
+  a 华文 question transcribed as English phonetics comes back as nonsense.
+- **The mic is CAPPED** (`MIC_MAX_MS`) and the button says what it is doing —
+  🎤 idle, ⏹ listening, ⏳ writing it down — because a recording being
+  transcribed looks exactly like a mic that has stopped working.
+- **The engine card says which model answered** (`window.transcribeRouteNote`),
+  for the reason every other line on that card exists: an app quietly running
+  on its fallback looks exactly like one running on its first choice.
+
 ## House rules
+- After touching **🎙️ transcription** (`AI_TRANSCRIBE_MODEL`,
+  `transcribeAudio`, `_transcribeModelGet`, `_transcribeClean`,
+  `TRANSCRIBE_PROMPT`, `transcribeRouteNote`, or any mic call site), record
+  something and check it comes back. Every failure here is silent in the one
+  direction that matters: a call site that goes back to `askGeminiVision`
+  still transcribes, so the mic keeps working and quietly stops using the
+  speech model — the words are simply a little worse, and nothing anywhere
+  says which model wrote them. Lose the fallback and a model id renamed under
+  us is a 400 on every recording, which reads as "the mic is broken"; lose the
+  down-mark and every recording pays for the same refusal; and send a
+  `thinkingConfig` to a speech model and it is a 400 rather than a worse
+  answer. The census exemption is the other half: a transcriber grounded in
+  the marking standards writes down the answer somebody wanted rather than
+  the one that was spoken.
 - After touching **the learning list or Ask Mr Chung** (`MB_LIST_*`,
   `mbListOf`, `mbIsLearning`, `mbInList`, `mbSetTab`, `mbSelectedIds`,
   `mbCardChipHtml`, `mbCardLearnClick`, `mbNoteWin`/`mbNoteMiss`'s learning
