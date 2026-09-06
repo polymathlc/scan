@@ -2384,6 +2384,7 @@ return {
   set store(v) { _store = v; },
   get last() { return window.aiLastCall; },
   AI_ENGINE_STORE, OPENAI_DEFAULT_MODEL, AI_DOWN_MS, OPENAI_URL, OPENAI_MAX_OUTPUT,
+  OPENAI_REASONING_RE, OPENAI_SUPERSEDED_MODELS, OPENAI_MODEL_GEN,
   openAiKey, openAiModel, openAiReady, aiEnginePref,
   kimiKey, kimiModel, kimiReady, KIMI_DEFAULT_MODEL, AI_ENGINES,
   aiEngineOrder, aiEngineIsDown, _openAiBody, _openAiText, aiAskWith
@@ -2401,11 +2402,34 @@ ok('the key slot is the shared one', eng.AI_ENGINE_STORE.key === 'sq_openai_key'
 ok('the model slot is the shared one', eng.AI_ENGINE_STORE.model === 'sq_openai_model');
 ok('the image-model slot is the shared one', eng.AI_ENGINE_STORE.imageModel === 'sq_openai_image_model');
 ok('Kimi has slots of its own', eng.AI_ENGINE_STORE.kimiKey === 'sq_kimi_key' && eng.AI_ENGINE_STORE.kimiModel === 'sq_kimi_model');
-ok('the backup model is the one the other apps use', eng.OPENAI_DEFAULT_MODEL === 'gpt-5.6-sol');
+ok('the backup model is the one the other apps use', eng.OPENAI_DEFAULT_MODEL === 'gpt-6-astra');
+
+/* A REASONING MODEL IS A FAMILY, NOT ONE ID. A gate written as /^gpt-5/ does
+   not merely miss the newer flagship — it sends it a `temperature`, which is a
+   400 on every single call, and the loop then falls to the next route for a
+   reason nothing on screen can name. */
+ok('the family covers the model this app actually uses', eng.OPENAI_REASONING_RE.test(eng.OPENAI_DEFAULT_MODEL));
+ok('…and the generation it replaced', eng.OPENAI_REASONING_RE.test('gpt-5.6-sol') && eng.OPENAI_REASONING_RE.test('gpt-5.7-sol'));
+ok('…and the fast variant of the same model', eng.OPENAI_REASONING_RE.test('gpt-6-astra-fast'));
+ok('…and the o-series', eng.OPENAI_REASONING_RE.test('o3') && eng.OPENAI_REASONING_RE.test('o4-mini'));
+ok('…and NOT a 4-series chat model, which does take a temperature',
+   !eng.OPENAI_REASONING_RE.test('gpt-4o') && !eng.OPENAI_REASONING_RE.test('gpt-4.1'));
+ok('a reasoning model is never sent a temperature',
+   eng._openAiBody('hi', { temperature: 0.2 }, eng.OPENAI_DEFAULT_MODEL).temperature === undefined);
+ok('…and a 4-series chat model still is',
+   eng._openAiBody('hi', { temperature: 0.2 }, 'gpt-4o').temperature === 0.2);
+
+/* THE MODEL AN ADMIN NEVER CHOSE IS NOT A CHOICE — a stored default from the
+   last flagship is lifted once, and a deliberate pick still sticks. */
+ok('the outgoing default is named', eng.OPENAI_SUPERSEDED_MODELS.indexOf('gpt-5.6-sol') >= 0);
+ok('…and the new one is not, or it would lift itself for ever',
+   eng.OPENAI_SUPERSEDED_MODELS.indexOf(eng.OPENAI_DEFAULT_MODEL) < 0);
+ok('the lift is stamped so it runs once per device', typeof eng.OPENAI_MODEL_GEN === 'string' && !!eng.OPENAI_MODEL_GEN);
+ok('…and the flag has a slot of its own', eng.AI_ENGINE_STORE.modelGen === 'sq_openai_model_gen');
 
 eng.store = {};
 ok('no key saved is no backup', eng.openAiReady() === false);
-ok('…and the model still has a name', eng.openAiModel() === 'gpt-5.6-sol');
+ok('…and the model still has a name', eng.openAiModel() === 'gpt-6-astra');
 eng.store = { sq_openai_key: '   ' };
 ok('whitespace is not a key', eng.openAiReady() === false);
 eng.store = { sq_openai_key: '  ' + KEY + '  ' };

@@ -1674,7 +1674,43 @@ phone whose Web Speech has no Chinese voice**.
   for the reason every other line on that card exists: an app quietly running
   on its fallback looks exactly like one running on its first choice.
 
+## 🤖 ChatGPT runs on GPT-6 Astra (v1.31.0)
+
+`OPENAI_DEFAULT_MODEL` / **`OPENAI_REASONING_RE`** / `OPENAI_SUPERSEDED_MODELS` /
+`OPENAI_MODEL_GEN` / the one-shot lift beside them.
+
+- **A REASONING MODEL IS A FAMILY, NOT ONE ID.** gpt-5.x and `gpt-6-astra`
+  behave identically where the request SHAPE is concerned — both take
+  `reasoning_effort`, both REFUSE a `temperature`. So a gate written as
+  `/^gpt-5/` does not merely miss the newer model, it sends it the **WRONG
+  REQUEST**: a temperature it answers with a 400. That is not a worse answer,
+  it is no answer at all, on every ChatGPT call — and it is silent, because the
+  loop simply falls to the next route for a reason nothing on screen can name.
+  The family is named ONCE and every gate asks it.
+- **A DEFAULT NOBODY CHOSE IS NOT A CHOICE.** The stored model is written every
+  time the settings are saved, so a device is carrying yesterday's default
+  pinned in its own storage — and a new default then reaches nobody who has
+  ever opened that panel. A model that was only ever a default is lifted ONCE,
+  per device; the flag is what makes a DELIBERATE pick of the old model stick.
+  Bump `OPENAI_MODEL_GEN` and add the outgoing id to
+  `OPENAI_SUPERSEDED_MODELS` on the next flagship.
+- **No `reasoning_effort` is sent from here**, deliberately: the model runs at
+  its own default, and a level a model does not know is a 400 rather than a
+  worse answer. The SERVER route (`askOpenAi` in `polymathlc/math/functions`)
+  chooses the model itself and carries its own copy of the family regex — and
+  **that half needs a functions deploy**, not just a page upload.
+- The other five apps (`polymathlc/cer`, `anskey`, `math`, `english`,
+  `chinese`) carry the same pair; keep all six in step.
+
 ## House rules
+- After touching **the ChatGPT engine** (`OPENAI_DEFAULT_MODEL`,
+  `OPENAI_REASONING_RE`, `OPENAI_SUPERSEDED_MODELS`, `OPENAI_MODEL_GEN`, the
+  one-shot lift, or the `temperature` gate in `_openAiBody`), check that a
+  ChatGPT call still answers. Both failures are silent: a `/^gpt-5/`-shaped
+  gate sends a reasoning model a temperature and every call 400s, which reads
+  on screen as "the backup is not working" rather than as the wrong request;
+  and a lift that stops running leaves every device pinned to the model it was
+  saved with, so a new default reaches nobody.
 - After touching **🎙️ transcription** (`AI_TRANSCRIBE_MODEL`,
   `transcribeAudio`, `_transcribeModelGet`, `_transcribeClean`,
   `TRANSCRIBE_PROMPT`, `transcribeRouteNote`, or any mic call site), record
