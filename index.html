@@ -1931,7 +1931,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.30.0';
+var APP_VERSION = 'v1.31.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -10437,9 +10437,32 @@ const AI_ENGINE_STORE = {
   model: 'sq_openai_model',
   imageModel: 'sq_openai_image_model',
   kimiKey: 'sq_kimi_key',
-  kimiModel: 'sq_kimi_model'
+  kimiModel: 'sq_kimi_model',
+  modelGen: 'sq_openai_model_gen'
 };
-const OPENAI_DEFAULT_MODEL = 'gpt-5.6-sol';
+const OPENAI_DEFAULT_MODEL = 'gpt-6-astra';
+/* A REASONING MODEL IS A FAMILY, NOT ONE ID, and this is the one place the
+   family is named. gpt-5.x and gpt-6-astra behave identically where the
+   request SHAPE is concerned — both take `reasoning_effort` and both REFUSE a
+   temperature — so a gate written as /^gpt-5/ does not merely miss the newer
+   model, it sends it the WRONG REQUEST: a temperature it answers with a 400,
+   and no thinking at all. Both are silent: the call drops to the next route
+   for a reason nothing on screen can name, or comes back fluent and thin. */
+const OPENAI_REASONING_RE = /^(gpt-[5-9]|o[1-9])/;
+/* THE MODEL AN ADMIN NEVER CHOSE IS NOT A CHOICE. A model that was only ever
+   a default is lifted to the new one ONCE, per device; the flag is what makes
+   a DELIBERATE pick of the old model stick. Bump OPENAI_MODEL_GEN and add the
+   outgoing id to OPENAI_SUPERSEDED_MODELS on the next flagship. */
+const OPENAI_SUPERSEDED_MODELS = ['gpt-5.6-sol'];
+const OPENAI_MODEL_GEN = 'astra';
+(function _openAiLiftDefaultOnce() {
+  try {
+    if (localStorage.getItem(AI_ENGINE_STORE.modelGen) === OPENAI_MODEL_GEN) return;
+    localStorage.setItem(AI_ENGINE_STORE.modelGen, OPENAI_MODEL_GEN);
+    var m = (localStorage.getItem(AI_ENGINE_STORE.model) || '').trim();
+    if (m && OPENAI_SUPERSEDED_MODELS.indexOf(m) >= 0) localStorage.setItem(AI_ENGINE_STORE.model, OPENAI_DEFAULT_MODEL);
+  } catch (e) { /* private browsing: nothing is stored, so there is nothing to lift */ }
+})();
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 // An over-large budget is a 400 rather than a long answer, so it is clamped.
 const OPENAI_MAX_OUTPUT = 32000;
@@ -10765,10 +10788,10 @@ function _openAiBody(prompt, opts, model) {
     // the belt on a call that would otherwise 400 rather than answer.
     if (!/json/i.test(prompt + ' ' + system)) messages[messages.length - 1].content.push({ type: 'text', text: 'Reply with JSON only.' });
   }
-  // A gpt-5 model runs only at its own default temperature; sending one is a
+  // A reasoning model runs only at its own default temperature; sending one is a
   // 400. `thinkingLevel` is deliberately not translated either — an argument
   // a model does not know is a failed call, not a worse answer.
-  if (opts.temperature !== undefined && !/^gpt-5/.test(model)) body.temperature = opts.temperature;
+  if (opts.temperature !== undefined && !OPENAI_REASONING_RE.test(model)) body.temperature = opts.temperature;
   return body;
 }
 
