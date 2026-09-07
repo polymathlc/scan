@@ -360,6 +360,45 @@ No web page can attach a file to a WhatsApp link — `wa.me` carries text and
 nothing else — so those two really are the only routes there are, and the
 button now takes the one that lands in the right chat.
 
+## Marked photo report and teacher corrections (v1.32.0)
+
+Photograph every page in the live camera, press **Done**, then **✓**. Gallery
+photos and PDF pages use the same queue. The existing live notebook shared by
+**Ans Key and CER** supplies the marking guidance; the report states when those
+notes are unavailable or no applicable notes were loaded.
+
+The results now include:
+
+- A front table with **question, topics, learning objective, marks obtained / full
+  marks, and reason for losing marks**. All detected questions and subparts appear.
+- A **What to study next** page using the question feedback and the whole-paper
+  report. It still provides revision priorities if the final report call fails.
+- The original photographed pages with **✓ correct, ✗ incorrect, ✓/✗ partly
+  correct**, plus a labelled result for each question below its page. Unreadable
+  writing gets a review flag; blanks remain unattempted.
+
+On the teacher account, press **Edit results table**. Correct the question number,
+up to three topics, the learning objective, verdict, marks, or reason. The student
+answer is editable too when the handwriting was misread. **Save corrections**
+validates the whole table before applying anything, updates the total and photo
+symbols, and refreshes study suggestions. **Cancel** discards the draft. An
+unrelated note update never wipes what you are typing. Corrections stay in this
+paper; they do not automatically change the shared teaching notebook.
+
+**Print marked paper** puts the first results table on page 1 and the study
+suggestions on page 2. Long tables continue after the study page, so no question
+row is discarded to make a whole exam fit. The marked photos and worked answers
+follow. Unknown allocations are shown as `—`; a marks total is withheld if any
+attempted answer still needs review or an allocation. Teacher corrections may
+supply the allocation. Failed images/pages are identified in the report.
+
+Validation: `node tools/paper-report-tests.mjs` also runs the existing Scan suite.
+Use `--fixture` to prepare an offline interaction fixture outside the repository.
+`tools/paper-report-dom-tests.cjs` exercises the real editing handlers with jsdom;
+it checks DOM behaviour, not pixel layout. `tools/mobile-check.mjs` includes the
+report and its editing controls; `--prepare-only` emits its fixture without
+launching a browser. Full layout checks still require Chromium.
+
 ## What it does
 
 Three buttons and two tabs. The **Snap** tab is a camera:

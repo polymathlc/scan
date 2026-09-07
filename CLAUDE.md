@@ -24,6 +24,38 @@ Guidance for Claude when working in this repo.
   Polymath app's vetting list. See those two sections below.
 - Version badge (`APP_VERSION`, shown in the header) is hard-coded — bump it on every change.
 
+## Marked paper table and teacher overrides (v1.32.0)
+
+- `SCAN_REPORT_RULE` adds display-only topics, learning objective, printed full
+  marks, loss reason, study advice and a page-local annotation point to page
+  answers. This is not a shared notebook/schema change. Vetting still chooses
+  its own topics and never receives these guesses.
+- `paperItems` / `paperReportHtml` give every detected page question a results
+  row, even when the optional AI commentary is ineligible or fails. The existing
+  two-attempted-question threshold only controls the extra commentary call.
+- `paperMark` and `paperTotals` use actual allocations, never the legacy
+  half-credit estimate. Contradictory or unavailable marks are review items.
+  Blanks keep their full allocation but no awarded mark and no cross.
+- `_paperRun` freezes the submitted page order, student and grounding description.
+  Reordering or removing gallery shots must not move marks onto another photo.
+  A reliable mark point is preferred; the validated question box is the fallback.
+  Each page also lists its question verdicts, including when no point is known.
+- `paperEditStart` and `paperEditSave` both check the teacher account. Save validates
+  ALL rows before applying ANY; Cancel and live notebook/report repaints preserve
+  saved results and unsaved typing respectively. A corrected verdict requires a
+  transcription, and numeric marks must agree with the verdict. Teacher changes
+  invalidate old commentary; `_reportSeq` also drops a response already in flight.
+- `preparePaperPrint` measures rows at A4 width and orders the first results page,
+  first study page, then overflow report pages. It never drops rows to force a
+  long exam onto the cover. `clearPaperPrint` removes the temporary print DOM.
+- Run `node tools/paper-report-tests.mjs` (includes the existing suite). Optional
+  `--fixture` writes an offline fixture outside this repository; run the DOM
+  harness with jsdom as described in its header. DOM tests use simulated page
+  capacity, so they verify order and completeness, not actual pixel layout.
+  `tools/mobile-check.mjs` includes the new controls and a matching mutant;
+  `--prepare-only` emits its fixture when a browser cannot run, without claiming
+  that layout has passed.
+
 ## The AI is the Ans Key app's, ported whole
 Everything that decides what an answer SAYS is a lift from `polymathlc/anskey` — **keep the two in
 step, and ship a change to the shape in both repos together**:

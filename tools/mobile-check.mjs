@@ -72,8 +72,10 @@ if (!path.relative(REPO, path.resolve(OUT)).startsWith('..')) {
 const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 let chromium;
-try { ({ chromium } = await import('playwright-core')); }
-catch { console.error('needs playwright-core:  npm i playwright-core'); process.exit(2); }
+if (!process.argv.includes('--prepare-only')) {
+  try { ({ chromium } = await import('playwright-core')); }
+  catch { console.error('needs playwright-core:  npm i playwright-core'); process.exit(2); }
+}
 
 const src = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 function cut(a, b) {
@@ -147,7 +149,7 @@ const api = new Function(prelude +
   cut('/* =====================================================================\n   THE SCAN', '/* ---- Showing the answers ----') +
   cut('/* ---- Showing the answers ----', '/* =====================================================================\n   📋 THE REPORT') +
   `\n  return { answerCardHtml: answerCardHtml, mbRowHtml: mbRowHtml, mbTabsHtml: mbTabsHtml,
-           reportCardHtml: reportCardHtml, setReport: function (v) { _report = v; },
+           paperReportHtml: paperReportHtml, paperEditHtml: paperEditHtml, reportCardHtml: reportCardHtml, setReport: function (v) { _report = v; },
            /* 📄 The worksheet is a whole screen this app has now, and it is the
               one screen that is MEANT to be printed — so it is laid out and
               measured like everything else rather than trusted. */
@@ -274,6 +276,10 @@ api.setReport({
   }
 });
 const reportDone = api.reportCardHtml();
+api.setAnswers(paper.map((it) => ({ ...it, topics: ['Heat transfer'],
+  learningObjective: 'Explain the process and use evidence from the question.' })));
+const paperReport = api.paperReportHtml();
+const paperEditor = api.paperEditHtml();
 if (!reportFail || !reportDone) {
   console.error('the report card rendered empty — the harness is not seeding it, and every ' +
                 'claim about the report is worthless. Check reportCardHtml\'s shape.');
@@ -313,7 +319,7 @@ let page = src
            '<div class="modalBody" id="mbBody">' + bookBody + '</div>')
   .replace('<div class="shots" id="shots"></div>',
            '<div class="shots" id="shots">' + STRIP + '</div>')
-  .replace('<div id="reportWrap"></div>', '<div id="reportWrap">' + reportDone + reportFail + '</div>')
+  .replace('<div id="reportWrap"></div>', '<div id="reportWrap">' + reportDone + reportFail + paperReport + paperEditor + '</div>')
   /* The student's own typed instruction, which is 1200 characters wide at the
      limit and reaches the page through `.sub` like the engine line does. */
   .replace('<p class="sub" id="askedLine" style="margin-top:10px;display:none"></p>',
@@ -354,6 +360,7 @@ page = page.replace('<h2 id="answersTitle" style="margin:0">The answers</h2>',
 fs.mkdirSync(OUT, { recursive: true });
 const file = path.join(OUT, 'page.html');
 fs.writeFileSync(file, page);
+if (process.argv.includes('--prepare-only')) { console.log('Prepared offline layout fixture: ' + file); process.exit(0); }
 
 /* EVERY ONE OF THESE IS A WIDTH SOMEBODY HOLDS, AND THEY MUST NOT ALL SIT ON
    ONE SIDE OF A BREAKPOINT. The first pass tested 393, 375 and 320 — all three
@@ -395,6 +402,15 @@ async function measure(url, vp) {
   const p = await ctx.newPage();
   await p.goto(url, { waitUntil: 'load' });
   await p.waitForTimeout(120);
+
+  const reportControls = await p.evaluate(() => {
+    const rows = [...document.querySelectorAll('.paperEditActions')];
+    return rows.length > 0 && rows.every(row => [...row.querySelectorAll('button')].every(button => {
+      const r = button.getBoundingClientRect();
+      return r.height >= 44 && r.left >= row.getBoundingClientRect().left - 1 && r.right <= row.getBoundingClientRect().right + 1;
+    }));
+  });
+  ok('report editing controls wrap and remain touch-sized', reportControls);
 
   /* ① THE ONE THAT MATTERS — AND IT WAS MEASURED AGAINST THE WRONG NUMBER.
      Under `isMobile` Chromium emulates the very shrink-to-fit this check
@@ -806,6 +822,10 @@ const MUST_PASS = [
      node tools/mobile-check.mjs --selftest
    --------------------------------------------------------------------- */
 const MUTANTS = [
+  { check: 'report editing controls wrap and remain touch-sized',
+    why: 'table correction actions accidentally collapsed',
+    also: ['every control is at least 44px, in every window'],
+    css: '.paperEditActions button { min-height: 0 !important; height: 1px !important; padding: 0 !important; overflow: hidden !important; }' },
   { check: 'the page is no wider than the screen',
     why: 'a 900px block dropped on the page',
     also: ['nothing hangs off either edge', 'no window lays itself out wider than the screen'],
