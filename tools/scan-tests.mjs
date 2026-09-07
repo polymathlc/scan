@@ -166,6 +166,11 @@ const api = new Function(prelude + json + grounding + scan + steps + worksheet +
     set sheetKeyOn(v) { _sheetKeyOn = v; },
     _reportMarkStr, reportScore, reportEligible, _reportPrompt, _reportNew, _reportRefs,
     reportScoreText, reportCountsText, reportBasisText, reportAsText, reportCardHtml,
+    paperMark, paperMarkText, paperLossReason, paperTotals, paperRowHtml, paperReportHtml, paperStudyBlocks,
+    paperEditPatch, paperEditStart, paperEditSave, paperEditHtml, markedPhotosHtml, paperWarnings, runReport,
+    set paperRun(v) { _paperRun = v; }, get paperEditing() { return _paperEditing; },
+    set run(v) { _scanRun = v; }, set ai(v) { window.askGemini = v; window.aiReady = () => true; },
+    invalidateReport() { _reportSeq++; _report = null; },
     REPORT_SYS, REPORT_MIN_MARKED, REPORT_MAX_GAPS, REPORT_MAX_LIST,
     set answers(v) { _answers = v; },
     set report(v) { _report = v; },
@@ -919,18 +924,18 @@ ok('a question reference is matched however it is written',
 api.answers = paper;
 api.report = { run: 1, status: 'done', score: api.reportScore(paper), words, err: '' };
 const rtxt = api.reportAsText();
-ok('the copied report carries the score', rtxt.includes('50%'));
+ok('the copied report uses actual allocations and flags missing marks', rtxt.includes('Marks total pending') && !rtxt.includes('50%'));
 ok('the copied report carries the words', rtxt.includes('A solid paper.') && rtxt.includes('Units'));
 ok('the report is copied out with the answers', /var rep = reportAsText\(\);/.test(html));
 ok('the report card is not in the noPrint header', html.indexOf('id="reportWrap"') > html.indexOf('</div>\n      <!-- 📋'));
 ok('the report card prints', /\.reportCard \{ break-inside: avoid/.test(html));
 /* A failed call still leaves a real report: the score was never the model's. */
 api.report = { run: 1, status: 'failed', score: api.reportScore(paper), words: null, err: 'no network' };
-ok('a failed report still shows the score', api.reportAsText().includes('50%'));
+ok('a failed commentary still copies the real allocation status', api.reportAsText().includes('Marks total pending'));
 ok('…and says the words are the part that failed',
    /could not be written/.test(api.reportCardHtml()) && api.reportCardHtml().includes('50%'));
 api.report = null;
-ok('no report is no text', api.reportAsText() === '' && api.reportCardHtml() === '');
+ok('without AI commentary the question table still copies', /Question \| Topics/.test(api.reportAsText()) && api.reportCardHtml() === '');
 
 /* It runs itself, once the whole paper has been read, and a reply that
    arrives after the teacher has started again is dropped. */
@@ -938,7 +943,7 @@ ok('the report is written after the run, not during it',
    /await runReport\(run\);/.test(html) &&
    html.indexOf('await runReport(run);') > html.indexOf('async function runScan'));
 ok('last paper\'s report never outlives its paper', /_report = null; +\/\/ last paper/.test(html));
-ok('a stale report is dropped', (report.match(/if \(run !== _scanRun\) return;/g) || []).length >= 2);
+ok('a stale report is dropped', (report.match(/if \(run !== _scanRun \|\| reportSeq !== _reportSeq\) return;/g) || []).length >= 2);
 
 /* ---------- 📷 The live viewfinder ----------
    A camera that stays open is worth having only if it can also NOT be there:
@@ -4073,4 +4078,6 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
 }
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
-process.exit(fails ? 1 : 0);
+if (fails) process.exit(1);
+
+export { api, prelude, json, grounding, scan, steps, worksheet, report, book, vet, authFns };

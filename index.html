@@ -1209,6 +1209,67 @@
     .sheetQ { break-inside: avoid; }
     .sheetKey { break-before: page; page-break-before: always; padding-top: 8px; }
   }
+  .paperEditActions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  .paperEditActions .btn { min-height: 44px; }
+  .paperEditTable textarea, .paperEditTable input, .paperEditTable select { width: 100%; min-width: 0; box-sizing: border-box; font-size: 16px; padding: 8px; }
+  .paperEditTable textarea { resize: vertical; }
+  .paperEditLabel { display: block; margin: 8px 0 4px; font-size: .8rem; }
+  /* Marked paper: a readable report on screen and measured A4 pages in print. */
+  .paperReport, .markedPhotoCard { margin: 20px auto; padding: 24px; max-width: 960px;
+    background: #fff; border: 1px solid #dce4dc; border-radius: 16px; overflow-wrap: anywhere; }
+  .paperReport h2, .markedPhotoCard h2 { margin: 0 0 16px; }
+  .paperEyebrow { color: #526651; font-size: .8rem; margin-bottom: 12px; }
+  .paperTotal { font-size: 1.15rem; font-weight: 700; margin: 12px 0; }
+  .paperMeta, .paperPrintFoot { color: #596659; font-size: .83rem; line-height: 1.6; margin: 8px 0; }
+  .paperWarning { color: #764a08; background: #fff5de; padding: 12px; border-radius: 8px; line-height: 1.6; }
+  .paperTableScroll { max-width: 100%; overflow-x: auto; margin-top: 20px; }
+  .paperTable { width: 100%; min-width: 680px; table-layout: fixed; border-collapse: collapse; font-size: .87rem; line-height: 1.5; }
+  .paperTable th, .paperTable td { border: 1px solid #d5ded5; padding: 10px 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  .paperTable thead { display: table-header-group; background: #eaf1e9; color: #243d28; }
+  .paperTable small { display: block; color: #596659; font-weight: 400; margin-top: 5px; }
+  .paperVerdict { font-family: Arial, sans-serif; font-size: 1.2em; font-weight: 700; white-space: nowrap; }
+  .paperVerdict.correct { color: #146333; }
+  .paperVerdict.wrong { color: #b21e2d; }
+  .paperVerdict.partial { color: #865200; }
+  .paperVerdict.review { color: #5b5866; }
+  .paperStudyBlock { margin: 20px 0; line-height: 1.7; break-inside: avoid; }
+  .paperStudyBlock h3 { font-size: 1rem; margin: 0 0 8px; }
+  .paperStudyBlock p { margin: 8px 0; }
+  .paperStudyBlock ul, .paperStudyBlock ol { padding-left: 24px; }
+  .markedPhotoFrame { position: relative; width: fit-content; max-width: 100%; margin: 0 auto; }
+  .markedPhotoFrame img { display: block; max-width: 100%; height: auto; }
+  .photoMark { position: absolute; transform: translate(-50%, -50%); background: rgba(255,255,255,.94);
+    border: 1px solid currentColor; border-radius: 6px; padding: 1px 5px; line-height: 1.2; text-align: center;
+    color: #493f37; font-size: clamp(16px, 2.4vw, 26px); }
+  .photoMark small { display: block; font-size: 10px; }
+  .photoResults { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; font-size: .85rem; }
+  .photoResults > span { border: 1px solid #dce4dc; padding: 6px 10px; border-radius: 8px; }
+  .paperPrintOnly { display: none; }
+  .paperPrintPage { width: 190mm; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 10pt;
+    line-height: 1.45; color: #17291c; overflow-wrap: anywhere; }
+  .paperPrintPage h2 { font-size: 17pt; margin: 0 0 12px; }
+  .paperPrintPage .paperTable { min-width: 0; font-size: 9pt; }
+  .paperPrintPage .paperTable th, .paperPrintPage .paperTable td { padding: 7px 6px; }
+  .paperPrintPage .paperMeta, .paperPrintPage .paperPrintFoot, .paperPrintPage .paperEyebrow { font-size: 8pt; }
+  .paperPrintPage .paperStudyBlock { font-size: 10pt; }
+  @media print {
+    @page { size: A4; margin: 10mm; }
+    body.paperPrinting #reportWrap { display: none !important; }
+    body.paperPrinting .paperPrintOnly { display: block; }
+    .paperPrintPage { break-after: page; page-break-after: always; }
+    .paperTable tr { break-inside: avoid; }
+    .paperTableScroll { overflow: visible; }
+    .paperTable { min-width: 0; }
+    .paperFront, .paperStudy { break-after: page; }
+    .markedPhotoCard { break-before: page; break-inside: avoid; border: 0; border-radius: 0; padding: 0; margin: 0; }
+    .markedPhotoFrame img { max-height: 210mm; width: auto; }
+    .photoMark { font-size: 21px; }
+    .photoResults { font-size: 9pt; gap: 6px; margin-top: 10px; }
+    .photoResults > span { padding: 2px 6px; }
+    body.paperPrinting #answersList { break-before: page; }
+    .paperTable thead, .paperVerdict, .photoMark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
 </style>
 </head>
 <body>
@@ -1341,6 +1402,7 @@
       <!-- 📋 The report on the whole paper. Outside the noPrint header card on
            purpose: it is the one thing on this screen that has to reach paper. -->
       <div id="reportWrap"></div>
+      <div id="markedPhotos"></div>
       <div id="answersList"></div>
     </div>
 
@@ -1351,6 +1413,7 @@
     <div class="card">
       <h2>How to use it</h2>
       <ol class="howList" style="margin-top:16px">
+        <li><b>Photograph every page, then mark.</b> Keep taking photos in the live camera and press Done when you have all pages. Press ✓ to mark the whole paper using the shared Ans Key and CER teaching notes. The report lists each question, topic, learning objective, marks and reason for lost marks, followed by what to study next. Print marked paper puts the table first, study suggestions second and photographed pages with ticks and crosses after the report. Long tables continue after the study page.</li>
         <li><b>Photograph each page.</b> Press the big button and take one photo per page, in the order they are printed. Flat on a table, in good light — the answers are only as good as the small print.</li>
         <li><b>Or pick them out of your gallery.</b> The button on the left opens it, and the number on it is how many pages you have so far. Tap a page to take it out or move it.</li>
         <li><b>The camera stays open.</b> Tap the shutter and it takes the page — no “use photo / retake”, no
@@ -1931,7 +1994,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.31.0';
+var APP_VERSION = 'v1.32.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -2919,6 +2982,7 @@ var _shotSeq = 0;
 var _answers = [];               // [{ number, page, question, options[], option, answer, explanation }]
 var _scanning = false;
 var _scanRun = 0;                // bumped on every run, so a stale reply is dropped
+var _paperRun = null;            // fixed page order and grounding for this marked paper
 var _askedFor = '';              // what the last run was asked, shown above its answers
 
 /* ---- What ✓ will do ----
@@ -3086,6 +3150,20 @@ var SCAN_STEPS_RULE =
   'more than ' + SCAN_STEPS_MAX + ' steps. The steps are the SAME working as "explanation", set out for walking ' +
   'through — not a different answer, and not a replacement for it. ';
 
+var SCAN_REPORT_RULE =
+  'For EVERY question, including blanks, return "topics" (one to three short topic names), ' +
+  '"learningObjective" (one specific skill, starting with a verb, in pupil-friendly language), ' +
+  'and "maxMarks" (the numeric allocation PRINTED for this individual question/part, or null if absent). ' +
+  'Never assign a parent question total to each subpart. Use the shared teaching notes from Ans Key and CER ' +
+  'for the terminology, learning objectives and marking criteria wherever relevant. Do not invent a syllabus code. ' +
+  'For a wrong or partly right answer, "lossReason" names the precise missing point, wrong step or misconception ' +
+  'that cost marks, consistent with "feedback", and "studyAdvice" gives a specific action to practise that skill. ' +
+  'Both are empty for a correct, blank or unreadable answer. Never invent a reason when the writing is unreadable. ' +
+  '"endPage" is the last attached picture this question spans, using the same batch-local numbering as "page". ' +
+  '"markPoint" is [y,x], two numbers from 0 to 1000 locating clear space beside the student answer for a tick ' +
+  'or cross. "markPage" is the attached picture that point is on, between page and endPage. ' +
+  'Do not cover the writing. Return null for markPoint if you cannot locate it confidently. ';
+
 var SCAN_SYS =
   'You are an experienced Singapore tuition teacher (P3 to Secondary 1) working through the photographs of a ' +
   'Science, Mathematics, English or Chinese worksheet or exam paper that are attached. You do TWO things at once, ' +
@@ -3101,6 +3179,8 @@ var SCAN_SYS =
   '"feedback":"what to say to the student about what they wrote, or an empty string",' +
   '"subject":"science | math | english | chinese",' +
   '"answerSource":"key | worked","keyNote":"",' +
+  '"topics":["Heat"],"learningObjective":"Explain heat transfer","maxMarks":null,' +
+  '"lossReason":"","studyAdvice":"","endPage":1,"markPage":1,"markPoint":null,' +
   '"questionBox":[ymin,xmin,ymax,xmax],"diagramBox":[ymin,xmin,ymax,xmax]}]}. ' +
   'Rules: one entry for every question actually PRINTED on the ' +
   'attached pictures, in the order they appear, keeping the paper\'s own numbering in "number" ("16", "3a"). ' +
@@ -3115,6 +3195,7 @@ var SCAN_SYS =
   'instructions page or a blank page returns {"questions":[]}. ' +
   '"page" is which of the attached pictures the question is printed on, 1 for the first attached picture. ' +
   SCAN_BOX_RULE +
+  SCAN_REPORT_RULE +
   '"question" is the printed wording as plain text, without the number itself; when the question depends on a ' +
   'diagram, graph or table, add a short factual description of it in brackets at the end. ' +
   'For a multiple-choice question, "type" is "mcq", "options" lists every printed option as ' +
@@ -4644,6 +4725,31 @@ function _askFoldRows(rows, into) {
   return made;
 }
 
+/* Display metadata stays on the scan item; it never changes the shared notebook
+   schema or files guessed topics into a destination question bank. */
+function _scanReportFields(r) {
+  var topics = [];
+  (Array.isArray(r.topics) ? r.topics : []).forEach(function (v) {
+    var t = typeof v === 'string' ? _scanStr(v, 80) : '';
+    if (t && topics.indexOf(t) < 0 && topics.length < 3) topics.push(t);
+  });
+  return {
+    topics: topics,
+    learningObjective: _scanStr(r.learningObjective, 220),
+    maxMarks: typeof r.maxMarks === 'number' && isFinite(r.maxMarks) && r.maxMarks > 0 && r.maxMarks <= 100
+      ? r.maxMarks : null,
+    lossReason: _scanStr(r.lossReason, 500),
+    studyAdvice: _scanStr(r.studyAdvice, 400)
+  };
+}
+function _scanMarkAnchor(r, batchStart, page, endPage) {
+  var p = r.markPage == null ? page : r.markPage;
+  var pt = r.markPoint;
+  if (!Number.isInteger(p) || p < page || p > endPage || !Array.isArray(pt) || pt.length !== 2 ||
+      !pt.every(function (n) { return typeof n === 'number' && isFinite(n) && n >= 0 && n <= 1000; })) return [];
+  return [{ page: batchStart + p, y: pt[0], x: pt[1] }];
+}
+
 function _scanNewItem(r, batchStart, batchLen) {
   if (!r || typeof r !== 'object') return null;
   var question = _scanStr(r.question, 1400);
@@ -4662,9 +4768,17 @@ function _scanNewItem(r, batchStart, batchLen) {
   var page = parseInt(r.page, 10);
   if (!(page >= 1 && page <= batchLen)) page = 1;
 
+  var endPage = Number.isInteger(r.endPage) && r.endPage >= page && r.endPage <= batchLen ? r.endPage : page;
+  var meta = _scanReportFields(r);
   var mk = _markFields(r);
   return {
     kind: 'page',
+    topics: meta.topics,
+    learningObjective: meta.learningObjective,
+    maxMarks: meta.maxMarks,
+    lossReason: mk.marked && mk.verdict !== 'correct' ? meta.lossReason : '',
+    studyAdvice: mk.marked && mk.verdict !== 'correct' ? meta.studyAdvice : '',
+    markAnchors: _scanMarkAnchor(r, batchStart, page, endPage),
     subject: _scanSubject(r),
     // Two rectangles, both on THIS question's page and both normalised the
     // moment they arrive, so an invented or malformed one never reaches a
@@ -4675,7 +4789,7 @@ function _scanNewItem(r, batchStart, batchLen) {
     box: _mbBoxOk(r.diagramBox) ? r.diagramBox.map(Number) : null,
     number: _scanStr(r.number, 16),
     page: batchStart + page,          // 1-based across the whole run
-    endPage: batchStart + page,
+    endPage: batchStart + endPage,
     type: type,
     question: question,
     options: options,
@@ -4726,7 +4840,12 @@ function _scanFoldRows(rows, batchStart, batchLen, into) {
     var prev = into[into.length - 1];
     if (i === 0 && r && r.continuation === true && prev) {
       prev.question = (prev.question + ' ' + it.question).trim();
-      prev.endPage = it.page;
+      prev.endPage = it.endPage;
+      prev.markAnchors = (prev.markAnchors || []).concat(it.markAnchors || []);
+      if (it.topics.length) prev.topics = it.topics;
+      if (it.learningObjective) prev.learningObjective = it.learningObjective;
+      if (it.maxMarks != null) prev.maxMarks = it.maxMarks;
+      if (it.marked) { prev.lossReason = it.lossReason; prev.studyAdvice = it.studyAdvice; }
       if (it.options.length && !prev.options.length) prev.options = it.options;
       if (it.option && !prev.option) prev.option = it.option;
       if (it.answer) prev.answer = it.answer;
@@ -5121,6 +5240,7 @@ function _applyMarkFix(items, rows, need) {
     it.verdict = mk.verdict;
     it.marks = mk.marks;
     it.feedback = mk.feedback;
+    it.lossReason = ''; it.studyAdvice = ''; // repaired feedback replaces the earlier reason
     fixed++;
   });
   return fixed;
@@ -5333,6 +5453,11 @@ async function runScan() {
   _keyCallsLeft = SCAN_KEY_CALLS;             // …and for the hunt for the answer key
   _scanKey = null;                            // last paper's key must never mark this one
   _answers = [];
+  _paperEditing = null; _reportSeq++;
+  _paperRun = mode === 'sheet' || !shots.length ? null : {
+    shots: shots.slice(), failedInputs: _shots.filter(function (s) { return !s.data; }).map(function (s) { return s.name; }),
+    grounding: groundingSummary().slice(), student: scanForName(), date: new Date().toLocaleDateString('en-GB')
+  };
   _report = null;                 // last paper's report must never outlive its paper
   _askedFor = ask;
   _ranAs = mode;
@@ -5503,7 +5628,10 @@ function _ansEditApply(it, patch) {
     it.marks = '';
     it.feedback = '';
   }
-  if (JSON.stringify([it.answer, it.explanation, it.verdict, it.marks, it.feedback, it.option || '']) !== before) it.edited = true;
+  if (JSON.stringify([it.answer, it.explanation, it.verdict, it.marks, it.feedback, it.option || '']) !== before) {
+    it.edited = true; it.lossReason = ''; it.studyAdvice = '';
+    _report = null; _reportSeq++; // the previous study report describes marks the teacher has just changed
+  }
   return it;
 }
 
@@ -6054,8 +6182,8 @@ function renderAnswers() {
       : 'No teaching notes are being applied — this is the ordinary syllabus standard.';
   }
   $('copyAnswersBtn').disabled = !_answers.length;
-  $('printAnswersBtn').disabled = !_answers.length;
-  $('printAnswersBtn').textContent = sheet ? '🖨 Print worksheet' : '🖨 Print';
+  $('printAnswersBtn').disabled = !_answers.length || _scanning || !!_paperEditing;
+  $('printAnswersBtn').textContent = sheet ? '🖨 Print worksheet' : '🖨 Print marked paper';
   renderReport();
   renderStepAllBtn();
   renderVetAllBtn();
@@ -6595,6 +6723,7 @@ var REPORT_MAX_GAPS = 4;     // a report naming eight themes has grouped nothing
    paper, and a score that treats them alike is the one a student argues with. */
 var REPORT_CREDIT = { correct: 1, partial: 0.5, wrong: 0 };
 
+var _reportSeq = 0;
 var _report = null;   // { run, status: 'writing'|'done'|'failed', score, words, err }
 
 /* The ONE place "2/3" becomes two numbers. It is deliberately strict: the
@@ -6733,6 +6862,11 @@ function _reportPrompt(items, s) {
       ' | asked: ' + (_scanStr(it.question, 320) || '(not transcribed)') +
       ' | the student wrote: ' + (it.studentAnswer || '(could not be read)') +
       ' | the correct answer: ' + (_scanStr(it.answer, 240) || (it.option ? '(' + it.option + ')' : '—')) +
+      ' | topics: ' + (it.topics || []).join(', ') +
+      ' | learning objective: ' + (it.learningObjective || '') +
+      ' | feedback: ' + _scanStr(it.feedback, 500) +
+      ' | reason for losing marks: ' + paperLossReason(it) +
+      ' | study advice: ' + (it.studyAdvice || '') +
       ' | marked: ' + (it.verdict || 'answered but not judged') +
       (it.marks ? ' (' + it.marks + ')' : ''));
   });
@@ -6804,6 +6938,7 @@ function _reportNew(parsed, items) {
    WORDS are waited for. A call that fails therefore still leaves a real
    report rather than an empty space where one was promised. */
 async function runReport(run) {
+  var reportSeq = ++_reportSeq;
   var items = _answers.slice();
   if (!reportEligible(items)) { _report = null; renderReport(); return; }
   if (!window.askGemini || !window.aiReady || !window.aiReady()) return;
@@ -6822,13 +6957,13 @@ async function runReport(run) {
       temperature: 0.3,
       json: true
     });
-    if (run !== _scanRun) return;                 // a newer run owns the screen now
+    if (run !== _scanRun || reportSeq !== _reportSeq) return;                 // a newer run owns the screen now
     var words = _reportNew(_parseAIJson(raw), items);
     if (words.empty) throw new Error('nothing came back');
     _report.words = words;
     _report.status = 'done';
   } catch (err) {
-    if (run !== _scanRun) return;
+    if (run !== _scanRun || reportSeq !== _reportSeq) return;
     console.warn('report: failed', err);
     _report.status = 'failed';
     _report.err = (err && err.message) || 'it could not be written';
@@ -6888,9 +7023,337 @@ function reportCardHtml() {
     (basis ? '<div class="repNote">' + escHtml(basis) + '</div>' : '') + '</div>';
 }
 
+/* ---- The marked paper: table, study page, then the actual photographs ---- */
+/* Teacher corrections are explicit and stay with this paper. They never teach
+   the shared notebook automatically or give students a score-editing control. */
+var _paperEditing = null;
+function paperEditStart() {
+  if (!isAdmin(currentUser) || _scanning || !paperItems().length) return;
+  _paperEditing = { run: _scanRun };
+  $('reportWrap').innerHTML = paperEditHtml();
+  $('printAnswersBtn').disabled = true;
+}
+function paperEditCancel() {
+  _paperEditing = null;
+  renderAnswers();
+}
+function paperEditHtml() {
+  function field(i, name, value, label, number) {
+    var id = 'paperEdit-' + i + '-' + name;
+    var aria = escHtml('Question ' + (i + 1) + ': ' + label);
+    return number ? '<label class="paperEditLabel" for="' + id + '">' + escHtml(label) + '</label>' +
+      '<input id="' + id + '" aria-label="' + aria + '" type="number" min="0" max="100" step="0.5" value="' + escHtml(value) + '">' :
+      '<textarea id="' + id + '" aria-label="' + aria + '" maxlength="' + (name === 'reason' ? 1200 : name === 'studentAnswer' ? 900 : name === 'number' ? 16 : name === 'objective' ? 220 : 240) +
+      '" rows="3">' + escHtml(value) + '</textarea>';
+  }
+  return '<section class="paperReport"><h2>Edit question results</h2>' +
+    '<p class="paperMeta">Use your judgement to correct the table. If the handwriting was misread, correct the student answer too. Changes apply to this paper when you press Save corrections.</p>' +
+    '<div class="paperEditActions"><button class="btn btnPrimary" onclick="paperEditSave()">Save corrections</button>' +
+    '<button class="btn" onclick="paperEditCancel()">Cancel</button></div>' +
+    '<p id="paperEditError" role="alert" class="paperWarning hidden"></p>' +
+    '<div class="paperTableScroll" role="region" aria-label="Editable question results" tabindex="0"><table class="paperTable paperEditTable">' +
+    paperTableHead() + '<tbody>' + paperItems().map(function (it, i) {
+      var m = _reportMarkStr(it.marks);
+      var verdict = !it.marked && !it.wrote ? 'blank' : (it.verdict || 'review');
+      var id = 'paperEdit-' + i + '-verdict';
+      return '<tr><td>' + field(i, 'number', it.number, 'Question number') + '</td>' +
+        '<td>' + field(i, 'topics', (it.topics || []).join(', '), 'Topics, separated by commas') + '</td>' +
+        '<td>' + field(i, 'objective', it.learningObjective || '', 'Learning objective') + '</td><td>' +
+        '<label class="paperEditLabel" for="' + id + '">Verdict</label><select id="' + id + '" aria-label="Question ' + (i + 1) + ': verdict">' +
+        [['correct','Correct'],['partial','Partly correct'],['wrong','Incorrect'],['blank','Not attempted'],['review','Needs review']].map(function (v) {
+          return '<option value="' + v[0] + '"' + (v[0] === verdict ? ' selected' : '') + '>' + v[1] + '</option>';
+        }).join('') + '</select>' + field(i, 'awarded', m ? m.awarded : '', 'Marks obtained', true) +
+        field(i, 'max', it.maxMarks != null ? it.maxMarks : m ? m.total : '', 'Full marks', true) +
+        '<label class="paperEditLabel" for="paperEdit-' + i + '-studentAnswer">Student answer</label>' +
+        field(i, 'studentAnswer', it.studentAnswer || '', 'Student answer as written') + '</td>' +
+        '<td>' + field(i, 'reason', it.lossReason || it.feedback || '', 'Reason for losing marks') + '</td></tr>';
+    }).join('') + '</tbody></table></div></section>';
+}
+/* Validate the entire draft before changing even one row. Returning an error
+   keeps the teacher's text in place and avoids half-applied corrections. */
+function paperEditPatch(it, draft) {
+  var number = _scanStr(draft.number, 16);
+  if (!number) throw new Error('Enter a question number.');
+  var verdict = draft.verdict;
+  if (!SCAN_VERDICTS[verdict] && verdict !== 'blank' && verdict !== 'review') throw new Error('Choose a verdict.');
+  var max = String(draft.max).trim() === '' ? null : Number(draft.max);
+  var got = String(draft.awarded).trim() === '' ? null : Number(draft.awarded);
+  if (max != null && (!isFinite(max) || max <= 0 || max > 100)) throw new Error('Full marks must be greater than 0 and at most 100.');
+  if (got != null && (!isFinite(got) || got < 0 || max == null || got > max)) throw new Error('Marks obtained must be between 0 and full marks.');
+  var answer = _scanStr(draft.studentAnswer, 900);
+  if (SCAN_VERDICTS[verdict] && !answer) throw new Error('Enter the student answer as written before assigning a verdict.');
+  if ((verdict === 'blank' || verdict === 'review') && got != null) throw new Error('Leave marks obtained empty for an unattempted answer or one needing review.');
+  if (verdict === 'blank' && answer) throw new Error('Clear the student answer to mark this question as not attempted, or choose another verdict.');
+  if (got != null && ((verdict === 'correct' && got !== max) || (verdict === 'wrong' && got !== 0) ||
+      (verdict === 'partial' && (got <= 0 || got >= max)))) throw new Error('The marks and verdict disagree. Use Partly correct for a score between zero and full marks.');
+  var topics = String(draft.topics || '').split(',').map(function (t) { return _scanStr(t, 80); }).filter(Boolean);
+  if (topics.length > 3) throw new Error('Enter up to three topics, separated by commas.');
+  var reason = _ansTrim(draft.reason, 1200);
+  if ((verdict === 'wrong' || verdict === 'partial') && !reason) throw new Error('Give a reason for losing marks.');
+  var mk = _markFields({ studentAnswer: answer, verdict: verdict, hasWriting: verdict !== 'blank',
+    marks: got != null && max != null ? got + '/' + max : '', feedback: SCAN_VERDICTS[verdict] ? reason : '' });
+  return {
+    number: number, topics: topics,
+    learningObjective: _scanStr(draft.objective, 220), maxMarks: max,
+    marked: mk.marked, wrote: mk.wrote, studentAnswer: mk.studentAnswer, verdict: mk.verdict, marks: mk.marks, feedback: mk.feedback,
+    lossReason: verdict === 'wrong' || verdict === 'partial' ? reason : '', studyAdvice: '', teacherReviewed: true, edited: true
+  };
+}
+function paperEditSave() {
+  if (!isAdmin(currentUser) || _scanning || !_paperEditing || _paperEditing.run !== _scanRun) return;
+  var items = paperItems(), patches = [];
+  try {
+    items.forEach(function (it, i) {
+      var draft = {};
+      ['number','topics','objective','verdict','awarded','max','reason','studentAnswer'].forEach(function (key) {
+        draft[key] = $('paperEdit-' + i + '-' + key).value;
+      });
+      try { patches.push(paperEditPatch(it, draft)); }
+      catch (e) { throw new Error('Question ' + (it.number || i + 1) + ': ' + e.message); }
+    });
+  } catch (e) {
+    var err = $('paperEditError'); err.textContent = e.message; err.classList.remove('hidden'); err.scrollIntoView({ block: 'nearest' }); return;
+  }
+  patches.forEach(function (patch, i) { Object.assign(items[i], patch); });
+  _paperEditing = null; _report = null; _reportSeq++;
+  renderAnswers();
+  toast('Corrections saved. Marks, symbols and study suggestions now use your judgement.');
+  runReport(_scanRun);
+}
+
+function paperItems() { return _answers.filter(function (it) { return it && it.kind === 'page'; }); }
+function paperMark(it) {
+  var m = it.marked && SCAN_VERDICTS[it.verdict] ? _reportMarkStr(it.marks) : null;
+  // A contradictory allocation is a review item, never a plausible-looking total.
+  if (m && ((it.maxMarks != null && m.total !== it.maxMarks) ||
+      (it.verdict === 'correct' && m.awarded !== m.total) ||
+      (it.verdict === 'wrong' && m.awarded !== 0) ||
+      (it.verdict === 'partial' && (m.awarded <= 0 || m.awarded >= m.total)))) m = null;
+  return m;
+}
+function paperMarkText(it) {
+  var m = paperMark(it);
+  if (m) return _reportNum(m.awarded) + ' / ' + _reportNum(m.total);
+  var max = it.maxMarks != null ? it.maxMarks : (_reportMarkStr(it.marks) || {}).total;
+  return '— / ' + (max != null ? _reportNum(max) : '—');
+}
+function paperLossReason(it) {
+  if (!it.marked) return it.wrote ? 'Writing could not be read — needs review.' : 'Not attempted.';
+  if (!SCAN_VERDICTS[it.verdict]) return 'No verdict — needs review.';
+  if (it.verdict === 'correct') return it.marks && !paperMark(it) ? 'Marks conflict with the verdict — needs review.' : '—';
+  return it.lossReason || it.feedback || 'Reason not supplied — needs review.';
+}
+function paperVerdict(it) {
+  if (!it.marked) return { symbol: it.wrote ? '?' : '—', label: it.wrote ? 'Needs review' : 'Not attempted', cls: 'review' };
+  return { correct: { symbol: '✓', label: 'Correct', cls: 'correct' },
+    partial: { symbol: '✓/✗', label: 'Partly correct', cls: 'partial' },
+    wrong: { symbol: '✗', label: 'Incorrect', cls: 'wrong' } }[it.verdict] ||
+    { symbol: '?', label: 'Needs review', cls: 'review' };
+}
+function paperBadge(it) {
+  var v = paperVerdict(it);
+  return '<span class="paperVerdict ' + v.cls + '" aria-label="' + v.label + '">' + v.symbol + '</span>';
+}
+function paperTotals(items) {
+  var awarded = 0, total = 0, pending = 0, judged = 0;
+  items.forEach(function (it) {
+    if (!it.marked && !it.wrote) return;
+    var m = paperMark(it);
+    if (m) { awarded += m.awarded; total += m.total; judged++; } else pending++;
+  });
+  if (pending) return 'Marks total pending — ' + pending + ' question' + (pending === 1 ? '' : 's') + ' need review or a printed mark allocation.';
+  return judged ? _reportNum(awarded) + ' / ' + _reportNum(total) + ' marks for attempted questions' : 'No attempted questions have marks yet.';
+}
+function paperWarnings() {
+  var notes = [];
+  if (_scanning) notes.push('Marking is still in progress. This table is incomplete.');
+  if (_askedFor) notes.push('Instruction for this run: ' + _askedFor);
+  if (_paperRun) {
+    if (_paperRun.failedInputs.length) notes.push('Not included because the image could not open: ' + _paperRun.failedInputs.join(', ') + '.');
+    var failed = [], empty = [];
+    _paperRun.shots.forEach(function (s, i) {
+      if (s.status === 'error') failed.push(i + 1);
+      // A continuation page may have no NEW questions; it is still covered.
+      if (s.status === 'empty' && !paperItems().some(function (it) { return it.page <= i + 1 && (it.endPage || it.page) >= i + 1; })) empty.push(i + 1);
+    });
+    if (failed.length) notes.push('Incomplete paper: pages ' + failed.join(', ') + ' could not be marked. Retake and run again.');
+    if (empty.length) notes.push('No questions detected on pages ' + empty.join(', ') + '. Check that these pages contain no questions.');
+  }
+  return notes;
+}
+function paperHeadingHtml(continued) {
+  var r = _paperRun;
+  var ground = r ? r.grounding : groundingSummary();
+  return '<div class="paperHeading"><div class="paperEyebrow">Polymath Learning Centre · Marked paper</div>' +
+    '<h2>' + (continued ? 'Question results — continued' : 'Question results') + '</h2>' +
+    (r ? '<p class="paperMeta">' + escHtml([r.student, r.date, r.shots.length + ' page photos'].filter(Boolean).join(' · ')) + '</p>' : '') +
+    '<p class="paperTotal">' + escHtml(paperTotals(paperItems())) + '</p>' +
+    '<p class="paperMeta">All detected questions are listed. Blanks are not attempted and are excluded from the marks total. “—” means unavailable; marks are never estimated. Allocations come from the paper or teacher corrections.</p>' +
+    '<p class="paperMeta">' + escHtml(ground.length
+      ? 'Shared /anskey and /cer notebook: applied ' + ground.join(', ') + '.'
+      : 'Shared /anskey and /cer notes unavailable or no applicable notes. Syllabus standard used.') + '</p>' +
+    paperWarnings().map(function (w) { return '<p class="paperWarning">' + escHtml(w) + '</p>'; }).join('') + '</div>';
+}
+function paperTableHead() {
+  return '<colgroup><col style="width:9%"><col style="width:16%"><col style="width:27%"><col style="width:16%"><col style="width:32%"></colgroup>' +
+    '<thead><tr><th scope="col">Question</th><th scope="col">Topics</th><th scope="col">Learning objective</th>' +
+    '<th scope="col">Marks obtained / full marks</th><th scope="col">Reason for losing marks</th></tr></thead>';
+}
+function paperRowHtml(it, i) {
+  var verdict = paperVerdict(it);
+  return '<tr><th scope="row">' + escHtml(it.number || String(i + 1)) +
+    '<small>p' + it.page + (it.endPage > it.page ? '–' + it.endPage : '') + '</small></th>' +
+    '<td>' + escHtml((it.topics || []).join(', ') || 'Needs review') + '</td>' +
+    '<td>' + escHtml(it.learningObjective || 'Needs review') + '</td>' +
+    '<td>' + paperBadge(it) + ' ' + escHtml(paperMarkText(it)) + '<small>' + verdict.label + (it.teacherReviewed ? ' · Teacher reviewed' : '') + '</small></td>' +
+    '<td>' + escHtml(paperLossReason(it)) + '</td></tr>';
+}
+function paperTableText() {
+  return 'Question | Topics | Learning objective | Marks obtained / full marks | Reason for losing marks\n' +
+    paperItems().map(function (it, i) {
+      return [it.number || i + 1, (it.topics || []).join(', ') || 'Needs review', it.learningObjective || 'Needs review',
+        paperMarkText(it), paperLossReason(it)].join(' | ');
+    }).join('\n');
+}
+function paperStudyBlocks() {
+  var w = _report && _report.status === 'done' ? _report.words : null;
+  var blocks = [];
+  if (paperItems().filter(function (it) { return it.marked; }).length > REPORT_MAX_Q) {
+    blocks.push('<p class="paperStudyBlock paperMeta">The whole-paper commentary covers the first ' + REPORT_MAX_Q + ' attempted questions. The results table and question feedback include all detected questions.</p>');
+  }
+  if (w && w.headline) blocks.push('<p class="paperStudyBlock">' + escHtml(w.headline) + '</p>');
+  if (w && w.gaps.length) w.gaps.forEach(function (g) {
+    blocks.push('<div class="paperStudyBlock"><h3>' + escHtml(g.title) + '</h3>' +
+      (g.questions.length ? '<p class="paperMeta">Questions ' + escHtml(g.questions.join(', ')) + '</p>' : '') +
+      '<p>' + escHtml(g.detail) + '</p></div>');
+  });
+  else {
+    var groups = [];
+    paperItems().filter(function (it) { return it.marked && (it.verdict === 'wrong' || it.verdict === 'partial'); })
+      .forEach(function (it) {
+        var title = (it.topics || []).join(', ') || it.learningObjective || 'Review the marking feedback';
+        var key = title + '|' + (it.learningObjective || '');
+        var group = groups.find(function (g) { return g.key === key; });
+        if (!group) { group = { key: key, title: title, items: [] }; groups.push(group); }
+        group.items.push(it);
+      });
+    groups.sort(function (a, b) { return b.items.length - a.items.length; });
+    groups.slice(0, 4).forEach(function (g) {
+      var it = g.items[0];
+      blocks.push('<div class="paperStudyBlock"><h3>' + escHtml(g.title) + '</h3>' +
+        '<p class="paperMeta">Questions ' + escHtml(g.items.map(function (q) { return q.number; }).join(', ')) + '</p>' +
+        (it.learningObjective ? '<p>' + escHtml(it.learningObjective) + '</p>' : '') +
+        '<p>' + escHtml(it.studyAdvice || paperLossReason(it)) + '</p>' +
+        '<p>Review the matching notes in Ans Key or CER, then retry these questions without the answer. Explain the corrected step in your own words.</p></div>');
+    });
+    if (!groups.length) blocks.push('<div class="paperStudyBlock"><h3>' +
+      (paperItems().some(function (it) { return it.marked && it.verdict === 'correct'; }) ? 'Keep practising' : 'Complete the paper') +
+      '</h3><p>Attempt any blank questions, then check the worked answers. Practise another question for each learning objective in the table.</p></div>');
+  }
+  if (w && w.next.length) blocks.push('<div class="paperStudyBlock"><h3>Practise next</h3><ol>' +
+    w.next.map(function (x) { return '<li>' + escHtml(x) + '</li>'; }).join('') + '</ol></div>');
+  if (w && w.strengths.length) blocks.push('<div class="paperStudyBlock"><h3>What went well</h3><ul>' +
+    w.strengths.map(function (x) { return '<li>' + escHtml(x) + '</li>'; }).join('') + '</ul></div>');
+  if (paperItems().some(function (it) { return it.wrote && !it.marked || it.marked && !SCAN_VERDICTS[it.verdict]; })) {
+    blocks.unshift('<div class="paperStudyBlock paperWarning">Some answers need review. Retake unclear photos or ask your teacher to check them before deciding what to revise.</div>');
+  }
+  if (_report && _report.status === 'writing') blocks.push('<p class="paperStudyBlock paperMeta">The whole-paper study suggestions are still being prepared. The priorities above come from the available question feedback.</p>');
+  if (_report && _report.status === 'failed') blocks.push('<p class="paperStudyBlock paperMeta">The whole-paper study suggestions could not be generated. The priorities above come from the question feedback. Use Report to retry.</p>');
+  return blocks;
+}
+function paperReportHtml() {
+  return '<section class="paperReport paperFront">' + paperHeadingHtml(false) +
+    (isAdmin(currentUser) && !_scanning ? '<div class="paperEditActions noPrint"><button class="btn" onclick="paperEditStart()">✎ Edit results table</button></div>' : '') +
+    '<div class="paperTableScroll" role="region" aria-label="Question results table" tabindex="0"><table class="paperTable">' +
+    paperTableHead() + '<tbody>' + paperItems().map(paperRowHtml).join('') + '</tbody></table></div></section>' +
+    '<section class="paperReport paperStudy"><h2>What to study next</h2>' + paperStudyBlocks().join('') + '</section>';
+}
+function markedPhotosHtml() {
+  if (!_paperRun || !paperItems().length) return '';
+  return _paperRun.shots.map(function (s, i) {
+    var page = i + 1;
+    var items = paperItems().filter(function (it) { return it.page <= page && (it.endPage || it.page) >= page; });
+    var pins = [];
+    items.forEach(function (it) {
+      if (!it.marked && !it.wrote) return;
+      var anchors = (it.markAnchors || []).filter(function (a) { return a.page === page; });
+      // Show a page-level result below when no reliable point was returned.
+      // Guessing a point could put a cross on the neighbouring question.
+      if (!anchors.length && it.qbox && (it.qboxPage || it.page) === page) {
+        anchors = [{ page: page, y: (it.qbox[0] + it.qbox[2]) / 2, x: it.qbox[3] + 20 }];
+      }
+      if (!anchors.length) return;
+      var a = anchors[anchors.length - 1];
+      pins.push('<span class="photoMark ' + paperVerdict(it).cls + '" style="top:' + Math.max(3, Math.min(97, a.y / 10)) +
+        '%;left:' + Math.max(5, Math.min(92, a.x / 10)) + '%" title="Question ' + escHtml(it.number) + ': ' +
+        paperVerdict(it).label + '">' + paperBadge(it) + '<small>' + escHtml(it.number) + '</small></span>');
+    });
+    var source = /^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(s.url || '') ? s.url : '';
+    return '<section class="markedPhotoCard"><h2>Marked page ' + page + '</h2>' +
+      (s.status === 'error' ? '<p class="paperWarning">This page could not be marked. Retake it and run again.</p>' : '') +
+      (s.status === 'key' ? '<p class="paperMeta">Answer key page — used as a reference.</p>' : '') +
+      '<div class="markedPhotoFrame">' + (source ? '<img src="' + source + '" alt="Original photographed page ' + page + '">' : '<p>Photo unavailable.</p>') +
+      pins.join('') + '</div><div class="photoResults">' + items.map(function (it) {
+        return '<span>' + paperBadge(it) + ' Q' + escHtml(it.number) + ' · ' + escHtml(paperMarkText(it)) + '</span>';
+      }).join('') + '</div>' + (!items.length && s.status !== 'key' && s.status !== 'error'
+        ? '<p class="paperMeta">No questions detected. Check this page before relying on the report.</p>' : '') + '</section>';
+  }).join('');
+}
+
+/* Measure real rows at A4 width. The first summary is page 1 and the first
+   study page is page 2. Long tables continue afterwards; no rows are clipped
+   or shrunk to unreadable text to force a whole exam onto one sheet. */
+function clearPaperPrint() {
+  var el = $('paperPrintReport');
+  if (el) el.remove();
+  document.body.classList.remove('paperPrinting');
+}
+function preparePaperPrint() {
+  clearPaperPrint();
+  if (!paperItems().length || _scanning) return;
+  var root = document.createElement('div');
+  root.id = 'paperPrintReport'; root.className = 'paperPrintOnly';
+  root.style.cssText = 'display:block;position:absolute;left:-20000px;top:0;width:190mm';
+  $('reportWrap').before(root);
+  var maxHeight = 265 * 96 / 25.4;
+  function page(html) {
+    var el = document.createElement('section'); el.className = 'paperPrintPage'; el.innerHTML = html;
+    root.appendChild(el); return el;
+  }
+  function tablePage(continued) {
+    return page(paperHeadingHtml(continued) + '<table class="paperTable">' + paperTableHead() + '<tbody></tbody></table>' +
+      '<p class="paperPrintFoot">Long tables continue after the study page.</p>');
+  }
+  var summaries = [], studies = [];
+  var current = tablePage(false); summaries.push(current);
+  paperItems().forEach(function (it, i) {
+    var tbody = current.querySelector('tbody');
+    tbody.insertAdjacentHTML('beforeend', paperRowHtml(it, i));
+    if (current.offsetHeight > maxHeight && tbody.rows.length > 1) {
+      var row = tbody.lastElementChild; row.remove();
+      current = tablePage(true); summaries.push(current); current.querySelector('tbody').appendChild(row);
+    }
+  });
+  current = page('<h2>What to study next</h2>'); studies.push(current);
+  paperStudyBlocks().forEach(function (html) {
+    var block = document.createElement('div'); block.innerHTML = html; current.appendChild(block);
+    if (current.offsetHeight > maxHeight && current.children.length > 2) {
+      block.remove(); current = page('<h2>What to study next — continued</h2>'); studies.push(current); current.appendChild(block);
+    }
+  });
+  [summaries[0], studies[0]].concat(summaries.slice(1), studies.slice(1)).forEach(function (el, i) {
+    root.appendChild(el);
+    el.insertAdjacentHTML('beforeend', '<div class="paperPrintFoot">Report · ' + (i + 1) + '</div>');
+  });
+  root.style.cssText = '';
+  document.body.classList.add('paperPrinting');
+}
+
 function renderReport() {
   var wrap = $('reportWrap');
-  if (wrap) wrap.innerHTML = reportCardHtml();
+  if (wrap && !_paperEditing) wrap.innerHTML = paperItems().length ? paperReportHtml() : reportCardHtml();
+  var photos = $('markedPhotos');
+  if (photos) photos.innerHTML = markedPhotosHtml();
   var b = $('reportBtn');
   if (!b) return;
   b.classList.toggle('hidden', !reportEligible(_answers));
@@ -6899,12 +7362,19 @@ function renderReport() {
 }
 
 function reportAsText() {
+  if ((!_report || !_report.score) && paperItems().length) return paperTableText() + '\n\nWHAT TO STUDY NEXT\n' +
+    paperItems().filter(function (it) { return it.marked && (it.verdict === 'wrong' || it.verdict === 'partial'); }).map(function (it) {
+      return 'Q' + it.number + ': ' + (it.learningObjective || (it.topics || []).join(', ')) + '\n' +
+        (it.studyAdvice || paperLossReason(it)) + '\nReview the matching notes and retry without the answer.';
+    }).join('\n\n');
   if (!_report || !_report.score) return '';
   var s = _report.score;
   var w = _report.words;
   var out = ['REPORT'];
-  var score = reportScoreText(s);
-  out.push((score ? score + (s.pct == null ? '' : '  ·  ' + s.pct + '%') + '\n' : '') + reportCountsText(s));
+  if (paperItems().length) out.push(paperTableText());
+  var pageReport = paperItems().length > 0;
+  var score = pageReport ? paperTotals(paperItems()) : reportScoreText(s);
+  out.push((score ? score + (pageReport || s.pct == null ? '' : '  ·  ' + s.pct + '%') + '\n' : '') + reportCountsText(s));
   if (_report.status === 'writing') out.push('(the written report had not come back yet)');
   if (_report.status === 'failed') out.push('(the written report could not be written: ' + _report.err + ')');
   if (w) {
@@ -6923,7 +7393,7 @@ function reportAsText() {
       out.push('Practise next:\n' + w.next.map(function (x) { return '  • ' + x; }).join('\n'));
     }
   }
-  var basis = reportBasisText(s);
+  var basis = pageReport ? 'Marks use printed allocations or teacher corrections. Blanks are excluded and unknown allocations are not estimated.' : reportBasisText(s);
   if (basis) out.push(basis);
   return out.join('\n\n');
 }
@@ -9834,6 +10304,7 @@ function stuSyncBar() {
 /* ================= Sign in ================= */
 function renderAuth() {
   var signedIn = !!currentUser;
+  if (!isAdmin(currentUser)) _paperEditing = null;
   $('signInBtn').style.display = signedIn ? 'none' : '';
   $('signOutBtn').style.display = signedIn ? '' : 'none';
   $('signedOutCard').classList.toggle('hidden', signedIn);
@@ -10130,7 +10601,9 @@ $('sheetKeyBtn').addEventListener('click', function () {
 });
 
 $('copyAnswersBtn').addEventListener('click', copyAnswers);
-$('printAnswersBtn').addEventListener('click', function () { window.print(); });
+$('printAnswersBtn').addEventListener('click', function () { if (!_scanning) window.print(); });
+window.addEventListener('beforeprint', preparePaperPrint);
+window.addEventListener('afterprint', clearPaperPrint);
 
 /* Drag, drop and paste — the desktop way in. A touchscreen has neither, which
    is why the camera and the gallery buttons are the headline. */
