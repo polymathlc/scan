@@ -152,8 +152,11 @@ const api = new Function(prelude + json + grounding + scan + steps + worksheet +
     set scanKey(v) { _scanKey = v; },
     _applyMarkFix, _itemNeedsMarking, _markFixBatchItems, _markFixPrompt,
     SCAN_MARK_FIX_SYS, SCAN_MARK_FIX_CALLS, SCAN_MARK_FIX_MAX,
-    SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
+    SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE, SCAN_MISTAKE_RULE,
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
+    MISTAKE_ANIMALS, MISTAKE_ANIMAL_ALIASES, mistakeAnimal, mistakeAnimalNormalize,
+    mistakeAnimalLabel, mistakeAnimalIds, _mistakeField, mistakeTally,
+    _itemGetsSidekick, sidekickAnalysisHtml, SCIENCE_COACHES,
     /* 📄 Worksheet mode: the same pages, read for their questions. */
     SCAN_MODES, scanMode, SHEET_SYS, SHEET_ASK_SYS, SHEET_STRIP_RULE, SHEET_NEW_RULE,
     SHEET_LINES_MAX, _sheetPrompt, _sheetAskPrompt, _sheetNewItem, _sheetFoldRows, _sheetLines,
@@ -4076,6 +4079,59 @@ ok('…and on a device that cannot share files, the LINK points at the sheet too
   ok('the phone is measured by a tool that is checked in',
      fs.existsSync(new URL('./mobile-check.mjs', import.meta.url)));
 }
+
+/* =====================================================================
+   🐾 Science Sidekick analysis — open-ended science only (v1.33.0)
+   Live site is main / GitHub Pages. A Sidekick on a maths paper or an MCQ
+   tick teaches a lesson the answer cannot show; a list that drifts from
+   polymathlc/cer sorts the same habit under two names. */
+ok('there are nine Sidekicks', api.MISTAKE_ANIMALS.length === 9);
+ok('the shared ids match the Portal',
+   JSON.stringify(api.mistakeAnimalIds()) === JSON.stringify([
+     'comparison', 'context', 'specific', 'evidence', 'keywords',
+     'concept', 'reasoning', 'careful', 'complete'
+   ]));
+ok('every Sidekick has a coach',
+   api.mistakeAnimalIds().every(id => api.SCIENCE_COACHES[id] &&
+     api.SCIENCE_COACHES[id].name === api.mistakeAnimal(id).animal));
+ok('old ids still normalise',
+   api.mistakeAnimalNormalize('sloth') === 'complete' &&
+   api.mistakeAnimalNormalize('The Rabbit') === 'careful' &&
+   api.mistakeAnimalNormalize('peacock') === 'specific');
+ok('a wrong answer keeps a Sidekick id',
+   api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'evidence', why: 'No data.' } })
+     .mistake.animal === 'evidence');
+ok('a correct answer never carries one',
+   api._markFields({ studentAnswer: 'x', verdict: 'correct', mistake: { animal: 'evidence' } }).mistake === null);
+ok('SCAN_SYS asks for the type', /"mistake":\{"animal"/.test(api.SCAN_SYS) && /MISTAKE TYPES/.test(api.SCAN_SYS));
+ok('SCAN_ASK_SYS carries the mistake rule', /"mistake":""/.test(api.SCAN_ASK_SYS) && /MISTAKE TYPES/.test(api.SCAN_ASK_SYS));
+ok('the drawings load beside the page', /<script src="sidekick-art\.js"><\/script>/.test(html));
+ok('version is v1.33.0', /var APP_VERSION = 'v1\.33\.0'/.test(html));
+
+api.meta = { level: 'P5', subject: 'science' };
+const skBase = {
+  marked: true, type: 'open', verdict: 'wrong', subject: 'science',
+  question: 'Why did the ice melt?', studentAnswer: 'It turned into liquid.',
+  mistake: { animal: 'specific', why: 'You repeated the question.' }
+};
+ok('open-ended science that is wrong gets a Sidekick', api._itemGetsSidekick(skBase) === true);
+ok('the analysis card names the Sidekick', (() => {
+  const h = api.sidekickAnalysisHtml(skBase);
+  return h.includes('data-sidekick="specific"') && h.includes('SCIENCE SIDEKICK') &&
+    h.includes('Specific Sherry') && h.includes('Why did the ice melt?');
+})());
+ok('a science MCQ does not', api._itemGetsSidekick(Object.assign({}, skBase, { type: 'mcq' })) === false);
+ok('a maths paper does not', (() => {
+  api.meta = { level: 'P5', subject: 'math' };
+  const no = api._itemGetsSidekick(Object.assign({}, skBase, { subject: 'math' })) === false;
+  api.meta = { level: 'P5', subject: 'science' };
+  return no;
+})());
+ok('a blank does not', api._itemGetsSidekick(Object.assign({}, skBase, { marked: false })) === false);
+ok('the card draws the analysis under what they wrote',
+   /mistakeBoxHtml\(it\) \+/.test(html) &&
+   html.indexOf('mistakeBoxHtml(it) +') > html.indexOf('<div class="youLabel">What you wrote</div>'));
+ok('Copy names a Sidekick when it is one', /Science Sidekick: /.test(html));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 if (fails) process.exit(1);
