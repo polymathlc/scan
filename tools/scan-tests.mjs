@@ -80,6 +80,8 @@ const api = new Function(prelude + json + grounding + scan + vet + `
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
+    MISTAKE_ANIMALS, mistakeAnimal, mistakeAnimalNormalize, mistakeAnimalLabel, mistakeAnimalIds,
+    MISTAKE_ANIMAL_RULE, SCAN_MISTAKE_RULE, _mistakeField, mistakeTally,
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
     set user(v) { currentUser = v; }
@@ -712,6 +714,98 @@ ok('the button and the automatic filing share ONE writer',
    (html.match(/await _vetSend\(/g) || []).length === 2 &&
    (html.match(/async function _vetSend\(/g) || []).length === 1);
 ok('…and the door is inside it', /async function _vetSend[\s\S]{0,320}!isAdmin\(currentUser\)\) return r;/.test(html));
+
+/* =====================================================================
+   🐾 THE MISTAKE TYPE — how a marked answer is wrong, in one word
+   Every failure here is silent and the card still renders: a type on a
+   CORRECT answer tells a child they made a mistake they did not make; a type
+   on a BLANK marks a question nobody attempted; an invented animal files the
+   mistake under a name no other app knows; and a list that drifts from the
+   one in polymathlc/cer and polymathlc/anskey sorts the same answer under a
+   different animal depending on which app read it. */
+ok('there are ten animals', api.MISTAKE_ANIMALS.length === 10);
+ok('every animal is whole', api.MISTAKE_ANIMALS.every(m => m.id && m.emoji && m.animal && m.name && m.desc && m.spot && m.fix));
+ok('the ids are unique and lowercase words', new Set(api.mistakeAnimalIds()).size === 10 &&
+   api.mistakeAnimalIds().every(id => /^[a-z]+$/.test(id)));
+ok('the shared list is byte-for-byte the one the other apps carry',
+   JSON.stringify(api.mistakeAnimalIds()) === JSON.stringify(['rabbit','parrot','sloth','chameleon','octopus','monkey','goldfish','fox','bat','peacock']));
+ok('the lookup returns null for an animal it does not know, never a default',
+   api.mistakeAnimal('dragon') === null && api.mistakeAnimal('') === null && api.mistakeAnimal(null) === null);
+ok('the lookup is case-tolerant', api.mistakeAnimal('Rabbit').id === 'rabbit');
+ok('an id normalises to itself', api.mistakeAnimalNormalize('sloth') === 'sloth');
+ok('the animal’s name normalises', api.mistakeAnimalNormalize('The Rabbit') === 'rabbit' && api.mistakeAnimalNormalize('RABBIT 🐇') === 'rabbit');
+ok('the mistake’s own name normalises', api.mistakeAnimalNormalize('Rushed it') === 'rabbit' && api.mistakeAnimalNormalize('too vague') === 'peacock');
+ok('a label read back normalises', api.mistakeAnimalNormalize('fox — reversed the logic') === 'fox');
+ok('an object with an animal in it normalises', api.mistakeAnimalNormalize({ animal: 'bat', why: 'x' }) === 'bat');
+ok('"unsure", "none" and nothing at all mean NO type', ['unsure', 'none', '', null, undefined, 'N/A', 'unknown'].every(v => api.mistakeAnimalNormalize(v) === ''));
+ok('an eleventh animal means no type too', api.mistakeAnimalNormalize('dragon') === '' && api.mistakeAnimalNormalize('the walrus') === '');
+ok('the label reads emoji, animal and habit', api.mistakeAnimalLabel('rabbit') === '🐇 The Rabbit — Rushed it' && api.mistakeAnimalLabel('dragon') === '');
+ok('the rule names every id', api.mistakeAnimalIds().every(id => api.MISTAKE_ANIMAL_RULE.includes('  ' + id + ' = ')));
+ok('the rule allows "none"', /empty string rather than forcing one/.test(api.MISTAKE_ANIMAL_RULE));
+ok('the rule forbids a type on a correct answer or a blank', /Never give a mistake type to a correct answer or to a question that was not attempted/.test(api.MISTAKE_ANIMAL_RULE));
+ok('the scan rule carries the shared rule and the field shape', api.SCAN_MISTAKE_RULE.includes(api.MISTAKE_ANIMAL_RULE) && /"mistake" is \{"animal"/.test(api.SCAN_MISTAKE_RULE));
+
+/* The door. */
+const mkWrong = api._markFields({ studentAnswer: '16', verdict: 'wrong', mistake: { animal: 'rabbit', why: 'You added instead of subtracting.' } });
+ok('a wrong answer keeps its mistake type', mkWrong.mistake && mkWrong.mistake.animal === 'rabbit' && mkWrong.mistake.why === 'You added instead of subtracting.');
+ok('a partly-right answer keeps it too', api._markFields({ studentAnswer: '16 g', verdict: 'partial', mistake: { animal: 'sloth' } }).mistake.animal === 'sloth');
+ok('a type that came as a bare word is still read', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'The Fox' }).mistake.animal === 'fox');
+ok('…with an empty why rather than a missing one', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'fox' }).mistake.why === '');
+ok('a CORRECT answer never carries one, whatever the model says',
+   api._markFields({ studentAnswer: '8', verdict: 'correct', mistake: { animal: 'rabbit', why: 'x' } }).mistake === null);
+ok('a BLANK never carries one — nothing was attempted',
+   api._markFields({ studentAnswer: '', verdict: 'wrong', mistake: { animal: 'rabbit', why: 'x' } }).mistake === null);
+ok('an answer the model would not judge carries none', api._markFields({ studentAnswer: 'x', mistake: { animal: 'rabbit' } }).mistake === null);
+ok('an invented animal files nothing', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'dragon', why: 'x' } }).mistake === null);
+ok('"unsure" files nothing', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'unsure' } }).mistake === null);
+ok('an empty string files nothing', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: '' }).mistake === null);
+ok('the why is clipped', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'bat', why: 'w'.repeat(900) } }).mistake.why.length <= 401);
+
+/* Both item builders carry it through the same door. */
+const scanIt = api._scanNewItem({ number: '3', question: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'wrong', mistake: { animal: 'peacock', why: 'Vague.' } }, 0, 1);
+ok('a page item carries the type', scanIt.mistake && scanIt.mistake.animal === 'peacock');
+const askIt = api._askNewItem({ heading: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'partial', mistake: 'octopus' });
+ok('an ask item carries the type', askIt.mistake && askIt.mistake.animal === 'octopus');
+ok('an unmarked page item carries none', api._scanNewItem({ number: '3', question: 'Q', answer: 'A', mistake: 'octopus' }, 0, 1).mistake === null);
+
+/* The fold across a page break: the half that judged is the half that decides. */
+{
+  const into = [];
+  api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'sloth', why: 'Half.' } }], 0, 1, into);
+  api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A', studentAnswer: 'x', verdict: 'correct' }], 1, 1, into);
+  ok('a continuation judged CORRECT clears the first half’s type', into.length === 1 && into[0].mistake === null);
+  const into2 = [];
+  api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'sloth', why: 'Half.' } }], 0, 1, into2);
+  api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A' }], 1, 1, into2);
+  ok('a continuation that judged nothing keeps it', into2.length === 1 && into2[0].mistake && into2[0].mistake.animal === 'sloth');
+  const into3 = [];
+  api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A' }], 0, 1, into3);
+  api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: 'fox' }], 1, 1, into3);
+  ok('a continuation that judged brings its own type', into3[0].mistake && into3[0].mistake.animal === 'fox');
+}
+
+/* Every prompt that marks asks for it — the paper and the typed question. */
+api.meta = { level: 'P5', subject: 'science' };
+ok('the page prompt asks for the type', api._scanPrompt(2, 1, 4, '').includes('MISTAKE TYPES'));
+ok('the ask-alone prompt asks for the type', api._askPrompt('I got 16, is that right?', 'normal').includes('MISTAKE TYPES'));
+ok('the page reply shape has the field', /"mistake":\{"animal"/.test(api.SCAN_SYS));
+ok('the ask reply shape has the field', /"mistake":""/.test(api.SCAN_ASK_SYS));
+
+/* The tally, most common first. */
+const tal = api.mistakeTally([
+  { marked: true, mistake: { animal: 'sloth' } }, { marked: true, mistake: { animal: 'rabbit' } },
+  { marked: true, mistake: { animal: 'sloth' } }, { marked: false, mistake: { animal: 'fox' } },
+  { marked: true, mistake: null }, { marked: true, mistake: { animal: 'dragon' } }
+]);
+ok('the tally counts each animal and sorts by count', tal.length === 2 && tal[0].id === 'sloth' && tal[0].count === 2 && tal[1].id === 'rabbit');
+ok('the tally ignores blanks and unknown animals', !tal.some(t => t.id === 'fox' || t.id === 'dragon'));
+
+/* The card and the copy text, read as text. */
+ok('the card box is gated on a marked answer that carries a type',
+   /function mistakeBoxHtml\(it\) \{\s*if \(!it \|\| !it\.marked \|\| !it\.mistake\) return '';/.test(html));
+ok('the card draws the box under what the student wrote', html.indexOf('mistakeBoxHtml(it) +') > html.indexOf('<div class="youLabel">What you wrote</div>'));
+ok('the copy text carries the type', /Mistake type: ' \+ mistakeAnimalLabel/.test(html));
+ok('the chip row counts the animals', /mistakeTally\(_answers\)\.forEach/.test(html));
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);

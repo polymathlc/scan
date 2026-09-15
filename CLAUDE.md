@@ -130,6 +130,42 @@ step, and ship a change to the shape in both repos together**:
 - **The page SAYS what it was asked** (`renderAskedLine`, and the Copy header). One card where
   twenty were expected is only honest if the instruction that narrowed the run is on screen.
 
+## 🐾 The mistake TYPE on a marked answer (v1.7.0)
+
+`MISTAKE_ANIMALS` / `mistakeAnimal` / `mistakeAnimalNormalize` / `mistakeAnimalLabel` /
+`mistakeAnimalPromptList` / `MISTAKE_ANIMAL_RULE` / `SCAN_MISTAKE_RULE` / **`_mistakeField`** /
+`mistakeTally` / `mistakeBoxHtml` (search `THE MISTAKE ANIMALS`), the `mistake` field on every
+answer item, and the `.mkBox` / `.tally.mMistake` CSS.
+
+Marking says WHETHER an answer is wrong; this says HOW, in the one word a student can carry to the
+next question. Every wrong or partly-right answer is one of ten familiar habits, each an ANIMAL —
+🐇 Rushed it, 🦜 Repeated the question, 🦥 Stopped halfway, 🦎 Wrong keyword, 🐙 Grabbed
+everything, 🐒 Mixed-up ideas, 🐟 Forgot the fact, 🦊 Reversed the logic, 🦇 Ignored the evidence,
+🦚 Too vague.
+
+- **THE LIST IS SHARED, BYTE FOR BYTE, WITH `polymathlc/cer` AND `polymathlc/anskey`.** The Portal
+  files students' own answers under these ids and quizzes the class on them; Ans Key writes a
+  deliberate mistake of one of them into a text box. The `id` is what travels and what is stored —
+  rename one here and every entry the other apps hold under it reads as "an unknown mistake" with
+  nothing anywhere to say so. **Ship a change to the block to all three together.**
+- **It rides the SAME call that marks the paper** — `SCAN_MISTAKE_RULE` is appended to both prompts
+  (`_scanPrompt` and `_askPrompt`) and the field is in both reply shapes. No second pass, no extra
+  cost, and no way for the type and the verdict to come from two different readings.
+- **`_mistakeField` is the ONE door, inside `_markFields`**, so the rule holds on both paths without
+  being written twice: a type is kept ONLY on a `wrong` or `partial` verdict. A correct answer has
+  no mistake to name and a blank was not attempted — whatever the model says, both file `null`. A
+  cross on a question nobody attempted is the one mistake marking must never make, and a mistake
+  TYPE on one is the same cross wearing a label.
+- **`mistakeAnimalNormalize` is how a model's word becomes an id, and '' IS an answer.** It takes
+  the id, the animal's name or the habit's name in any case; "unsure", "none", nothing and an
+  invented eleventh animal all come back '' and file nothing. Forcing a mistake into the nearest
+  animal teaches the wrong lesson with a straight face, so the prompt says so too.
+- **The fold across a page break follows the verdict.** The half that judged the question decides
+  its type — including "none", which is what a `correct` continuation means for the first half.
+- **The child's work still does not travel.** `_vetPortalDoc` / `_vetMathDoc` carry the QUESTION
+  to a vetting list and nothing about the student's answer, the type included.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
 ## 📥 Keeping a question — into the four vetting lists (v1.6.0)
 > **v1.5.0 is deliberately skipped.** `polymathlc/cer` and `polymathlc/anskey` both already document
 > "scan v1.5.0" as the version that types a correction on an ANSWER CARD and files it as a teaching
@@ -249,6 +285,14 @@ step, and ship a change to the shape in both repos together**:
   is dropped instead of landing among the new answers.
 
 ## House rules
+- After touching **🐾 the mistake type** (`MISTAKE_ANIMALS`, `mistakeAnimal`,
+  `mistakeAnimalNormalize`, `MISTAKE_ANIMAL_RULE`, `SCAN_MISTAKE_RULE`, `_mistakeField`,
+  `mistakeTally`, `mistakeBoxHtml`, the `mistake` field on an item, or the fold's `prev.mistake`
+  line), run `node tools/scan-tests.mjs`. Every failure is silent and the card still renders: a
+  type kept on a CORRECT answer tells a child they made a mistake they did not make; one kept on a
+  BLANK marks a question nobody attempted; an invented animal files the mistake under a name no
+  other app knows; and a list that drifts from the one in `polymathlc/cer` and `polymathlc/anskey`
+  sorts the same answer under a different animal depending on which app read it.
 - After touching **the grounding, the live notebook, the scan run or the vetting door**
   (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
   `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
