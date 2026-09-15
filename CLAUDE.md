@@ -138,10 +138,17 @@ step, and ship a change to the shape in both repos together**:
 answer item, and the `.mkBox` / `.tally.mMistake` CSS.
 
 Marking says WHETHER an answer is wrong; this says HOW, in the one word a student can carry to the
-next question. Every wrong or partly-right answer is one of ten familiar habits, each an ANIMAL —
-🐇 Rushed it, 🦜 Repeated the question, 🦥 Stopped halfway, 🦎 Wrong keyword, 🐙 Grabbed
-everything, 🐒 Mixed-up ideas, 🐟 Forgot the fact, 🦊 Reversed the logic, 🦇 Ignored the evidence,
-🦚 Too vague.
+next question. Every wrong or partly-right answer is **one of the nine Science Sidekicks' skills,
+missing** (v1.8.0) — 🦎 Comparison Casey missed the comparison, 🐹 Context Connie ignored the
+question's clues, 🦊 Specific Sherry was too vague, 🐘 Evidence Ellen ignored the evidence, 🦜
+Keyword Kai used the wrong keyword, 🦉 Concept Cora mixed up the science, 🐼 Reasoning Ravi broke the
+chain, 🐢 Careful Cleo slipped on a detail, 🦫 Complete Cody stopped halfway. They are the Portal's
+own coaches, so the figure that says what an answer needs NEXT and the one that names the habit
+are ONE figure. The list used to be ten animals of its own (🐇 the Rabbit, 🦜 the Parrot, 🦥 the
+Sloth, …); **`MISTAKE_ANIMAL_ALIASES` inside `mistakeAnimalNormalize` carries every one of those
+ids and habit names to its Sidekick**, so a model still answering with the old word — and every
+entry the other two apps hold under one — reads as the habit it always meant. Drop an alias and
+that entry is "an unknown mistake" with nothing anywhere to say so.
 
 - **THE LIST IS SHARED, BYTE FOR BYTE, WITH `polymathlc/cer` AND `polymathlc/anskey`.** The Portal
   files students' own answers under these ids and quizzes the class on them; Ans Key writes a
@@ -285,14 +292,16 @@ everything, 🐒 Mixed-up ideas, 🐟 Forgot the fact, 🦊 Reversed the logic, 
   is dropped instead of landing among the new answers.
 
 ## House rules
-- After touching **🐾 the mistake type** (`MISTAKE_ANIMALS`, `mistakeAnimal`,
+- After touching **🐾 the mistake type** (`MISTAKE_ANIMALS`, `MISTAKE_ANIMAL_ALIASES`, `mistakeAnimal`,
   `mistakeAnimalNormalize`, `MISTAKE_ANIMAL_RULE`, `SCAN_MISTAKE_RULE`, `_mistakeField`,
   `mistakeTally`, `mistakeBoxHtml`, the `mistake` field on an item, or the fold's `prev.mistake`
   line), run `node tools/scan-tests.mjs`. Every failure is silent and the card still renders: a
   type kept on a CORRECT answer tells a child they made a mistake they did not make; one kept on a
   BLANK marks a question nobody attempted; an invented animal files the mistake under a name no
-  other app knows; and a list that drifts from the one in `polymathlc/cer` and `polymathlc/anskey`
-  sorts the same answer under a different animal depending on which app read it.
+  other app knows; a list that drifts from the one in `polymathlc/cer` and `polymathlc/anskey`
+  sorts the same answer under a different animal depending on which app read it; and an alias
+  dropped from `MISTAKE_ANIMAL_ALIASES` turns every mistake filed under the old ten-animal list
+  into an unknown one.
 - After touching **the grounding, the live notebook, the scan run or the vetting door**
   (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
   `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,

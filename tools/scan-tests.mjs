@@ -720,68 +720,74 @@ ok('…and the door is inside it', /async function _vetSend[\s\S]{0,320}!isAdmin
    Every failure here is silent and the card still renders: a type on a
    CORRECT answer tells a child they made a mistake they did not make; a type
    on a BLANK marks a question nobody attempted; an invented animal files the
-   mistake under a name no other app knows; and a list that drifts from the
+   mistake under a name no other app knows; a list that drifts from the
    one in polymathlc/cer and polymathlc/anskey sorts the same answer under a
-   different animal depending on which app read it. */
-ok('there are ten animals', api.MISTAKE_ANIMALS.length === 10);
+   different animal depending on which app read it; and an alias table that
+   forgets an old id turns every mistake filed before v1.8.0 into an unknown
+   one. */
+ok('there are nine mistake types — one per Science Sidekick', api.MISTAKE_ANIMALS.length === 9);
 ok('every animal is whole', api.MISTAKE_ANIMALS.every(m => m.id && m.emoji && m.animal && m.name && m.desc && m.spot && m.fix));
-ok('the ids are unique and lowercase words', new Set(api.mistakeAnimalIds()).size === 10 &&
+ok('the ids are unique and lowercase words', new Set(api.mistakeAnimalIds()).size === 9 &&
    api.mistakeAnimalIds().every(id => /^[a-z]+$/.test(id)));
 ok('the shared list is byte-for-byte the one the other apps carry',
-   JSON.stringify(api.mistakeAnimalIds()) === JSON.stringify(['rabbit','parrot','sloth','chameleon','octopus','monkey','goldfish','fox','bat','peacock']));
+   JSON.stringify(api.mistakeAnimalIds()) === JSON.stringify(['comparison','context','specific','evidence','keywords','concept','reasoning','careful','complete']));
+ok('every id is a Science Sidekick’s own id — the coach and the mistake are ONE figure', api.MISTAKE_ANIMALS.every(m => /^(Comparison Casey|Context Connie|Specific Sherry|Evidence Ellen|Keyword Kai|Concept Cora|Reasoning Ravi|Careful Cleo|Complete Cody)$/.test(m.animal)));
 ok('the lookup returns null for an animal it does not know, never a default',
    api.mistakeAnimal('dragon') === null && api.mistakeAnimal('') === null && api.mistakeAnimal(null) === null);
-ok('the lookup is case-tolerant', api.mistakeAnimal('Rabbit').id === 'rabbit');
-ok('an id normalises to itself', api.mistakeAnimalNormalize('sloth') === 'sloth');
-ok('the animal’s name normalises', api.mistakeAnimalNormalize('The Rabbit') === 'rabbit' && api.mistakeAnimalNormalize('RABBIT 🐇') === 'rabbit');
-ok('the mistake’s own name normalises', api.mistakeAnimalNormalize('Rushed it') === 'rabbit' && api.mistakeAnimalNormalize('too vague') === 'peacock');
-ok('a label read back normalises', api.mistakeAnimalNormalize('fox — reversed the logic') === 'fox');
-ok('an object with an animal in it normalises', api.mistakeAnimalNormalize({ animal: 'bat', why: 'x' }) === 'bat');
+ok('the lookup is case-tolerant', api.mistakeAnimal('Careful').id === 'careful');
+ok('an id normalises to itself', api.mistakeAnimalNormalize('complete') === 'complete');
+ok('the Sidekick’s name normalises, full or first', api.mistakeAnimalNormalize('Careful Cleo') === 'careful' && api.mistakeAnimalNormalize('CLEO 🐢') === 'careful' && api.mistakeAnimalNormalize('evidence ellen') === 'evidence');
+ok('the OLD ten-animal ids and names are carried to their Sidekick, so nothing already filed reads as unknown',
+   api.mistakeAnimalNormalize('rabbit') === 'careful' && api.mistakeAnimalNormalize('The Rabbit') === 'careful' && api.mistakeAnimalNormalize('sloth') === 'complete' && api.mistakeAnimalNormalize('fox') === 'reasoning' && api.mistakeAnimalNormalize('bat') === 'evidence' && api.mistakeAnimalNormalize('peacock') === 'specific' && api.mistakeAnimalNormalize('parrot') === 'specific' && api.mistakeAnimalNormalize('chameleon') === 'keywords' && api.mistakeAnimalNormalize('octopus') === 'specific' && api.mistakeAnimalNormalize('monkey') === 'concept' && api.mistakeAnimalNormalize('goldfish') === 'concept');
+ok('the mistake’s own name normalises', api.mistakeAnimalNormalize('Missed the comparison') === 'comparison' && api.mistakeAnimalNormalize('too vague') === 'specific' && api.mistakeAnimalNormalize('Rushed it') === 'careful');
+ok('a label read back normalises', api.mistakeAnimalNormalize('reasoning — Broke the chain') === 'reasoning' && api.mistakeAnimalNormalize('fox — reversed the logic') === 'reasoning');
+ok('an object with an animal in it normalises', api.mistakeAnimalNormalize({ animal: 'evidence', why: 'x' }) === 'evidence' && api.mistakeAnimalNormalize({ animal: 'bat', why: 'x' }) === 'evidence');
 ok('"unsure", "none" and nothing at all mean NO type', ['unsure', 'none', '', null, undefined, 'N/A', 'unknown'].every(v => api.mistakeAnimalNormalize(v) === ''));
-ok('an eleventh animal means no type too', api.mistakeAnimalNormalize('dragon') === '' && api.mistakeAnimalNormalize('the walrus') === '');
-ok('the label reads emoji, animal and habit', api.mistakeAnimalLabel('rabbit') === '🐇 The Rabbit — Rushed it' && api.mistakeAnimalLabel('dragon') === '');
+ok('a tenth type means no type', api.mistakeAnimalNormalize('dragon') === '' && api.mistakeAnimalNormalize('the walrus') === '');
+ok('the label reads emoji, Sidekick and habit', api.mistakeAnimalLabel('comparison') === '🦎 Comparison Casey — Missed the comparison' && api.mistakeAnimalLabel('dragon') === '');
 ok('the rule names every id', api.mistakeAnimalIds().every(id => api.MISTAKE_ANIMAL_RULE.includes('  ' + id + ' = ')));
 ok('the rule allows "none"', /empty string rather than forcing one/.test(api.MISTAKE_ANIMAL_RULE));
 ok('the rule forbids a type on a correct answer or a blank', /Never give a mistake type to a correct answer or to a question that was not attempted/.test(api.MISTAKE_ANIMAL_RULE));
 ok('the scan rule carries the shared rule and the field shape', api.SCAN_MISTAKE_RULE.includes(api.MISTAKE_ANIMAL_RULE) && /"mistake" is \{"animal"/.test(api.SCAN_MISTAKE_RULE));
 
 /* The door. */
-const mkWrong = api._markFields({ studentAnswer: '16', verdict: 'wrong', mistake: { animal: 'rabbit', why: 'You added instead of subtracting.' } });
-ok('a wrong answer keeps its mistake type', mkWrong.mistake && mkWrong.mistake.animal === 'rabbit' && mkWrong.mistake.why === 'You added instead of subtracting.');
-ok('a partly-right answer keeps it too', api._markFields({ studentAnswer: '16 g', verdict: 'partial', mistake: { animal: 'sloth' } }).mistake.animal === 'sloth');
-ok('a type that came as a bare word is still read', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'The Fox' }).mistake.animal === 'fox');
-ok('…with an empty why rather than a missing one', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'fox' }).mistake.why === '');
+const mkWrong = api._markFields({ studentAnswer: '16', verdict: 'wrong', mistake: { animal: 'careful', why: 'You added instead of subtracting.' } });
+ok('a wrong answer keeps its mistake type', mkWrong.mistake && mkWrong.mistake.animal === 'careful' && mkWrong.mistake.why === 'You added instead of subtracting.');
+ok('a partly-right answer keeps it too', api._markFields({ studentAnswer: '16 g', verdict: 'partial', mistake: { animal: 'complete' } }).mistake.animal === 'complete');
+ok('a type that came as a bare word is still read', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'Reasoning Ravi' }).mistake.animal === 'reasoning');
+ok('a type the model gave under the OLD list is stored as the Sidekick id', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'The Fox' }).mistake.animal === 'reasoning');
+ok('…with an empty why rather than a missing one', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'reasoning' }).mistake.why === '');
 ok('a CORRECT answer never carries one, whatever the model says',
-   api._markFields({ studentAnswer: '8', verdict: 'correct', mistake: { animal: 'rabbit', why: 'x' } }).mistake === null);
+   api._markFields({ studentAnswer: '8', verdict: 'correct', mistake: { animal: 'careful', why: 'x' } }).mistake === null);
 ok('a BLANK never carries one — nothing was attempted',
-   api._markFields({ studentAnswer: '', verdict: 'wrong', mistake: { animal: 'rabbit', why: 'x' } }).mistake === null);
-ok('an answer the model would not judge carries none', api._markFields({ studentAnswer: 'x', mistake: { animal: 'rabbit' } }).mistake === null);
+   api._markFields({ studentAnswer: '', verdict: 'wrong', mistake: { animal: 'careful', why: 'x' } }).mistake === null);
+ok('an answer the model would not judge carries none', api._markFields({ studentAnswer: 'x', mistake: { animal: 'careful' } }).mistake === null);
 ok('an invented animal files nothing', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'dragon', why: 'x' } }).mistake === null);
 ok('"unsure" files nothing', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'unsure' } }).mistake === null);
 ok('an empty string files nothing', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: '' }).mistake === null);
-ok('the why is clipped', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'bat', why: 'w'.repeat(900) } }).mistake.why.length <= 401);
+ok('the why is clipped', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'evidence', why: 'w'.repeat(900) } }).mistake.why.length <= 401);
 
 /* Both item builders carry it through the same door. */
-const scanIt = api._scanNewItem({ number: '3', question: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'wrong', mistake: { animal: 'peacock', why: 'Vague.' } }, 0, 1);
-ok('a page item carries the type', scanIt.mistake && scanIt.mistake.animal === 'peacock');
-const askIt = api._askNewItem({ heading: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'partial', mistake: 'octopus' });
-ok('an ask item carries the type', askIt.mistake && askIt.mistake.animal === 'octopus');
-ok('an unmarked page item carries none', api._scanNewItem({ number: '3', question: 'Q', answer: 'A', mistake: 'octopus' }, 0, 1).mistake === null);
+const scanIt = api._scanNewItem({ number: '3', question: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'wrong', mistake: { animal: 'specific', why: 'Vague.' } }, 0, 1);
+ok('a page item carries the type', scanIt.mistake && scanIt.mistake.animal === 'specific');
+const askIt = api._askNewItem({ heading: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'partial', mistake: 'context' });
+ok('an ask item carries the type', askIt.mistake && askIt.mistake.animal === 'context');
+ok('an unmarked page item carries none', api._scanNewItem({ number: '3', question: 'Q', answer: 'A', mistake: 'context' }, 0, 1).mistake === null);
 
 /* The fold across a page break: the half that judged is the half that decides. */
 {
   const into = [];
-  api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'sloth', why: 'Half.' } }], 0, 1, into);
+  api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'complete', why: 'Half.' } }], 0, 1, into);
   api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A', studentAnswer: 'x', verdict: 'correct' }], 1, 1, into);
   ok('a continuation judged CORRECT clears the first half’s type', into.length === 1 && into[0].mistake === null);
   const into2 = [];
-  api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'sloth', why: 'Half.' } }], 0, 1, into2);
+  api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'complete', why: 'Half.' } }], 0, 1, into2);
   api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A' }], 1, 1, into2);
-  ok('a continuation that judged nothing keeps it', into2.length === 1 && into2[0].mistake && into2[0].mistake.animal === 'sloth');
+  ok('a continuation that judged nothing keeps it', into2.length === 1 && into2[0].mistake && into2[0].mistake.animal === 'complete');
   const into3 = [];
   api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A' }], 0, 1, into3);
   api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: 'fox' }], 1, 1, into3);
-  ok('a continuation that judged brings its own type', into3[0].mistake && into3[0].mistake.animal === 'fox');
+  ok('a continuation that judged brings its own type — an old word carried to its Sidekick', into3[0].mistake && into3[0].mistake.animal === 'reasoning');
 }
 
 /* Every prompt that marks asks for it — the paper and the typed question. */
@@ -793,12 +799,12 @@ ok('the ask reply shape has the field', /"mistake":""/.test(api.SCAN_ASK_SYS));
 
 /* The tally, most common first. */
 const tal = api.mistakeTally([
-  { marked: true, mistake: { animal: 'sloth' } }, { marked: true, mistake: { animal: 'rabbit' } },
-  { marked: true, mistake: { animal: 'sloth' } }, { marked: false, mistake: { animal: 'fox' } },
+  { marked: true, mistake: { animal: 'complete' } }, { marked: true, mistake: { animal: 'careful' } },
+  { marked: true, mistake: { animal: 'complete' } }, { marked: false, mistake: { animal: 'reasoning' } },
   { marked: true, mistake: null }, { marked: true, mistake: { animal: 'dragon' } }
 ]);
-ok('the tally counts each animal and sorts by count', tal.length === 2 && tal[0].id === 'sloth' && tal[0].count === 2 && tal[1].id === 'rabbit');
-ok('the tally ignores blanks and unknown animals', !tal.some(t => t.id === 'fox' || t.id === 'dragon'));
+ok('the tally counts each animal and sorts by count', tal.length === 2 && tal[0].id === 'complete' && tal[0].count === 2 && tal[1].id === 'careful');
+ok('the tally ignores blanks and unknown animals', !tal.some(t => t.id === 'reasoning' || t.id === 'dragon'));
 
 /* The card and the copy text, read as text. */
 ok('the card box is gated on a marked answer that carries a type',

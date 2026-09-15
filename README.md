@@ -70,11 +70,37 @@ A page holding some of each — the ordinary case — comes back with some of ea
 the answers say how it went. The correct answer is always worked out from scratch **first**, from
 the printed question alone, so what the student wrote can never talk the app into agreeing with it.
 
+## 🐾 The mistake type is a Science Sidekick's skill (v1.8.0)
+
+The ten animals of v1.7.0 are gone. A wrong answer is now filed under **which of the nine Science
+Sidekicks' skills it was missing** — the same nine coaches the Science Learning Portal shows after
+a marked answer, so the figure that says what an answer needs next and the one that names the
+habit are one figure, in every app:
+
+| | Sidekick | The habit |
+| --- | --- | --- |
+| 🦎 | Comparison Casey | Missed the comparison — one side described, the other left out |
+| 🐹 | Context Connie | Ignored the question's clues — the diagram label, the situation, the given detail |
+| 🦊 | Specific Sherry | Too vague — "it affects the plant", or the question repeated back |
+| 🐘 | Evidence Ellen | Ignored the evidence — never used the table, graph or reading |
+| 🦜 | Keyword Kai | Wrong keyword — "melt" for "dissolve" |
+| 🦉 | Concept Cora | Mixed up the science — evaporation and boiling swapped, the fact forgotten |
+| 🐼 | Reasoning Ravi | Broke the chain — cause and effect the wrong way round, a step missing |
+| 🐢 | Careful Cleo | Slipped on a detail — rushed it, answered a different question |
+| 🦫 | Complete Cody | Stopped halfway — the cause without the effect, one part of two |
+
+Everything else about the 🐾 Mistake type box is as it was: asked for in the same call that marks
+the paper, never on a correct answer or a blank, left untyped when it fits none of the nine, and
+counted in the chips above the answers. A model that still answers with one of the old animals
+(the Rabbit, the Parrot, the Sloth…) is read as the Sidekick it meant, and so is anything the
+other apps hold under an old id.
+
 ## 🐾 …and says WHICH KIND of mistake it was (v1.7.0)
 
-A wrong answer is wrong in one of a handful of familiar ways, and each one is an **animal** — the
-same ten animals the Science Learning Portal and Ans Key use, so a child meets the same names
-everywhere:
+A wrong answer is wrong in one of a handful of familiar ways, and each one had an **animal** —
+the same list the Science Learning Portal and Ans Key use, so a child meets the same names
+everywhere. (The list became the nine Science Sidekicks' skills in v1.8.0; the table below is the
+original cast, kept for the record.)
 
 | | Animal | The habit |
 | --- | --- | --- |
@@ -89,15 +115,15 @@ everywhere:
 | 🦇 | The Bat | Ignored the evidence — never looked at the diagram or table |
 | 🦚 | The Peacock | Too vague — "it affects the plant" |
 
-Every ✗ wrong and ~ partly right answer now carries a **🐾 Mistake type** box under what the
-student wrote: the animal, one sentence naming the habit in *this* answer, and the one thing to do
-next time. The chips above the answers count them ("🦥 3× The Sloth"), so a whole paper says at a
+Every ✗ wrong and ~ partly right answer carries a **🐾 Mistake type** box under what the
+student wrote: the type, one sentence naming the habit in *this* answer, and the one thing to do
+next time. The chips above the answers count them, so a whole paper says at a
 glance what to work on, and the type goes into the copied text too.
 
 - It is asked for **in the same call that marks the paper** — no second pass, nothing extra to
   wait for.
 - A **correct** answer never gets one, and neither does a **blank** — it was not attempted. A
-  mistake that fits none of the ten is left untyped rather than forced into the nearest animal.
+  mistake that fits none of the list is left untyped rather than forced into the nearest one.
 
 ## Four subjects
 
