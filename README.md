@@ -70,34 +70,35 @@ A page holding some of each — the ordinary case — comes back with some of ea
 the answers say how it went. The correct answer is always worked out from scratch **first**, from
 the printed question alone, so what the student wrote can never talk the app into agreeing with it.
 
-## 🐾 …and says WHICH KIND of mistake it was (v1.7.0)
+## 🐾 …and says WHICH KIND of mistake it was (v1.8.0)
 
-A wrong answer is wrong in one of a handful of familiar ways, and each one is an **animal** — the
-same ten animals the Science Learning Portal and Ans Key use, so a child meets the same names
-everywhere:
+A wrong answer is wrong in one of a handful of familiar ways, and each one is a **Science
+Sidekick's skill, missing** — the same nine Sidekicks the Science Learning Portal and Ans Key use,
+so a child meets the same names everywhere:
 
-| | Animal | The habit |
+| | Sidekick | The habit |
 | --- | --- | --- |
-| 🐇 | The Rabbit | Rushed it — answered a different question from the one printed |
-| 🦜 | The Parrot | Repeated the question instead of answering it |
-| 🦥 | The Sloth | Stopped halfway — the cause without the effect, one part of two |
-| 🦎 | The Chameleon | Wrong keyword — "melt" for "dissolve" |
-| 🐙 | The Octopus | Grabbed everything — every fact about the topic, the point buried |
-| 🐒 | The Monkey | Mixed-up ideas — evaporation and boiling swapped |
-| 🐟 | The Goldfish | Forgot the fact |
-| 🦊 | The Fox | Reversed the logic — cause and effect the wrong way round |
-| 🦇 | The Bat | Ignored the evidence — never looked at the diagram or table |
-| 🦚 | The Peacock | Too vague — "it affects the plant" |
+| 🦎 | Comparison Casey | Missed the comparison — only one of the two things, or different features |
+| 🐹 | Context Connie | Ignored the question clues — a general answer, blind to this setup |
+| 🦊 | Specific Sherry | Too vague — "it affects the plant" |
+| 🐘 | Evidence Ellen | Ignored the evidence — never used the diagram, table or result |
+| 🦜 | Keyword Kai | Wrong keyword — "melt" for "dissolve" |
+| 🦉 | Concept Cora | Mixed up the science — evaporation and boiling swapped |
+| 🐼 | Reasoning Ravi | Broke the chain — cause and effect not linked |
+| 🐢 | Careful Cleo | Slipped on a detail — the NOT, the unit, the label |
+| 🦫 | Complete Cody | Stopped halfway — the cause without the effect, one part of two |
 
-Every ✗ wrong and ~ partly right answer now carries a **🐾 Mistake type** box under what the
-student wrote: the animal, one sentence naming the habit in *this* answer, and the one thing to do
-next time. The chips above the answers count them ("🦥 3× The Sloth"), so a whole paper says at a
-glance what to work on, and the type goes into the copied text too.
+Every ✗ wrong and ~ partly right answer carries a **🐾 Mistake type**. On an **open-ended science**
+question that is the full **Science Sidekick analysis**: the Sidekick's figure, the habit, the
+question beside what the student wrote, and what to do next time. A multiple-choice tick, a maths
+paper, English or Chinese keep the shorter box. The chips above the answers count them
+("🦫 3× Complete Cody"), so a whole paper says at a glance what to work on, and the type goes into
+the copied text too.
 
 - It is asked for **in the same call that marks the paper** — no second pass, nothing extra to
   wait for.
 - A **correct** answer never gets one, and neither does a **blank** — it was not attempted. A
-  mistake that fits none of the ten is left untyped rather than forced into the nearest animal.
+  mistake that fits none of the nine is left untyped rather than forced into the nearest Sidekick.
 
 ## Four subjects
 
@@ -162,5 +163,6 @@ like a grounded one, so it says so rather than leaving you to guess.
 
 ## Running it
 
-It is one static file. Open `index.html`, or serve the folder — it is published at
-`polymathlc.github.io/scan`. Sign in with Google; the teaching notes window is the admin's alone.
+It is one static page plus the Sidekick drawings (`sidekick-art.js`). Open `index.html`, or serve
+the folder — it is published at `polymathlc.github.io/scan`. Sign in with Google; the teaching notes
+window is the admin's alone.

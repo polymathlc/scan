@@ -80,8 +80,9 @@ const api = new Function(prelude + json + grounding + scan + vet + `
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
     SCAN_ASK_SYS, SCAN_ASK_WITH_PAGES_RULE,
-    MISTAKE_ANIMALS, mistakeAnimal, mistakeAnimalNormalize, mistakeAnimalLabel, mistakeAnimalIds,
+    MISTAKE_ANIMALS, MISTAKE_ANIMAL_ALIASES, mistakeAnimal, mistakeAnimalNormalize, mistakeAnimalLabel, mistakeAnimalIds,
     MISTAKE_ANIMAL_RULE, SCAN_MISTAKE_RULE, _mistakeField, mistakeTally,
+    _scanSubjectOf, _itemSubject, _itemGetsSidekick, sidekickAnalysisHtml, SCIENCE_COACHES,
     VET_TARGETS, vetTarget, VET_SOURCE, _vetPortalDoc, _vetMathDoc,
     _vetTitle, _vetHtml, _vetCorrectIndex, _vetIsMcq, _vetCardFootHtml,
     set user(v) { currentUser = v; }
@@ -723,33 +724,42 @@ ok('…and the door is inside it', /async function _vetSend[\s\S]{0,320}!isAdmin
    mistake under a name no other app knows; and a list that drifts from the
    one in polymathlc/cer and polymathlc/anskey sorts the same answer under a
    different animal depending on which app read it. */
-ok('there are ten animals', api.MISTAKE_ANIMALS.length === 10);
-ok('every animal is whole', api.MISTAKE_ANIMALS.every(m => m.id && m.emoji && m.animal && m.name && m.desc && m.spot && m.fix));
-ok('the ids are unique and lowercase words', new Set(api.mistakeAnimalIds()).size === 10 &&
+ok('there are nine Sidekicks', api.MISTAKE_ANIMALS.length === 9);
+ok('every Sidekick is whole', api.MISTAKE_ANIMALS.every(m => m.id && m.emoji && m.animal && m.name && m.desc && m.spot && m.fix));
+ok('the ids are unique and lowercase words', new Set(api.mistakeAnimalIds()).size === 9 &&
    api.mistakeAnimalIds().every(id => /^[a-z]+$/.test(id)));
 ok('the shared list is byte-for-byte the one the other apps carry',
-   JSON.stringify(api.mistakeAnimalIds()) === JSON.stringify(['rabbit','parrot','sloth','chameleon','octopus','monkey','goldfish','fox','bat','peacock']));
+   JSON.stringify(api.mistakeAnimalIds()) === JSON.stringify(['comparison','context','specific','evidence','keywords','concept','reasoning','careful','complete']));
+ok('every Sidekick has a coach with matching id and name',
+   api.mistakeAnimalIds().every(id => api.SCIENCE_COACHES[id] && api.SCIENCE_COACHES[id].name === api.mistakeAnimal(id).animal));
 ok('the lookup returns null for an animal it does not know, never a default',
    api.mistakeAnimal('dragon') === null && api.mistakeAnimal('') === null && api.mistakeAnimal(null) === null);
-ok('the lookup is case-tolerant', api.mistakeAnimal('Rabbit').id === 'rabbit');
-ok('an id normalises to itself', api.mistakeAnimalNormalize('sloth') === 'sloth');
-ok('the animal’s name normalises', api.mistakeAnimalNormalize('The Rabbit') === 'rabbit' && api.mistakeAnimalNormalize('RABBIT 🐇') === 'rabbit');
-ok('the mistake’s own name normalises', api.mistakeAnimalNormalize('Rushed it') === 'rabbit' && api.mistakeAnimalNormalize('too vague') === 'peacock');
-ok('a label read back normalises', api.mistakeAnimalNormalize('fox — reversed the logic') === 'fox');
-ok('an object with an animal in it normalises', api.mistakeAnimalNormalize({ animal: 'bat', why: 'x' }) === 'bat');
+ok('the lookup is case-tolerant', api.mistakeAnimal('Comparison').id === 'comparison');
+ok('an id normalises to itself', api.mistakeAnimalNormalize('complete') === 'complete');
+ok('the Sidekick’s name normalises', api.mistakeAnimalNormalize('Comparison Casey') === 'comparison' && api.mistakeAnimalNormalize('CASEY 🦎') === 'comparison');
+ok('the last name alone normalises', api.mistakeAnimalNormalize('casey') === 'comparison' && api.mistakeAnimalNormalize('ellen') === 'evidence');
+ok('the mistake’s own name normalises', api.mistakeAnimalNormalize('Slipped on a detail') === 'careful' && api.mistakeAnimalNormalize('too vague') === 'specific');
+ok('a label read back normalises', api.mistakeAnimalNormalize('reasoning — broke the chain') === 'reasoning');
+ok('an object with an animal in it normalises', api.mistakeAnimalNormalize({ animal: 'evidence', why: 'x' }) === 'evidence');
+ok('an OLD id still names the habit it always meant',
+   api.mistakeAnimalNormalize('sloth') === 'complete' &&
+   api.mistakeAnimalNormalize('The Rabbit') === 'careful' &&
+   api.mistakeAnimalNormalize('peacock') === 'specific' &&
+   api.mistakeAnimalNormalize('bat') === 'evidence' &&
+   api.mistakeAnimalNormalize('fox') === 'reasoning');
 ok('"unsure", "none" and nothing at all mean NO type', ['unsure', 'none', '', null, undefined, 'N/A', 'unknown'].every(v => api.mistakeAnimalNormalize(v) === ''));
-ok('an eleventh animal means no type too', api.mistakeAnimalNormalize('dragon') === '' && api.mistakeAnimalNormalize('the walrus') === '');
-ok('the label reads emoji, animal and habit', api.mistakeAnimalLabel('rabbit') === '🐇 The Rabbit — Rushed it' && api.mistakeAnimalLabel('dragon') === '');
+ok('a tenth animal means no type too', api.mistakeAnimalNormalize('dragon') === '' && api.mistakeAnimalNormalize('the walrus') === '');
+ok('the label reads emoji, animal and habit', api.mistakeAnimalLabel('careful') === '🐢 Careful Cleo — Slipped on a detail' && api.mistakeAnimalLabel('dragon') === '');
 ok('the rule names every id', api.mistakeAnimalIds().every(id => api.MISTAKE_ANIMAL_RULE.includes('  ' + id + ' = ')));
 ok('the rule allows "none"', /empty string rather than forcing one/.test(api.MISTAKE_ANIMAL_RULE));
 ok('the rule forbids a type on a correct answer or a blank', /Never give a mistake type to a correct answer or to a question that was not attempted/.test(api.MISTAKE_ANIMAL_RULE));
 ok('the scan rule carries the shared rule and the field shape', api.SCAN_MISTAKE_RULE.includes(api.MISTAKE_ANIMAL_RULE) && /"mistake" is \{"animal"/.test(api.SCAN_MISTAKE_RULE));
 
-/* The door. */
+/* The door. Old ids are accepted and stored as the Sidekick they became. */
 const mkWrong = api._markFields({ studentAnswer: '16', verdict: 'wrong', mistake: { animal: 'rabbit', why: 'You added instead of subtracting.' } });
-ok('a wrong answer keeps its mistake type', mkWrong.mistake && mkWrong.mistake.animal === 'rabbit' && mkWrong.mistake.why === 'You added instead of subtracting.');
-ok('a partly-right answer keeps it too', api._markFields({ studentAnswer: '16 g', verdict: 'partial', mistake: { animal: 'sloth' } }).mistake.animal === 'sloth');
-ok('a type that came as a bare word is still read', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'The Fox' }).mistake.animal === 'fox');
+ok('a wrong answer keeps its mistake type', mkWrong.mistake && mkWrong.mistake.animal === 'careful' && mkWrong.mistake.why === 'You added instead of subtracting.');
+ok('a partly-right answer keeps it too', api._markFields({ studentAnswer: '16 g', verdict: 'partial', mistake: { animal: 'sloth' } }).mistake.animal === 'complete');
+ok('a type that came as a bare word is still read', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'The Fox' }).mistake.animal === 'reasoning');
 ok('…with an empty why rather than a missing one', api._markFields({ studentAnswer: 'x', verdict: 'wrong', mistake: 'fox' }).mistake.why === '');
 ok('a CORRECT answer never carries one, whatever the model says',
    api._markFields({ studentAnswer: '8', verdict: 'correct', mistake: { animal: 'rabbit', why: 'x' } }).mistake === null);
@@ -763,9 +773,9 @@ ok('the why is clipped', api._markFields({ studentAnswer: 'x', verdict: 'wrong',
 
 /* Both item builders carry it through the same door. */
 const scanIt = api._scanNewItem({ number: '3', question: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'wrong', mistake: { animal: 'peacock', why: 'Vague.' } }, 0, 1);
-ok('a page item carries the type', scanIt.mistake && scanIt.mistake.animal === 'peacock');
+ok('a page item carries the type', scanIt.mistake && scanIt.mistake.animal === 'specific');
 const askIt = api._askNewItem({ heading: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'partial', mistake: 'octopus' });
-ok('an ask item carries the type', askIt.mistake && askIt.mistake.animal === 'octopus');
+ok('an ask item carries the type', askIt.mistake && askIt.mistake.animal === 'specific');
 ok('an unmarked page item carries none', api._scanNewItem({ number: '3', question: 'Q', answer: 'A', mistake: 'octopus' }, 0, 1).mistake === null);
 
 /* The fold across a page break: the half that judged is the half that decides. */
@@ -777,11 +787,11 @@ ok('an unmarked page item carries none', api._scanNewItem({ number: '3', questio
   const into2 = [];
   api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: { animal: 'sloth', why: 'Half.' } }], 0, 1, into2);
   api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A' }], 1, 1, into2);
-  ok('a continuation that judged nothing keeps it', into2.length === 1 && into2[0].mistake && into2[0].mistake.animal === 'sloth');
+  ok('a continuation that judged nothing keeps it', into2.length === 1 && into2[0].mistake && into2[0].mistake.animal === 'complete');
   const into3 = [];
   api._scanFoldRows([{ number: '9', question: 'first half', answer: 'A' }], 0, 1, into3);
   api._scanFoldRows([{ continuation: true, question: 'second half', answer: 'A', studentAnswer: 'x', verdict: 'wrong', mistake: 'fox' }], 1, 1, into3);
-  ok('a continuation that judged brings its own type', into3[0].mistake && into3[0].mistake.animal === 'fox');
+  ok('a continuation that judged brings its own type', into3[0].mistake && into3[0].mistake.animal === 'reasoning');
 }
 
 /* Every prompt that marks asks for it — the paper and the typed question. */
@@ -790,22 +800,77 @@ ok('the page prompt asks for the type', api._scanPrompt(2, 1, 4, '').includes('M
 ok('the ask-alone prompt asks for the type', api._askPrompt('I got 16, is that right?', 'normal').includes('MISTAKE TYPES'));
 ok('the page reply shape has the field', /"mistake":\{"animal"/.test(api.SCAN_SYS));
 ok('the ask reply shape has the field', /"mistake":""/.test(api.SCAN_ASK_SYS));
+ok('the page reply asks for a subject', /"subject":"science/.test(api.SCAN_SYS));
+ok('the ask reply asks for a subject', /"subject":"science/.test(api.SCAN_ASK_SYS));
 
-/* The tally, most common first. */
+/* The tally, most common first. Filed ids are the Sidekicks'; unknown and
+   unmarked answers are ignored. */
 const tal = api.mistakeTally([
-  { marked: true, mistake: { animal: 'sloth' } }, { marked: true, mistake: { animal: 'rabbit' } },
-  { marked: true, mistake: { animal: 'sloth' } }, { marked: false, mistake: { animal: 'fox' } },
+  { marked: true, mistake: { animal: 'complete' } }, { marked: true, mistake: { animal: 'careful' } },
+  { marked: true, mistake: { animal: 'complete' } }, { marked: false, mistake: { animal: 'evidence' } },
   { marked: true, mistake: null }, { marked: true, mistake: { animal: 'dragon' } }
 ]);
-ok('the tally counts each animal and sorts by count', tal.length === 2 && tal[0].id === 'sloth' && tal[0].count === 2 && tal[1].id === 'rabbit');
-ok('the tally ignores blanks and unknown animals', !tal.some(t => t.id === 'fox' || t.id === 'dragon'));
+ok('the tally counts each animal and sorts by count', tal.length === 2 && tal[0].id === 'complete' && tal[0].count === 2 && tal[1].id === 'careful');
+ok('the tally ignores blanks and unknown animals', !tal.some(t => t.id === 'evidence' || t.id === 'dragon'));
 
 /* The card and the copy text, read as text. */
-ok('the card box is gated on a marked answer that carries a type',
-   /function mistakeBoxHtml\(it\) \{\s*if \(!it \|\| !it\.marked \|\| !it\.mistake\) return '';/.test(html));
+ok('a Sidekick analysis stands in for the short box on open science',
+   /function mistakeBoxHtml\(it\) \{\s*if \(_itemGetsSidekick\(it\)\) return sidekickAnalysisHtml\(it\);/.test(html));
+ok('the short box is still gated on a marked answer that carries a type',
+   /if \(!it \|\| !it\.marked \|\| !it\.mistake\) return '';/.test(html));
 ok('the card draws the box under what the student wrote', html.indexOf('mistakeBoxHtml(it) +') > html.indexOf('<div class="youLabel">What you wrote</div>'));
-ok('the copy text carries the type', /Mistake type: ' \+ mistakeAnimalLabel/.test(html));
+ok('the copy text names a Sidekick when it is one', /Science Sidekick: /.test(html) && /Mistake type: /.test(html));
 ok('the chip row counts the animals', /mistakeTally\(_answers\)\.forEach/.test(html));
+ok('the drawings load beside the page, not from a CDN', /<script src="sidekick-art\.js"><\/script>/.test(html));
+
+/* 🐾 Science Sidekick analysis — open-ended science only. */
+api.meta = { level: 'P5', subject: 'science' };
+const skBase = {
+  marked: true, type: 'open', verdict: 'wrong', subject: 'science',
+  question: 'Why did the ice melt?', studentAnswer: 'It turned into liquid.',
+  mistake: { animal: 'specific', why: 'You repeated the question.' }
+};
+ok('open-ended science that is wrong gets a Sidekick', api._itemGetsSidekick(skBase) === true);
+ok('the analysis card names the Sidekick and the question', (() => {
+  const h = api.sidekickAnalysisHtml(skBase);
+  return h.includes('data-sidekick="specific"') && h.includes('SCIENCE SIDEKICK') &&
+    h.includes('Specific Sherry') && h.includes('Why did the ice melt?') &&
+    h.includes('It turned into liquid.') && h.includes('Watch for it next time');
+})());
+ok('a multiple-choice science question does not',
+   api._itemGetsSidekick(Object.assign({}, skBase, { type: 'mcq' })) === false);
+ok('a correct science answer does not',
+   api._itemGetsSidekick(Object.assign({}, skBase, { verdict: 'correct' })) === false);
+ok('a blank does not — nothing was attempted',
+   api._itemGetsSidekick(Object.assign({}, skBase, { marked: false, studentAnswer: '' })) === false);
+ok('a maths paper does not, even when the habit is named', (() => {
+  api.meta = { level: 'P5', subject: 'math' };
+  const no = api._itemGetsSidekick(skBase) === false;
+  api.meta = { level: 'P5', subject: 'science' };
+  return no;
+})());
+ok('on Any subject the question’s own subject decides', (() => {
+  api.meta = { level: 'P5', subject: '' };
+  const yes = api._itemGetsSidekick(skBase) === true;
+  const no = api._itemGetsSidekick(Object.assign({}, skBase, { subject: 'english' })) === false;
+  const unknown = api._itemGetsSidekick(Object.assign({}, skBase, { subject: '' })) === false;
+  api.meta = { level: 'P5', subject: 'science' };
+  return yes && no && unknown;
+})());
+ok('an unknown habit draws no Sidekick',
+   api._itemGetsSidekick(Object.assign({}, skBase, { mistake: { animal: 'dragon' } })) === false);
+ok('the picker wins over a mismatched per-question subject', (() => {
+  api.meta = { level: 'P5', subject: 'science' };
+  return api._itemGetsSidekick(Object.assign({}, skBase, { subject: 'math' })) === true;
+})());
+ok('a page item from a science paper carries the picker as subject',
+   api._scanNewItem({ number: '3', question: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'wrong', mistake: 'specific' }, 0, 1).subject === 'science');
+ok('on Any subject the model’s subject is kept', (() => {
+  api.meta = { level: 'P5', subject: '' };
+  const it = api._scanNewItem({ number: '3', question: 'Q', answer: 'A', studentAnswer: 'B', verdict: 'wrong', mistake: 'specific', subject: 'science' }, 0, 1);
+  api.meta = { level: 'P5', subject: 'science' };
+  return it.subject === 'science';
+})());
 
 console.log((fails ? '✗ ' : '✓ ') + (ran - fails) + '/' + ran + ' checks passed');
 process.exit(fails ? 1 : 0);
