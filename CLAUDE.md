@@ -3,15 +3,18 @@
 Guidance for Claude when working in this repo.
 
 ## App
-- `index.html` — **"Scan & Answer"**. One self-contained file (markup + CSS + JS) on the shared
-  `mathgen--app` Firebase project with Google sign-in. Photograph a worksheet or an exam paper —
-  or pick pictures out of the gallery — and **every question printed on them is read: what the
-  student has already written is MARKED, what is still blank is ANSWERED**. Four subjects:
-  Science, Mathematics, English, Chinese. **A typed or dictated question is the other way in**:
-  with pages it governs the run, with no pages it *is* the run. Nothing is saved anywhere: a
-  photographed paper is somebody's work, so it lives in the tab and leaves through Copy or Print —
-  **except on the admin's own press of 📥 Send to vetting**, which files one question (never the
-  student's answer to it) in another Polymath app's vetting list. See that section below.
+- `index.html` — **"Scan & Answer"**. Markup + CSS + JS on the shared `mathgen--app` Firebase
+  project with Google sign-in. Photograph a worksheet or an exam paper — or pick pictures out of
+  the gallery — and **every question printed on them is read: what the student has already written
+  is MARKED, what is still blank is ANSWERED**. Four subjects: Science, Mathematics, English,
+  Chinese. **A typed or dictated question is the other way in**: with pages it governs the run,
+  with no pages it *is* the run. Nothing is saved anywhere: a photographed paper is somebody's
+  work, so it lives in the tab and leaves through Copy or Print — **except on the admin's own press
+  of 📥 Send to vetting**, which files one question (never the student's answer to it) in another
+  Polymath app's vetting list. See that section below.
+- `sidekick-art.js` — the Science Sidekick drawings, the Portal's own sheet (`science-coach-art.js`
+  in `polymathlc/cer`), so a Scan card and a Portal card wear the same figure. Loaded beside
+  `index.html`; do not CDN it, do not rewrite an id into SVG markup.
 - Version badge (`APP_VERSION`, shown in the header) is hard-coded — bump it on every change.
 
 ## The AI is the Ans Key app's, ported whole
@@ -130,24 +133,26 @@ step, and ship a change to the shape in both repos together**:
 - **The page SAYS what it was asked** (`renderAskedLine`, and the Copy header). One card where
   twenty were expected is only honest if the instruction that narrowed the run is on screen.
 
-## 🐾 The mistake TYPE on a marked answer (v1.7.0)
+## 🐾 The mistake TYPE on a marked answer (v1.7.0 → v1.8.0)
 
-`MISTAKE_ANIMALS` / `mistakeAnimal` / `mistakeAnimalNormalize` / `mistakeAnimalLabel` /
-`mistakeAnimalPromptList` / `MISTAKE_ANIMAL_RULE` / `SCAN_MISTAKE_RULE` / **`_mistakeField`** /
-`mistakeTally` / `mistakeBoxHtml` (search `THE MISTAKE ANIMALS`), the `mistake` field on every
-answer item, and the `.mkBox` / `.tally.mMistake` CSS.
+`MISTAKE_ANIMALS` / `MISTAKE_ANIMAL_ALIASES` / `mistakeAnimal` / `mistakeAnimalNormalize` /
+`mistakeAnimalLabel` / `mistakeAnimalPromptList` / `MISTAKE_ANIMAL_RULE` / `SCAN_MISTAKE_RULE` /
+**`_mistakeField`** / `mistakeTally` / `mistakeBoxHtml` (search `THE MISTAKE ANIMALS`), the
+`mistake` field on every answer item, and the `.mkBox` / `.tally.mMistake` CSS.
 
 Marking says WHETHER an answer is wrong; this says HOW, in the one word a student can carry to the
-next question. Every wrong or partly-right answer is one of ten familiar habits, each an ANIMAL —
-🐇 Rushed it, 🦜 Repeated the question, 🦥 Stopped halfway, 🦎 Wrong keyword, 🐙 Grabbed
-everything, 🐒 Mixed-up ideas, 🐟 Forgot the fact, 🦊 Reversed the logic, 🦇 Ignored the evidence,
-🦚 Too vague.
+next question. Every wrong or partly-right answer is one of **nine Science Sidekicks' skills,
+missing** — Comparison Casey, Context Connie, Specific Sherry, Evidence Ellen, Keyword Kai,
+Concept Cora, Reasoning Ravi, Careful Cleo, Complete Cody.
 
 - **THE LIST IS SHARED, BYTE FOR BYTE, WITH `polymathlc/cer` AND `polymathlc/anskey`.** The Portal
   files students' own answers under these ids and quizzes the class on them; Ans Key writes a
   deliberate mistake of one of them into a text box. The `id` is what travels and what is stored —
   rename one here and every entry the other apps hold under it reads as "an unknown mistake" with
   nothing anywhere to say so. **Ship a change to the block to all three together.**
+- **The old ten-animal ids still normalise.** `MISTAKE_ANIMAL_ALIASES` carries `rabbit` →
+  `careful`, `sloth` → `complete`, `peacock` → `specific` and the rest, so a model's leftover word
+  still files as the habit it always meant. Never written, never offered.
 - **It rides the SAME call that marks the paper** — `SCAN_MISTAKE_RULE` is appended to both prompts
   (`_scanPrompt` and `_askPrompt`) and the field is in both reply shapes. No second pass, no extra
   cost, and no way for the type and the verdict to come from two different readings.
@@ -157,13 +162,45 @@ everything, 🐒 Mixed-up ideas, 🐟 Forgot the fact, 🦊 Reversed the logic, 
   cross on a question nobody attempted is the one mistake marking must never make, and a mistake
   TYPE on one is the same cross wearing a label.
 - **`mistakeAnimalNormalize` is how a model's word becomes an id, and '' IS an answer.** It takes
-  the id, the animal's name or the habit's name in any case; "unsure", "none", nothing and an
-  invented eleventh animal all come back '' and file nothing. Forcing a mistake into the nearest
-  animal teaches the wrong lesson with a straight face, so the prompt says so too.
+  the id, the Sidekick's name, the habit's name or an old id in any case; "unsure", "none", nothing
+  and an invented tenth Sidekick all come back '' and file nothing. Forcing a mistake into the
+  nearest animal teaches the wrong lesson with a straight face, so the prompt says so too.
 - **The fold across a page break follows the verdict.** The half that judged the question decides
   its type — including "none", which is what a `correct` continuation means for the first half.
 - **The child's work still does not travel.** `_vetPortalDoc` / `_vetMathDoc` carry the QUESTION
   to a vetting list and nothing about the student's answer, the type included.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
+
+## 🐾 Science Sidekick analysis on a scanned paper (v1.8.0)
+
+`SCIENCE_COACHES` / `SIDEKICK_ACCENT` / `_scanSubjectOf` / `_itemSubject` / **`_itemGetsSidekick`**
+/ `sidekickAvatarHtml` / **`sidekickAnalysisHtml`** (beside the taxonomy — search `SCIENCE SIDEKICK
+analysis`), `mistakeBoxHtml`'s first-line hand-off, the `subject` field on every answer item, and
+the `.skCard` CSS. Drawings live in `sidekick-art.js`.
+
+A Science Sidekick (Evidence Ellen, Context Connie…) says what a stronger answer needs NEXT, and
+names the habit this answer showed, against the question and what the student wrote. It appears
+automatically under an open-ended science mark — no second pass, no extra button.
+
+- **OPEN-ENDED SCIENCE ONLY.** `_itemGetsSidekick` is the ONE gate: marked, `wrong` or `partial`,
+  `type !== 'mcq'`, subject is science, and a habit this app can name. A multiple-choice tick is a
+  tick — "(3)" shows no missed comparison and no vague wording. A blank was not attempted. Maths,
+  English and Chinese keep the short 🐾 box. A failure of the gate draws nothing rather than a
+  plausible face.
+- **THE PICKER IS THE TEACHER'S WORD.** `_itemSubject` / `_scanSubjectOf` read `wsMeta.subject`
+  first: a Science paper stays Science even if one question looks like maths. On *Any subject* the
+  model's per-question `subject` decides, and an empty name means we do not know — no Sidekick,
+  never a guess.
+- **IT RIDES THE SAME MARKING CALL.** The habit is the `mistake` field already on the item. The
+  card is presentation only: it never marks, never calls a model, never reads an answer key.
+  `sidekickAnalysisHtml` refuses through `_itemGetsSidekick` rather than guessing.
+- **THE FIGURE IS THE PORTAL'S.** `sidekickAvatarHtml` asks `renderScienceCoachAvatar` from
+  `sidekick-art.js` and falls back to the Sidekick's emoji if the sheet is missing, so a test
+  harness that never loaded the drawings still names the habit. An unknown id draws nothing: the
+  Portal sheet falls back to Comparison Casey, which is the right thing for a coach card and the
+  wrong thing here.
+- **A SCIENCE MCQ STILL GETS THE SHORT BOX**, not the Sidekick card. The gate is on the analysis,
+  not on filing a habit.
 - Run **`node tools/scan-tests.mjs`** after touching any of it.
 
 ## 📥 Keeping a question — into the four vetting lists (v1.6.0)
@@ -285,14 +322,17 @@ everything, 🐒 Mixed-up ideas, 🐟 Forgot the fact, 🦊 Reversed the logic, 
   is dropped instead of landing among the new answers.
 
 ## House rules
-- After touching **🐾 the mistake type** (`MISTAKE_ANIMALS`, `mistakeAnimal`,
-  `mistakeAnimalNormalize`, `MISTAKE_ANIMAL_RULE`, `SCAN_MISTAKE_RULE`, `_mistakeField`,
-  `mistakeTally`, `mistakeBoxHtml`, the `mistake` field on an item, or the fold's `prev.mistake`
-  line), run `node tools/scan-tests.mjs`. Every failure is silent and the card still renders: a
-  type kept on a CORRECT answer tells a child they made a mistake they did not make; one kept on a
-  BLANK marks a question nobody attempted; an invented animal files the mistake under a name no
-  other app knows; and a list that drifts from the one in `polymathlc/cer` and `polymathlc/anskey`
-  sorts the same answer under a different animal depending on which app read it.
+- After touching **🐾 the mistake type or the Sidekick analysis** (`MISTAKE_ANIMALS`,
+  `MISTAKE_ANIMAL_ALIASES`, `mistakeAnimal`, `mistakeAnimalNormalize`, `MISTAKE_ANIMAL_RULE`,
+  `SCAN_MISTAKE_RULE`, `_mistakeField`, `mistakeTally`, `mistakeBoxHtml`, `_itemGetsSidekick`,
+  `sidekickAnalysisHtml`, `_scanSubjectOf`, `_itemSubject`, `SCIENCE_COACHES`, the `mistake` or
+  `subject` field on an item, or the fold's `prev.mistake` / `prev.subject` line), run
+  `node tools/scan-tests.mjs`. Every failure is silent and the card still renders: a type kept on
+  a CORRECT answer tells a child they made a mistake they did not make; one kept on a BLANK marks
+  a question nobody attempted; an invented animal files the mistake under a name no other app
+  knows; a list that drifts from the one in `polymathlc/cer` and `polymathlc/anskey` sorts the same
+  answer under a different animal depending on which app read it; and a Sidekick on a maths paper
+  or a multiple-choice tick teaches a lesson the answer cannot show.
 - After touching **the grounding, the live notebook, the scan run or the vetting door**
   (`aiGrounding`, `notesBlock`, `guidanceBlock`, `styleBlock`, `noteAppliesHere`, `noteSubjects`,
   `notesRelevant`, `groundingSummary`, `loadTeachingNotes`, `_notesDetach`, `stopTeachingNotes`,
