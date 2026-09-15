@@ -70,6 +70,35 @@ A page holding some of each — the ordinary case — comes back with some of ea
 the answers say how it went. The correct answer is always worked out from scratch **first**, from
 the printed question alone, so what the student wrote can never talk the app into agreeing with it.
 
+## 🐾 …and says WHICH KIND of mistake it was (v1.7.0)
+
+A wrong answer is wrong in one of a handful of familiar ways, and each one is an **animal** — the
+same ten animals the Science Learning Portal and Ans Key use, so a child meets the same names
+everywhere:
+
+| | Animal | The habit |
+| --- | --- | --- |
+| 🐇 | The Rabbit | Rushed it — answered a different question from the one printed |
+| 🦜 | The Parrot | Repeated the question instead of answering it |
+| 🦥 | The Sloth | Stopped halfway — the cause without the effect, one part of two |
+| 🦎 | The Chameleon | Wrong keyword — "melt" for "dissolve" |
+| 🐙 | The Octopus | Grabbed everything — every fact about the topic, the point buried |
+| 🐒 | The Monkey | Mixed-up ideas — evaporation and boiling swapped |
+| 🐟 | The Goldfish | Forgot the fact |
+| 🦊 | The Fox | Reversed the logic — cause and effect the wrong way round |
+| 🦇 | The Bat | Ignored the evidence — never looked at the diagram or table |
+| 🦚 | The Peacock | Too vague — "it affects the plant" |
+
+Every ✗ wrong and ~ partly right answer now carries a **🐾 Mistake type** box under what the
+student wrote: the animal, one sentence naming the habit in *this* answer, and the one thing to do
+next time. The chips above the answers count them ("🦥 3× The Sloth"), so a whole paper says at a
+glance what to work on, and the type goes into the copied text too.
+
+- It is asked for **in the same call that marks the paper** — no second pass, nothing extra to
+  wait for.
+- A **correct** answer never gets one, and neither does a **blank** — it was not attempted. A
+  mistake that fits none of the ten is left untyped rather than forced into the nearest animal.
+
 ## Four subjects
 
 Science, Mathematics, English and Chinese, each held to its own standard: a maths answer needs its
