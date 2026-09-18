@@ -72,10 +72,13 @@ const api = new Function(prelude + json + grounding + scan + vet + `
   return {
     set notes(v) { teachingNotes = v; },
     set style(v) { aiStyle = v; },
+    set cer(v) { cerStyle = v; },
     set meta(v) { wsMeta = v; },
     get meta() { return wsMeta; },
     noteAppliesHere, noteSubjects, notesRelevant, notesBlock, guidanceBlock, styleBlock,
     aiGrounding, groundingSummary, notesKeywordList,
+    styleProfilePick, styleBucketKey, styleEditsAll, styleCorrections, styleLessons, styleRecentEdits,
+    styleExemplarsFor, notesFairShare, notesJoinField, notesTrimTo, notesDedupe, NOTES_TRIM_MARK,
     _parseAIJson, _scanNewItem, _scanFoldRows, _scanStr, _scanPrompt, scanSubjectRule,
     _askPrompt, _askNewItem, _askFoldRows, _markFields, micAvailable, micLang,
     SCAN_SYS, SCAN_DETAIL_RULE, SCAN_SUBJECT_RULE, SCAN_MARK_RULE,
@@ -161,8 +164,118 @@ ok('the learned style reaches an answer', s1.includes('Full sentences'));
 ok('the exemplars reach an answer', s1.includes('evaporated into water vapour'));
 const s2 = api.aiGrounding('mark');
 ok('the exemplars stay OUT of marking', !s2.includes('evaporated into water vapour'));
-ok('how the teacher marks reaches marking', s2.includes('No mark without the keyword'));
+/* The profile's `markingStandards` is a GUESS a model drew from the teacher's
+   answers, and an inference must never decide a mark: the standard a student
+   is held to is the typed notes and guidance. It used to reach marking. */
+ok("the profile's INFERRED marking standard never reaches marking", !s2.includes('No mark without the keyword'));
+ok("'How this teacher marks' is never in a marking digest", !s2.includes('How this teacher marks'));
+ok('marking still gets the rules, the phrasing and the keywords',
+   s2.includes('Full sentences') && s2.includes('Because the') && s2.includes('evaporation'));
 ok('the style alone is grounding enough', api.groundingSummary().length > 0);
+ok("the summary names the teacher's learned style", api.groundingSummary().some(b => /learned style/.test(b)));
+
+/* ---------- The teacher's corrections reach this app (v1.9.0) ----------
+   Document A is read WHOLE (per-bucket profiles, the corpus, the edits and
+   their lessons) and document C — the Science portal's corrections — beside
+   it. Every failure here is silent: the answer still comes back, it simply
+   goes on making the mistake the teacher corrected yesterday. */
+api.meta = { level: 'P5', subject: 'science' };
+api.notes = [];
+api.cer = null;
+api.style = {
+  samples: [{ k: 's1', q: 'Why did the water level in the beaker fall?', a: 'The water evaporated into water vapour and escaped.', lvl: 'p5', sub: 'science' }],
+  edits: [{ k: 'e1', q: 'Why did the ice melt?', wrote: 'It got hot.', a: 'The ice gained heat from the surroundings and melted.',
+            lvl: 'p5', sub: 'science', note: 'Always name the direction of heat flow.' }]
+};
+const nul = api.styleBlock('answer', 'Why did the water level fall?');
+ok('with NO profile the exemplars still reach an answer (no early return)', nul.includes('evaporated into water vapour'));
+ok('…and the lessons', nul.includes('direction of heat flow'));
+ok('…and the raw pairs', nul.includes('the teacher rewrote it as: The ice gained heat'));
+ok('…and the heading counts the corrections being followed', /following 1 correction\b/.test(nul));
+ok('the pairs go LAST, nearest the question', nul.indexOf('rewrote it as') > nul.indexOf('direction of heat flow'));
+ok('the summary says the loop is in force with no profile at all',
+   api.groundingSummary().some(b => /learned style/.test(b)) && api.groundingSummary().some(b => /^1 correction$/.test(b)));
+const mk = api.styleBlock('mark', 'Why did the water level fall?');
+ok("'mark' gets no exemplars", !mk.includes('evaporated'));
+ok("'mark' gets no lessons and no pairs", !mk.includes('direction of heat flow') && !mk.includes('rewrote it as'));
+ok("'mark' with nothing but corrections is an EMPTY block", mk === '');
+api.style = { samples: [], edits: [], profiles: { _global: {
+  styleRules: 'Full sentences.', markingStandards: 'Inferred: no mark without the keyword.',
+  fixes: ['Name the process.'], keywords: ['evaporation'] } } };
+const mk2 = api.styleBlock('mark', '');
+ok("'mark' never contains 'How this teacher marks'", !mk2.includes('How this teacher marks') && !mk2.includes('no mark without the keyword'));
+ok("'mark' gets no fixes", !mk2.includes('Name the process'));
+ok("'mark' still gets the rules and the keywords", mk2.includes('Full sentences') && mk2.includes('evaporation'));
+ok("'scan' writes answers, so it gets the fixes", api.styleBlock('scan', '').includes('Name the process'));
+ok("…but never the inferred marking standard either", !api.styleBlock('scan', '').includes('no mark without the keyword'));
+
+/* The bucket fallback chain: lvl:sub (≥30 answers) → any:sub → _global. */
+const mk30 = n => Array.from({ length: n }, (_, i) => ({ k: 'p' + i, q: 'q' + i, a: 'a' + i, lvl: 'p5', sub: 'science' }));
+let st = { samples: mk30(30), profiles: {
+  'p5:science': { styleRules: 'P5 SCIENCE VOICE' }, 'any:science': { styleRules: 'ANY SCIENCE VOICE' }, _global: { styleRules: 'GLOBAL VOICE' } } };
+api.style = st;
+ok('the exact bucket wins with 30 answers behind it', api.styleBlock('answer', '').includes('P5 SCIENCE VOICE'));
+ok('…and the heading says which', /learned from 30 of their own P5 Science answers/.test(api.styleBlock('answer', '')));
+ok('the pick is reported', api.styleProfilePick('P5', 'science').bucket === 'p5:science');
+ok('the summary names the bucket', api.groundingSummary().some(b => /learned style \(P5 Science\)/.test(b)));
+st.samples = mk30(29);
+ok('a thin bucket (29) falls to the subject at any level', api.styleBlock('answer', '').includes('ANY SCIENCE VOICE'));
+ok('…and says it fell', api.styleProfilePick('P5', 'science').fell === true);
+delete st.profiles['any:science'];
+ok('…and then to the global profile', api.styleBlock('answer', '').includes('GLOBAL VOICE'));
+api.style = { samples: [], profiles: { 'p5:science': { styleRules: 'P5 SCIENCE VOICE', n: 40 }, _global: { styleRules: 'GLOBAL VOICE' } } };
+ok('with no samples in hand the bucket counts itself (profile.n)', api.styleBlock('answer', '').includes('P5 SCIENCE VOICE'));
+api.style = { samples: [], profiles: { 'p5:science': { styleRules: 'P5 SCIENCE VOICE', n: 12 }, _global: { styleRules: 'GLOBAL VOICE' } } };
+ok('…and a thin one still falls through', api.styleBlock('answer', '').includes('GLOBAL VOICE'));
+api.style = { samples: [], profile: { styleRules: 'FLAT MIRROR' } };
+ok('a document holding only the flat mirror still grounds', api.styleBlock('answer', '').includes('FLAT MIRROR'));
+api.meta = { level: 'P6', subject: 'math' };
+api.style = { samples: mk30(30), profiles: { 'p5:science': { styleRules: 'P5 SCIENCE VOICE' }, _global: { styleRules: 'GLOBAL VOICE' } } };
+ok('another worksheet is never served a bucket that is not its own', !api.styleBlock('answer', '').includes('P5 SCIENCE VOICE'));
+api.meta = { level: '', subject: '' };
+ok('an untagged run is the global profile', api.styleProfilePick('', '').bucket === '_global');
+
+/* Document C — the Science portal's own corrections. */
+api.meta = { level: 'P5', subject: 'science' };
+api.style = { samples: [], edits: [{ k: 'a1', q: 'Why did the ice melt?', wrote: 'It got hot.', a: 'The ice gained heat.', lvl: 'p5', sub: 'science', at: '2026-08-01T00:00:00Z' }] };
+api.cer = { v: 2, edits: [{ slot: 'q1', q: 'Why does the puddle disappear?', wrote: 'It dries.', a: 'The water evaporates into water vapour.',
+                            sub: 'science', lvl: 'p5', src: 'cer', note: 'Name evaporation, never "dries up".', at: '2026-09-01T00:00:00Z' }] };
+const cb = api.styleBlock('answer', 'Why does a puddle disappear on a hot day?');
+ok("the Science portal's corrections reach the block", cb.includes('evaporates into water vapour'));
+ok('…and their lessons', cb.includes('never "dries up"'));
+ok('…and the union is keyed apart', api.styleEditsAll().some(e => e.k === 'cer:q1' && e.src === 'cer') && api.styleEditsAll().some(e => e.k === 'a1' && e.src === 'anskey'));
+ok('…and the summary counts both', api.groundingSummary().some(b => /^2 corrections$/.test(b)));
+ok('…and the newest is newest whichever document holds it', api.styleRecentEdits('', 'P5', 'science')[0].k === 'cer:q1');
+ok('…but none of it reaches marking', !api.styleBlock('mark', '').includes('evaporates') && !api.styleBlock('mark', '').includes('dries up'));
+api.cer = { v: 2, edits: [{ slot: 'q2', q: 'Q', wrote: 'W', a: 'A', sub: 'science', note: 'Same lesson twice.' }, { slot: 'q3', q: 'Q', wrote: 'W', a: 'A', sub: 'science', note: 'SAME LESSON TWICE.' }] };
+ok('the same lesson twice is one lesson', api.styleLessons('P5', 'science').length === 1);
+
+/* Retrieval by the question, this bucket first. */
+api.cer = null;
+api.style = { samples: [
+  { k: 'a', q: 'Why does a metal spoon feel colder than a wooden one?', a: 'METAL CONDUCTS heat away from the hand faster.', lvl: 'p5', sub: 'science' },
+  { k: 'b', q: 'How many quarters make a whole?', a: 'FOUR quarters make one whole.', lvl: 'p4', sub: 'math' },
+  { k: 'c', q: 'Why does a metal spoon feel colder than a wooden one in the morning?', a: 'MATHS METAL red herring.', lvl: 'p6', sub: 'math' }
+], edits: [] };
+const rq = api.styleBlock('answer', 'Why does a metal spoon feel colder than a plastic one?');
+ok('the exemplars are retrieved for the question', rq.includes('METAL CONDUCTS') && !rq.includes('FOUR quarters'));
+ok("this worksheet's bucket comes before another subject's stronger match", rq.indexOf('METAL CONDUCTS') < rq.indexOf('MATHS METAL'));
+ok('omitting the question is the old behaviour, byte for byte', api.styleBlock('answer') === api.styleBlock('answer', ''));
+ok('aiGrounding hands the question through', api.aiGrounding('answer', { q: 'metal spoon colder' }).includes('METAL CONDUCTS'));
+
+/* Fair-share pots: the second standing rule REACHES the prompt. */
+api.style = null; api.cer = null;
+const longA = 'A'.repeat(1500), longB = 'B'.repeat(1500);
+api.notes = [{ id: 'g1', guidance: longA }, { id: 'g2', guidance: longB }];
+const fs2 = api.aiGrounding('answer');
+ok('the second standing rule reaches the prompt', fs2.includes('BBBBBBBB'));
+ok('a long one is trimmed and SAYS so', fs2.includes(api.NOTES_TRIM_MARK));
+api.notes = [{ id: 'g1', guidance: 'Short rule.' }, { id: 'g2', guidance: longB }];
+ok('a short note is never trimmed', api.aiGrounding('answer').includes('Short rule.'));
+api.notes = [{ id: 'g1', guidance: 'Name the process.' }, { id: 'g2', guidance: 'name the process' }];
+ok('the same rule typed in two apps is one rule', (api.aiGrounding('answer').match(/ame the process/g) || []).length === 1);
+ok('notesTrimTo cuts on a word and marks the cut', api.notesTrimTo('one two three four five six', 20).endsWith(api.NOTES_TRIM_MARK));
+api.notes = [];
 
 /* ---------- Four subjects ----------
    English and Chinese notes have to be filtered exactly as science and maths
@@ -225,7 +338,8 @@ api.style = { profileSamples: 42, profile: {
 const sc = api.aiGrounding('scan');
 ok('the scan digest carries the key facts the answers need', sc.includes('Evaporation happens'));
 ok('the scan digest carries the exemplars the answers need', sc.includes('evaporated into water vapour'));
-ok('the scan digest carries the standard the marking is held to', sc.includes('No mark without the keyword'));
+ok("the scan digest does NOT carry the profile's INFERRED marking standard", !sc.includes('No mark without the keyword'),
+   'that field is a guess drawn from the teacher\'s answers and must never decide a mark');
 ok('the scan digest carries the marking standards from the notes', sc.includes('The process must be named'));
 ok('the scan digest carries the standing guidance', sc.includes('it dries up'));
 ok('the notes are consulted FIRST, before answering and before marking',
@@ -505,7 +619,7 @@ ok('a live repaint yields to whatever is being typed',
    paper without ever being told how this teacher marks — and every card would
    still look perfectly right. */
 ok("the run is grounded as a scan, not as a plain answer",
-   /system: SCAN_SYS \+ aiGrounding\('scan'\),/.test(html));
+   /system: SCAN_SYS \+ aiGrounding\('scan', \{ q: ask \}\),/.test(html));
 ok('the marking reaches the screen',
    /class="youBox/.test(html) && /class="fbBox/.test(html) && /Correct answer/.test(html));
 ok('a paper with nothing written on it says nothing about marks',
@@ -534,7 +648,13 @@ ok('✓ is reachable with a question and no picture at all',
 ok('a run with no pages takes the ask-alone path',
    /if \(shots\.length\) await _runPages\([\s\S]{0,120}else askErr = await _runAskAlone\(/.test(html));
 ok('the ask-alone call is grounded too — the one door',
-   /system: SCAN_ASK_SYS \+ aiGrounding\('scan'\),/.test(html));
+   /system: SCAN_ASK_SYS \+ aiGrounding\('scan', \{ q: ask \}\),/.test(html));
+ok('the corrections document is watched beside the profile, and comes down with it',
+   /_cerStyleUnsub = cerStyleDocRef\(owner\)\.onSnapshot\(/.test(html) &&
+   /\[_notesUnsub, _styleUnsub, _cerStyleUnsub\]\.forEach/.test(html) &&
+   /cerStyle = null;\n\}/.test(html.slice(html.indexOf('function stopTeachingNotes'), html.indexOf('function stopTeachingNotes') + 400)));
+ok('the note budgets are pots, not a slice',
+   !/function notesJoinField\(rel, field, cap\) \{\n  var s = rel\.map/.test(html) && /function notesFairShare\(/.test(html));
 ok('dictation is stopped before a run, and when the tab is left',
    /micStop\(\);/.test(html.slice(html.indexOf('async function runScan'), html.indexOf('async function runScan') + 1400)) &&
    /if \(_tab !== 'snap'\) micStop\(\);/.test(html));

@@ -28,7 +28,9 @@ step, and ship a change to the shape in both repos together**:
   it answers the blanks AND marks what is written, so it gets everything `'answer'` gets PLUS the
   marking standard)** or `'teach'` (explaining). **`'mark'` gets the marking standards and never
   the key facts or the exemplar answers** — a marker handed the answer stops marking against the
-  paper. `'scan'` is the exception on purpose: it is writing the answer anyway.
+  paper. `'scan'` is the exception on purpose: it is writing the answer anyway. (The marking
+  standard here is the NOTES' typed one; the style profile's inferred `markingStandards` reaches
+  no kind since v1.9.0 — see 🧠 below.)
 - **The authority order is stated in the digest and never changes**: what the paper itself prints
   wins, then the teacher's general guidance, then the notes and the style, and ordinary syllabus
   knowledge only where they say nothing.
@@ -78,6 +80,76 @@ step, and ship a change to the shape in both repos together**:
   ungrounded, exactly as it did before the feature existed.
 - **The page SAYS whether it is grounded** (`groundingSummary`). An ungrounded answer looks
   identical to a grounded one, so the teacher would otherwise never know the notes were not read.
+
+## 🧠 The teacher's corrections reach this app (v1.9.0)
+
+`cerStyle` / `cerStyleDocRef` / `styleBucketKey` / `styleProfilePick` / `_styleCountIn` /
+`_styleTokens` / `_styleOverlap` / `_styleTier` / `_styleRetrieve` / `styleExemplarsFor` /
+`styleEditsAll` / `styleCorrections` / `styleEditRules` / `styleLessons` / `styleRecentEdits` /
+`_styleProfileBits` / `styleCorpusCount` / **`styleBlock(kind, q)`** / `aiGrounding(kind, opts)`,
+the fair-share pots `notesTrimTo` / `notesDedupe` / `notesFairShare` / `notesJoinField` /
+`notesLedger*` (search `THE WHOLE LOOP IS READ` and `Every note gets a GUARANTEED share`), and the
+🧠 panel in `notesStyleHtml`. **`polymathlc/tutor` carries the same block byte for byte, and both
+are a port of `polymathlc/anskey` — ship a change to all three together.**
+
+Until this the app read ONE field of the style document — the flat `profile` mirror — and six
+frozen exemplars, and nothing else. So a P3 Maths profile was averaged into every Sec 1 Science
+answer, a correction the teacher made in Ans Key on Monday reached Ans Key and NO other app, and
+the Science portal's corrections reached nothing here at all. Every one of those was silent: the
+answers still came back, they simply went on making the mistake the teacher had already corrected.
+
+- **DOCUMENT A IS READ WHOLE, AND DOCUMENT C BESIDE IT.** A is Ans Key's
+  `users/{adminUid}/aiTraining/answerStyle` — the corpus (`samples`), the corrections (`edits`,
+  each with the lesson it taught), one profile per level×subject bucket (`profiles`) and the flat
+  mirror. C is the Science portal's `users/{adminUid}/settings/answerStyle`, which holds only that
+  app's corrections. A second `onSnapshot` sits beside the first in `loadTeachingNotes`, comes
+  down in `_notesDetach` / `stopTeachingNotes` on every account change, and a denied read is a
+  `console.warn` and nothing more — the block carries fewer corrections, exactly as it did
+  before the listener existed.
+- **`styleProfilePick(lvl, sub)` IS THE ONE PLACE THE BUCKET IS CHOSEN**, and the chain is the
+  family's: `lvl:sub` when that bucket has `STYLE_BUCKET_MIN` (30) answers behind it, then
+  `any:sub`, then `_global` (or the flat `profile`). The count is taken off `samples` when the
+  corpus travelled, and off the bucket profile's own `n` when it did not. The level and subject
+  are the How-tab pickers — the same `wsMeta` `noteAppliesHere` already reads — so another
+  worksheet is never served a bucket that is not its own, and an untagged run is the global one.
+- **THE EXEMPLARS AND THE RAW CORRECTIONS ARE RETRIEVED FOR THE QUESTION** (`opts.q`, token
+  Jaccard over `q`), tier by tier — this bucket, then the same subject at any level, then
+  everything — so a strong Maths match never displaces a weaker one from this worksheet's own
+  bucket. Omitting `q` is the old behaviour byte for byte: the profile's own six and the NEWEST
+  corrections. Both `'scan'` call sites pass the typed ask when there is one — the pages are
+  pictures, so it is the only text about the run the retrieval can see.
+- **`styleEditsAll()` IS THE UNION**: A's edits (src defaults `'anskey'`) and C's (keyed
+  `'cer:' + slot`, src `'cer'`), sorted by time so "the newest" is the newest whichever document
+  holds it. They reach a prompt three ways — the profile's distilled `fixes` (up to 6), the
+  lessons (up to 8, deduped by exact lowercase text, this bucket first and newest first inside
+  each tier) and up to 3 raw before/after pairs, which go LAST, nearest the question.
+- **NO EARLY RETURN ON A NULL PROFILE.** The exemplars, the lessons and the pairs come out of the
+  corpus and are current the moment the teacher saves; only the distilled description waits for a
+  rebuild. `if (!p) return ''` is what made a teacher's very first correction reach nothing.
+- **WHAT EACH KIND GETS.** `'mark'` gets the profile's `styleRules`, `phrasing` and `keywords`
+  and nothing else — never an exemplar, a fix, a lesson or a pair, because every one of those is
+  an ANSWER and a marker handed the answer stops marking against the paper. `'scan'` writes the
+  answers too, so it gets everything `'answer'` gets. **NO KIND GETS THE PROFILE'S
+  `markingStandards` ANY MORE, `'scan'` included.** That field is INFERRED by a model from the
+  teacher's own answers, and an inference must never decide a mark: the standard a student is
+  held to is the typed notes and the guidance (`notesBlock`'s `markingStandards` still reaches
+  marking exactly as it did). The 🧠 panel shows it as *Inferred standard* and says so.
+- **THE HEADING SAYS WHICH BUCKET AND HOW MANY CORRECTIONS** — *learned from 30 of their own P5
+  Science answers, following 4 corrections* — and `groundingSummary()` says *the teacher's
+  learned style (P5 Science)* and *N corrections*, because an answer grounded on the global
+  fallback looks exactly like one grounded on this worksheet's own bucket.
+- **THE NOTE BUDGETS ARE POTS, NEVER A LENGTH TO CUT TO.** `notesJoinField` used to be a
+  `.slice()` over the JOINED text of every relevant note, so with two standing instructions of
+  1,600 characters the first lost most of itself and the second reached no prompt at all.
+  `notesFairShare` water-fills: every note takes its floor (`NOTES_GUIDE_MIN_EACH` /
+  `NOTES_FIELD_MIN_EACH`), the remainder is handed round, a short note is never trimmed, a long
+  one is trimmed on a word and SAYS so (`NOTES_TRIM_MARK`), the pot grows to `n × minEach` when
+  it cannot floor everybody, and `NOTES_HARD_CHARS` is the only path on which a note is lost.
+  The same rule typed in two apps is ONE rule (`notesDedupe`). The per-app caps stayed as the
+  pots. `notesLedger` records what was trimmed or dropped on every `aiGrounding` call.
+- **This app still WRITES nothing to either document.** Nothing photographed here is an answer
+  the teacher wrote.
+- Run **`node tools/scan-tests.mjs`** after touching any of it.
 
 ## Four subjects, and marking (v1.3.0)
 - **`SUBJECTS` is the ONE list.** Science, Mathematics, English, Chinese. The settings picker, the
@@ -322,6 +394,22 @@ automatically under an open-ended science mark — no second pass, no extra butt
   is dropped instead of landing among the new answers.
 
 ## House rules
+- After touching **🧠 the corrections loop** (`cerStyle`, `cerStyleDocRef`, the third listener
+  in `loadTeachingNotes`, `styleBucketKey`, `styleProfilePick`, `_styleCountIn`, `_styleTier`,
+  `_styleRetrieve`, `styleExemplarsFor`, `styleEditsAll`, `styleCorrections`, `styleEditRules`,
+  `styleLessons`, `styleRecentEdits`, `_styleProfileBits`, `styleBlock`, `aiGrounding`'s
+  `opts.q`, either `'scan'` call site's `{ q: ask }`, `notesTrimTo`, `notesDedupe`,
+  `notesFairShare`, `notesJoinField`, or the `NOTES_*_MIN_EACH` / `NOTES_HARD_CHARS` pots), run
+  `node tools/scan-tests.mjs`. Every failure is silent and the answers still come back. Put the
+  `if (!p) return ''` back in `styleBlock` and a teacher's first correction reaches nothing at
+  all; read `profile` instead of `styleProfilePick` and every answer is written in the averaged
+  voice again; let the profile's `markingStandards` reach `'mark'` or `'scan'` and a guess a
+  model drew from the teacher's answers decides a child's mark; let an exemplar, a fix, a lesson
+  or a pair reach `'mark'` and the marker has been handed the answer; drop the C listener and a
+  correction made in the Science portal reaches nothing here, while the panel says the loop is
+  in force; stop sorting the union by time and "the newest correction" is whichever document
+  happens to come second; and turn a pot back into a `.slice()` and the teacher's second
+  standing instruction reaches no prompt while sitting in the notebook looking obeyed.
 - After touching **🐾 the mistake type or the Sidekick analysis** (`MISTAKE_ANIMALS`,
   `MISTAKE_ANIMAL_ALIASES`, `mistakeAnimal`, `mistakeAnimalNormalize`, `MISTAKE_ANIMAL_RULE`,
   `SCAN_MISTAKE_RULE`, `_mistakeField`, `mistakeTally`, `mistakeBoxHtml`, `_itemGetsSidekick`,
