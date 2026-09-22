@@ -4106,7 +4106,55 @@ ok('a correct answer never carries one',
 ok('SCAN_SYS asks for the type', /"mistake":\{"animal"/.test(api.SCAN_SYS) && /MISTAKE TYPES/.test(api.SCAN_SYS));
 ok('SCAN_ASK_SYS carries the mistake rule', /"mistake":""/.test(api.SCAN_ASK_SYS) && /MISTAKE TYPES/.test(api.SCAN_ASK_SYS));
 ok('the drawings load beside the page', /<script src="sidekick-art\.js"><\/script>/.test(html));
-ok('version is v1.33.0', /var APP_VERSION = 'v1\.33\.0'/.test(html));
+ok('version is v1.34.0', /var APP_VERSION = 'v1\.34\.0'/.test(html));
+
+/* =====================================================================
+   👁 The browse row does not spoil its own answer (v1.34.0)
+   📕 My questions is read BEFORE the questions are practised — both tabs are
+   "what I still have to do" — so an answer printed on the closed row hands
+   the key to a student scrolling past it, and spoils every question below
+   the one they are on. Every failure here is silent: the row still renders,
+   the worksheet still prints, and the answer is simply on screen. */
+const mbRowFn = section('function mbRowHtml(m) {', '\nfunction mbSelectedIds(');
+ok('the closed row never prints the raw answer',
+   !/<div class="mbAns">Answer: /.test(html) &&
+   !/'Answer: ' \+ escHtml\(m\.answer\)/.test(mbRowFn));
+ok('the answer is behind a disclosure instead',
+   /<details class="mbAnsReveal"><summary>/.test(mbRowFn) &&
+   /<span class="mbAnsShow">Show answer<\/span>/.test(mbRowFn) &&
+   /<div class="mbAns">' \+ escHtml\(m\.answer\)/.test(mbRowFn));
+/* DEFAULT CLOSED is the whole point — an `open` attribute here is the bug
+   back, wearing a disclosure. */
+ok('the disclosure is closed by default', !/<details class="mbAnsReveal"[^>]*\bopen\b/.test(mbRowFn));
+ok('a row with no answer grows no control at all',
+   /\(m\.answer\s*\n?\s*\? '<details class="mbAnsReveal">/.test(mbRowFn));
+/* Open, the control has to say what it does NEXT. */
+ok('the label flips to Hide answer when it is open',
+   /<span class="mbAnsHide">Hide answer<\/span>/.test(mbRowFn) &&
+   /\.mbAnsReveal\[open\] > summary \.mbAnsShow \{ display: none; \}/.test(html) &&
+   /* A BARE descendant rule here hides both words at once and leaves a button
+      with nothing written on it — which is what the first cut of this did. */
+   /\.mbAnsReveal:not\(\[open\]\) > summary \.mbAnsHide,/.test(html));
+/* What the student is allowed to see on the closed row is unchanged. */
+ok('“You wrote” still shows on the row',
+   /<div class="mbYou">You wrote: ' \+ escHtml\(m\.studentAnswer\)/.test(mbRowFn));
+ok('the chips still show on the row',
+   /<div class="mbChips">' \+ chips\.join\(''\)/.test(mbRowFn));
+/* The summary is a CONTROL browsed with a thumb, so it carries a real target
+   height rather than the chips' 3px padding — and the default triangle is off
+   in every browser, not just the one this was written in. */
+ok('the summary is a tap target with no stock marker',
+   /\.mbAnsReveal > summary \{[^}]*min-height: 34px/.test(html) &&
+   /\.mbAnsReveal > summary \{[^}]*list-style: none/.test(html) &&
+   /\.mbAnsReveal > summary::-webkit-details-marker \{ display: none; \}/.test(html));
+/* OUT OF SCOPE, and pinned so it stays that way: the worksheet's back page is
+   the teacher's and is printed after the questions are done, and 💬 Ask Mr
+   Chung has never carried the answer. */
+ok('the worksheet still carries the answer to its back page',
+   /answer: m\.answer \|\| ''/.test(section('function _mbPaperDoc(items) {', '\nfunction _mbMailDoc(')));
+ok('Ask Mr Chung still sends the question alone',
+   !/m\.answer/.test(section('function mbAskText(m) {', '\nfunction mbAskWaUrl(')));
+
 
 api.meta = { level: 'P5', subject: 'science' };
 const skBase = {

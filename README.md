@@ -20,6 +20,27 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Study Buddy | `polymathlc/tutor` | a student's own worksheet, hinted rather than answered |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 👁 The mistake book stops giving its own answers away (v1.34.0)
+
+📕 **My questions** is read *before* the questions are practised — both tabs,
+Mistakes and the Learning list, are "what I still have to do" — and every row
+printed its answer underneath the question. So a student scrolling the list to
+find the one they were going to try had already read the answer to it, and to
+every question below it, before they reached any of them.
+
+The answer is behind **Show answer** on each row now: one tap, and it says
+**Hide answer** while it is showing. Everything else on the row is unchanged —
+the chips, the question, *You wrote*, 💬 Ask Mr Chung and 🗑.
+
+It is **closed by default and it re-closes on every render**, so ticking a
+question or switching tabs can never leave a row sitting open with its answer
+on screen.
+
+Nothing else moved. **Make a worksheet** still prints the answers on the page
+at the back, because that page is the teacher's and is printed after the
+questions are done; and 💬 **Ask Mr Chung** still sends the question on its own,
+as it always has.
+
 ## 📄 Worksheet mode — the whole scan becomes the worksheet (v1.29.0)
 
 Two pills above the box say what ✓ is for. Leave them alone and the app does exactly what it always

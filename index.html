@@ -362,6 +362,7 @@
      used to diagnose a breakage. */
   .ansQ, .ansText, .ansOpts li, .stepDo, .stepWhy, .stepLead,
   .fbText, .youText, .whyText, .keyNoteText, .mbQ, .mbYou, .mbAns,
+  .mbAnsReveal > summary,
   .reportCard, .sub, .tnText, .tnCardTitle {
     overflow-wrap: anywhere;
   }
@@ -833,6 +834,30 @@
   .mbQ { font-size: 0.88rem; color: var(--ink); line-height: 1.65; white-space: pre-wrap; }
   .mbYou { font-size: 0.8rem; color: #8C2E1D; margin-top: 7px; }
   .mbAns { font-size: 0.8rem; color: #2C6B30; margin-top: 3px; }
+  /* Show answer — the disclosure, never the answer. It has to read as a
+     CONTROL rather than as a chip (a chip is a label and nobody taps one) and
+     it is browsed with a thumb, so it carries a real target height rather
+     than the 3px padding the chips beside it use. `list-style: none` plus the
+     -webkit rule take the default triangle off in every browser this app is
+     opened in; the inline-flex is what centres the words inside the height. */
+  .mbAnsReveal { margin-top: 7px; }
+  .mbAnsReveal > summary {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    list-style: none; min-height: 34px; padding: 4px 14px;
+    font-size: 0.78rem; font-weight: 700; color: #2C6B30;
+    border: 1px solid #C3DCC5; border-radius: 999px; background: #F1F8F1;
+  }
+  .mbAnsReveal > summary::-webkit-details-marker { display: none; }
+  .mbAnsReveal > summary::before { content: '👁'; font-weight: 400; }
+  /* `:not([open])` and not a bare descendant rule — hiding .mbAnsHide
+     unconditionally hides BOTH words the moment it opens, leaving a button
+     with nothing written on it. */
+  .mbAnsReveal:not([open]) > summary .mbAnsHide,
+  .mbAnsReveal[open] > summary .mbAnsShow { display: none; }
+  .mbAnsReveal[open] > summary {
+    color: var(--ink-soft); border-color: var(--line); background: var(--bg-soft);
+  }
+  .mbAnsReveal[open] > summary::before { content: '🙈'; }
   .mbThumb {
     flex: none; width: 78px; height: 78px; border-radius: 8px; overflow: hidden;
     border: 1px solid var(--line); background: var(--bg-soft);
@@ -2058,7 +2083,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.33.0';
+var APP_VERSION = 'v1.34.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -9068,7 +9093,29 @@ function mbRowHtml(m) {
       '<div class="mbChips">' + chips.join('') + '</div>' +
       '<div class="mbQ">' + escHtml(m.question || '(no wording)') + '</div>' +
       (m.studentAnswer ? '<div class="mbYou">You wrote: ' + escHtml(m.studentAnswer) + '</div>' : '') +
-      (m.answer ? '<div class="mbAns">Answer: ' + escHtml(m.answer) + '</div>' : '') +
+      /* THE ANSWER IS NOT ON THE CLOSED ROW. This list is READ BEFORE the
+         questions are practised — both tabs are "what I still have to do" — so
+         an answer printed on the row hands the key to a student scrolling past
+         it, and every question below the one they are on is spoiled before
+         they reach it. It is one tap away instead, and DEFAULT CLOSED: a
+         <details> re-renders closed, so ticking a box or changing tab can
+         never leave a row sitting open with its answer showing.
+         Deliberately NOT narrowed any further than the row: the worksheet's
+         back page (_mbPaperDoc) still carries the answer, because that page is
+         the teacher's and is printed after the questions are done, and
+         mbAskText still sends the question alone. */
+      (m.answer
+        ? '<details class="mbAnsReveal"><summary>' +
+              /* Both words are REAL text, swapped by CSS. A label that still
+                 reads "Show answer" over a showing answer is the control
+                 lying about what it does next, and a ::content label is one a
+                 screen reader may never say. */
+              '<span class="mbAnsShow">Show answer</span>' +
+              '<span class="mbAnsHide">Hide answer</span>' +
+            '</summary>' +
+            '<div class="mbAns">' + escHtml(m.answer) + '</div>' +
+          '</details>'
+        : '') +
     '</div>' +
     (m.img ? '<div class="mbThumb"><img src="' + escHtml(m.img) + '" alt=""></div>' : '') +
     '<div class="mbDrop">' +
