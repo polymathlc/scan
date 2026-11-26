@@ -16,6 +16,12 @@ Part of the Polymath Learning Centre family of apps, on the shared `mathgen--app
 | Chinese Learning Portal | `polymathlc/chinese` | the 华文 bank and practice |
 | **Scan & Answer** | **`polymathlc/scan`** | **photos in, marks and answers out** |
 
+## 📖 Your own answers (v1.10.0)
+
+When Ans Key holds the teacher's own written answer to a question on the scanned paper, the answer card
+shows it ("📖 Your own answer (from Ans Key)") and the marking and answers are grounded in it, so a scanned
+paper is marked the way the teacher marks it. Nothing is written back.
+
 ## What it does
 
 Three buttons and two tabs. The **Snap** tab is a camera:

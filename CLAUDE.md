@@ -2,6 +2,21 @@
 
 Guidance for Claude when working in this repo.
 
+## 📖 The answer book — the teacher's own answers ground the scan (v1.10.0)
+
+`teacher-voice.js` (`window.TeacherVoice`) is **byte for byte the same file in polymathlc/anskey, tutor, cer and
+scan**; `tools/teacher-voice-tests.mjs` (also shared) compares the copies when siblings are checked out beside this
+repo. Ans Key is the ONLY writer (`users/{admin}/aiTraining/answerBook/entries`, `answerIndex-<bucket>`, `answerIndex`).
+- Glue `📖 THE ANSWER BOOK — the teacher's own answers (v1.10.0)` just above `aiGrounding`: `tvInit` (the reader:
+  `getDoc`; `listEntries` only for the admin on their own account), `tvBlock(kind, q)` (appended by `aiGrounding` as
+  `voice`; `'scan'` reads as `'answer'` plus `TV_SCAN_NOTE`: mark against the paper, the teacher's answer is the model
+  answer), `tvLoadAll` (admin, after the notebook loads), **`tvMatchAnswers(run)`** (after a scan: primes each card's
+  question, ≤40, 8 s cap, drops a stale `_scanRun`, sets `it.teacher = {a, ws}` from a `same` match), `tvReset`
+  (`stopTeachingNotes`). Grounding stays SYNCHRONOUS: an unprimed question gets nothing this time, never a wait.
+- The answer card shows `📖 Your own answer (from Ans Key)` when the book holds this very question.
+- Nothing here writes to the book (the test fails on a write or `innerHTML` in the glue).
+- Checks: `node --test tools/scan-voice-tests.mjs tools/teacher-voice-tests.mjs` and `node tools/scan-tests.mjs`.
+
 ## App
 - `index.html` — **"Scan & Answer"**. Markup + CSS + JS on the shared `mathgen--app` Firebase
   project with Google sign-in. Photograph a worksheet or an exam paper — or pick pictures out of
