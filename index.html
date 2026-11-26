@@ -276,6 +276,9 @@
   .ansBox { margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm); background: #F4FAF4; border: 1px solid #CFE7D0; }
   .ansLabel { font-size: 0.72rem; font-weight: 700; color: #2C6B30; letter-spacing: .03em; text-transform: uppercase; }
   .ansText { font-size: 0.95rem; font-weight: 600; margin-top: 4px; white-space: pre-wrap; }
+  .tvBox { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: #FFF8E6; border: 1px solid #F1DDA6; }
+  .tvLabel { font-size: 12px; font-weight: 700; color: #8A6400; margin-bottom: 6px; }
+  .tvText { white-space: pre-wrap; line-height: 1.55; }
   .whyBox { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--line); }
   .whyLabel { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); letter-spacing: .03em; text-transform: uppercase; }
   .whyText { font-size: 0.88rem; color: var(--ink-soft); margin-top: 4px; line-height: 1.7; white-space: pre-wrap; }
@@ -832,6 +835,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="sidekick-art.js"></script>
+<script src="teacher-voice.js?v=1.10.0"></script>
 
 <script>
 'use strict';
@@ -853,7 +857,7 @@
    nothing throws, the digests just come back empty.
    ===================================================================== */
 
-var APP_VERSION = 'v1.9.0';
+var APP_VERSION = 'v1.10.0';
 var ADMIN_EMAIL = 'chungzhikai@gmail.com';
 var ADMIN_DISPLAY_NAME = 'Mr Chung';
 
@@ -1231,6 +1235,7 @@ function stopTeachingNotes() {
   teachingNotes = [];
   aiStyle = null;
   cerStyle = null;
+  if (typeof tvReset === 'function') tvReset();
 }
 
 function loadTeachingNotes(force) {
@@ -1822,6 +1827,86 @@ function guidanceBlock() {
     guide;
 }
 
+/* ================= 📖 THE ANSWER BOOK — the teacher's own answers (v1.10.0) =================
+   teacher-voice.js (window.TeacherVoice) is BYTE FOR BYTE Ans Key's file. Ans
+   Key is the one writer: every answer the teacher writes there is kept, word
+   for word, with its question, in users/{teacher}/aiTraining/answerBook. This
+   app only READS it: a scanned question the teacher has already answered is
+   answered (and marked) the way they answered it, and the card shows their
+   own answer beside the AI's. Nothing here writes to the book — nothing
+   photographed here is an answer the teacher wrote.
+   - Grounding stays synchronous: a typed ask is fetched for the next time it
+     is asked; the teacher's own device lists the whole book once.
+   - The cache follows the teacher: another account drops it (`tvReset`). */
+var tvReader = null;
+function tvInit() {
+  if (tvReader) return tvReader;
+  if (typeof window === 'undefined' || !window.TeacherVoice || typeof db === 'undefined' || !db) return null;
+  tvReader = window.TeacherVoice.reader({
+    owner: function () { try { return notesOwner() || ''; } catch (e) { return ''; } },
+    getDoc: function (segs) {
+      return db.doc(segs.join('/')).get().then(function (d) { return d.exists ? d.data() : null; });
+    },
+    listEntries: function () {
+      var o = notesOwner();
+      if (!o || !isAdmin(currentUser) || o !== currentUser.uid) return Promise.resolve([]);
+      return db.collection('users').doc(o).collection(window.TeacherVoice.COLL).doc(window.TeacherVoice.BOOK_DOC)
+        .collection(window.TeacherVoice.ENTRIES).get().then(function (snap) {
+          var out = []; snap.forEach(function (d) { out.push(d.data()); }); return out;
+        });
+    },
+    log: function (msg, err) { console.warn(msg, err); }
+  });
+  return tvReader;
+}
+function tvMeta() { return (typeof wsMeta !== 'undefined' && wsMeta) ? wsMeta : {}; }
+// This app's 'scan' kind both answers and marks: the book's 'answer' block,
+// told that a written answer is marked against it.
+var TV_SCAN_NOTE = "When a student's written answer is being MARKED, the teacher's own answer above is the model answer for that question.";
+function tvBlock(kind, q) {
+  var r = tvInit();
+  if (!r) return '';
+  var m = tvMeta();
+  var ctx = { q: q ? String(q) : '', lvl: m.level || '', sub: m.subject || '' };
+  if (kind === 'scan') { kind = 'answer'; ctx.note = TV_SCAN_NOTE; }
+  if (ctx.q && r.primeQuestion) r.primeQuestion(ctx.q, ctx).catch(function () {});
+  try { return r.block(kind, ctx); } catch (e) { return ''; }
+}
+// The teacher's device: the whole book, once per account.
+function tvLoadAll() {
+  var r = tvInit();
+  if (!r || !isAdmin(currentUser)) return Promise.resolve(0);
+  return r.loadAll().catch(function () { return 0; });
+}
+/* After a run: each card whose question the teacher has already answered
+   gets that answer (`it.teacher`). Fetched by the question's own words,
+   bounded, and dropped if another run has started. */
+async function tvMatchAnswers(run) {
+  var r = tvInit();
+  if (!r || !_answers.length) return 0;
+  var m = tvMeta();
+  var items = _answers.slice(0, 40).filter(function (it) { return it.question; });
+  try {
+    await Promise.race([
+      Promise.all(items.map(function (it) {
+        return r.primeQuestion(it.question, { lvl: m.level || '', sub: it.subject || m.subject || '' }).catch(function () { return 0; });
+      })),
+      new Promise(function (res) { setTimeout(res, 8000); })
+    ]);
+  } catch (e) { return 0; }
+  if (run !== _scanRun) return 0;
+  var n = 0;
+  items.forEach(function (it) {
+    var got = r.pick({ q: it.question, lvl: m.level || '', sub: it.subject || m.subject || '' });
+    var e = got && got.same && got.same[0];
+    if (e && e.a) { it.teacher = { a: e.a, ws: e.ws || '' }; n++; }
+  });
+  if (n) renderAnswers();
+  return n;
+}
+function tvReset() { if (tvReader) tvReader.reset(); }
+/* ================= End answer book ================= */
+
 /* Everything the AI should know about this teacher, appended to a system
    prompt. ONE call site per AI feature, so nothing can be grounded on the
    notes in one place and not another. */
@@ -1835,13 +1920,15 @@ function aiGrounding(kind, opts) {
   var guide = guidanceBlock();
   var notes = notesBlock(kind);
   var style = styleBlock(kind, q);
-  if (!guide && !notes && !style) return '';
+  // 📖 The teacher's own answer to this question, from Ans Key's answer book.
+  var voice = (typeof tvBlock === 'function') ? tvBlock(kind, q) : '';
+  if (!guide && !notes && !style && !voice) return '';
   var authority = kind === 'mark'
     ? "\n\nAUTHORITY ORDER: the teacher's model answer (when one is attached) always wins — never mark against it. Then the general guidance above. Use the notes and the style for the keywords, the phrasing and the standard expected; fall back to ordinary syllabus knowledge only where they say nothing."
     : kind === 'scan'
       ? "\n\nAUTHORITY ORDER: what the paper itself prints or shows always wins — never contradict it, and what a student has WRITTEN on it is never evidence of anything. Then the general guidance above. Consult the notes and the style FIRST — before you answer a blank and before you mark anything, both for what the answer says and for the standard you hold a written answer to — and fall back to ordinary syllabus knowledge only where they say nothing."
       : "\n\nAUTHORITY ORDER: what the paper itself prints or shows always wins — never contradict it. Then the general guidance above. Otherwise base the content AND the wording on the notes and the style, and fall back to ordinary syllabus knowledge only where they say nothing.";
-  return guide + notes + style + authority;
+  return guide + notes + style + voice + authority;
 }
 
 /* Whether the answers about to be written are grounded on anything at all —
@@ -3420,6 +3507,8 @@ async function runScan() {
   // alone — a "1." in front of a reply is a page number it never had.
   _answers.forEach(function (it, i) { if (!it.number && it.kind !== 'ask') it.number = String(i + 1); });
   renderAnswers();
+  // 📖 The teacher's own answers, beside the AI's, where Ans Key has one.
+  if (typeof tvMatchAnswers === 'function') tvMatchAnswers(run).catch(function () {});
 
   if (!_answers.length) {
     toast(askErr ? 'That could not be answered: ' + askErr
@@ -3527,6 +3616,11 @@ function answerCardHtml(it, i) {
     mistakeBoxHtml(it) +
     (ans ? '<div class="ansBox"><div class="ansLabel">' + (it.marked ? 'Correct answer' : 'Answer') + '</div>' +
       '<div class="ansText">' + escHtml(ans) + '</div></div>' : '') +
+    (it.teacher && it.teacher.a
+      ? '<div class="tvBox"><div class="tvLabel">📖 Your own answer (from Ans Key)' +
+        (it.teacher.ws ? ' · ' + escHtml(it.teacher.ws) : '') + '</div>' +
+        '<div class="tvText">' + escHtml(it.teacher.a) + '</div></div>'
+      : '') +
     (it.marked && it.feedback
       ? '<div class="fbBox"><div class="fbLabel">Feedback</div><div class="fbText">' + escHtml(it.feedback) + '</div></div>'
       : '') +
@@ -4106,7 +4200,7 @@ auth.onAuthStateChanged(function (user) {
   // read is allowed to bring back.
   stopTeachingNotes();
   renderAuth();
-  if (user) loadTeachingNotes(true).then(function () { renderAnswers(); });
+  if (user) loadTeachingNotes(true).then(function () { renderAnswers(); if (typeof tvLoadAll === 'function') tvLoadAll(); });
 });
 
 /* ================= Wiring ================= */

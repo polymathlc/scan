@@ -652,7 +652,7 @@ ok('the ask-alone call is grounded too — the one door',
 ok('the corrections document is watched beside the profile, and comes down with it',
    /_cerStyleUnsub = cerStyleDocRef\(owner\)\.onSnapshot\(/.test(html) &&
    /\[_notesUnsub, _styleUnsub, _cerStyleUnsub\]\.forEach/.test(html) &&
-   /cerStyle = null;\n\}/.test(html.slice(html.indexOf('function stopTeachingNotes'), html.indexOf('function stopTeachingNotes') + 400)));
+   /cerStyle = null;\n(?:  if \(typeof tvReset === 'function'\) tvReset\(\);\n)?\}/.test(html.slice(html.indexOf('function stopTeachingNotes'), html.indexOf('function stopTeachingNotes') + 400)));
 ok('the note budgets are pots, not a slice',
    !/function notesJoinField\(rel, field, cap\) \{\n  var s = rel\.map/.test(html) && /function notesFairShare\(/.test(html));
 ok('dictation is stopped before a run, and when the tab is left',
